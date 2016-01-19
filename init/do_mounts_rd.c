@@ -177,9 +177,11 @@ int __init rd_load_image(char *from)
 	unsigned long rd_blocks, devblocks;
 	int nblocks, i, disk;
 	char *buf = NULL;
+#if 0
 	unsigned short rotate = 0;
 #if !defined(CONFIG_S390) && !defined(CONFIG_PPC_ISERIES)
 	char rotator[4] = { '|' , '/' , '-' , '\\' };
+#endif
 #endif
 
 	out_fd = sys_open("/dev/ram", O_RDWR, 0);
@@ -255,7 +257,7 @@ int __init rd_load_image(char *from)
 	for (i = 0, disk = 1; i < nblocks; i++) {
 		if (i && (i % devblocks == 0)) {
 			printk("done disk #%d.\n", disk++);
-			rotate = 0;
+/*			rotate = 0; */
 			if (sys_close(in_fd)) {
 				printk("Error closing the disk.\n");
 				goto noclose_input;
@@ -270,7 +272,7 @@ int __init rd_load_image(char *from)
 		}
 		sys_read(in_fd, buf, BLOCK_SIZE);
 		sys_write(out_fd, buf, BLOCK_SIZE);
-#if !defined(CONFIG_S390) && !defined(CONFIG_PPC_ISERIES)
+#if 0 /* !defined(CONFIG_S390) && !defined(CONFIG_PPC_ISERIES) */
 		if (!(i % 16)) {
 			printk("%c\b", rotator[rotate & 0x3]);
 			rotate++;
