@@ -32,6 +32,11 @@ MODULE_ALIAS("ipt_CONNMARK");
 #include <linux/netfilter/xt_CONNMARK.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+
+
 static unsigned int
 target(struct sk_buff **pskb,
        const struct net_device *in,
@@ -69,6 +74,15 @@ target(struct sk_buff **pskb,
 			mark = (*pskb)->mark;
 			diff = (ct->mark ^ mark) & markinfo->mask;
 			(*pskb)->mark = mark ^ diff;
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		if (	(*pskb)->mark &&
+				IS_SPACE_AVAILABLED(*pskb) &&
+          	((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
+           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
+           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE)))
+          		FOE_ALG(*pskb) = 1;
+#endif
 			break;
 		}
 	}

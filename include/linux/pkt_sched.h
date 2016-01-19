@@ -148,6 +148,33 @@ struct tc_sfq_qopt
  *	to change these parameters in compile time.
  */
 
+/* ESFQ section */
+
+enum
+{
+        /* traditional */
+	TCA_ESFQ_HASH_CLASSIC,
+	TCA_ESFQ_HASH_DST,
+	TCA_ESFQ_HASH_SRC,
+	TCA_ESFQ_HASH_FWMARK,
+	/* conntrack */
+	TCA_ESFQ_HASH_CTORIGDST,
+	TCA_ESFQ_HASH_CTORIGSRC,
+	TCA_ESFQ_HASH_CTREPLDST,
+	TCA_ESFQ_HASH_CTREPLSRC,
+	TCA_ESFQ_HASH_CTNATCHG,
+};
+
+struct tc_esfq_qopt
+{
+	unsigned	quantum;	/* Bytes per round allocated to flow */
+	int		perturb_period;	/* Period of hash perturbation */
+	__u32		limit;		/* Maximal packets in queue */
+	unsigned	divisor;	/* Hash divisor  */
+	unsigned	flows;		/* Maximal number of flows  */
+	unsigned	hash_kind;	/* Hash function to use for flow identification */
+};
+
 /* RED section */
 
 enum

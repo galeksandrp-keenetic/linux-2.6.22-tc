@@ -20,6 +20,10 @@
 #include <net/netfilter/nf_conntrack.h>
 #endif
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marc Boucher <marc@mbsi.ca>");
 MODULE_DESCRIPTION("ip[6]tables MARK modification module");
@@ -64,6 +68,15 @@ target_v1(struct sk_buff **pskb,
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 		if( ct ) ct->fast_ext = 1;
 #endif
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		if (IS_SPACE_AVAILABLED(*pskb) &&
+          	((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
+           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
+           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE)))
+          		FOE_ALG(*pskb) = 1;
+#endif
+
 		break;
 
 	case XT_MARK_AND:
