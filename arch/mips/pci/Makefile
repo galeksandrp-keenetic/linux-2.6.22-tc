@@ -17,13 +17,17 @@ obj-$(CONFIG_PCI_VR41XX)	+= ops-vr41xx.o pci-vr41xx.o
 obj-$(CONFIG_NEC_CMBVR4133)	+= fixup-vr4133.o
 obj-$(CONFIG_MARKEINS)		+= ops-emma2rh.o pci-emma2rh.o fixup-emma2rh.o
 obj-$(CONFIG_MIPS_TC3162)	+= ops-tc3162.o pci-tc3162.o fixup-tc3162.o
+ifdef CONFIG_MIPS_RT63365
+obj-$(CONFIG_MIPS_RT63365)	+= pci-rt6xxxx.o
+else
 ifdef CONFIG_MIPS_TC3262 
 CFLAGS += -DPCIE_PCI_COEXIT
 endif
 obj-$(CONFIG_MIPS_TC3262)	+= ops-tc3162u.o pci-tc3162u.o fixup-tc3162u.o
-obj-$(CONFIG_MIPS_TC3262)       += ops-tc3162.o pci-tc3162.o fixup-tc3162.o
+obj-$(CONFIG_MIPS_TC3262)	+= ops-tc3162.o pci-tc3162.o fixup-tc3162.o
 ifdef CONFIG_MIPS_TC3162U
 CFLAGS += -DPCIE_PCI_COEXIT
+endif
 endif
 obj-$(CONFIG_MIPS_TC3162U)	+= ops-tc3162u.o pci-tc3162u.o fixup-tc3162u.o
 obj-$(CONFIG_MIPS_TC3162U)	+= ops-tc3162.o pci-tc3162.o fixup-tc3162.o
