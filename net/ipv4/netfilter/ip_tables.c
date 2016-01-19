@@ -35,6 +35,10 @@ MODULE_DESCRIPTION("IPv4 packet filter");
 /*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
 /*#define DEBUG_IP_FIREWALL_USER*/
 
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+unsigned char wan_name[IFNAMSIZ];
+#endif
+
 #ifdef DEBUG_IP_FIREWALL
 #define dprintf(format, args...)  printk(format , ## args)
 #else
@@ -1274,6 +1278,15 @@ add_counter_to_entry(struct ipt_entry *e,
 		     const struct xt_counters addme[],
 		     unsigned int *i)
 {
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+        struct ipt_entry_target *f = ipt_get_target(e);
+
+        if(strcmp(f->u.kernel.target->name,"MASQUERADE") == 0 && strlen(e->ip.outiface) != 0) {
+		memset(wan_name, 0, sizeof(wan_name));
+		memcpy(wan_name, e->ip.outiface, strlen(e->ip.outiface));
+	}
+#endif
+
 #if 0
 	duprintf("add_counter: Entry %u %lu/%lu + %lu/%lu\n",
 		 *i,
@@ -2232,6 +2245,14 @@ static int __init ip_tables_init(void)
 		goto err5;
 
 	printk("ip_tables: (C) 2000-2006 Netfilter Core Team\n");
+#if defined (CONFIG_NAT_FCONE)
+        printk(KERN_INFO "Type NAT: Fully Cone\n");
+#elif defined (CONFIG_NAT_RCONE)
+	printk(KERN_INFO "Type NAT: Restricted Cone\n");
+#else
+	printk(KERN_INFO "Type NAT: Linux\n");
+#endif
+
 	return 0;
 
 err5:

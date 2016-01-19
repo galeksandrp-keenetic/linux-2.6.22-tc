@@ -1,6 +1,21 @@
 menu "Core Netfilter Configuration"
 	depends on NET && INET && NETFILTER
 
+choice
+        prompt "NAT Types"
+	default NAT_LINUX
+
+	config  NAT_FCONE
+	bool "Full_Cone (EXPERIMENTAL)"
+
+	config  NAT_RCONE
+	bool "Restricted_Cone (EXPERIMENTAL)"
+
+	config  NAT_LINUX
+	bool "Linux"
+
+endchoice
+
 config NETFILTER_NETLINK
        tristate "Netfilter netlink interface"
        help

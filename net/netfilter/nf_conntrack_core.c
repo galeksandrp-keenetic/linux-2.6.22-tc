@@ -29,6 +29,9 @@
 #include <linux/netdevice.h>
 #include <linux/socket.h>
 #include <linux/mm.h>
+#include <linux/ip.h>
+#include <linux/in.h>
+
 #if defined(TCSUPPORT_HWNAT)
 #include <linux/pktflow.h>
 #endif
@@ -109,6 +112,9 @@ LIST_HEAD(unconfirmed);
 static int nf_conntrack_vmalloc __read_mostly;
 
 static unsigned int nf_conntrack_next_id;
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+extern char wan_name[IFNAMSIZ];
+#endif
 
 DEFINE_PER_CPU(struct ip_conntrack_stat, nf_conntrack_stat);
 EXPORT_PER_CPU_SYMBOL(nf_conntrack_stat);
@@ -147,12 +153,22 @@ static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
 				  unsigned int size, unsigned int rnd)
 {
 	unsigned int a, b;
-
+#if defined (CONFIG_NAT_FCONE) /* Full Cone */
+        a = jhash2(tuple->dst.u3.all, ARRAY_SIZE(tuple->dst.u3.all),
+	          (__force __u16)tuple->dst.u.all); /* dst ip, dst port */
+	b = jhash2(tuple->dst.u3.all, ARRAY_SIZE(tuple->dst.u3.all),
+		  tuple->dst.protonum); /* dst ip, & dst ip protocol */
+#elif defined (CONFIG_NAT_RCONE) /* Restricted Cone */
+	a = jhash2(tuple->src.u3.all, ARRAY_SIZE(tuple->src.u3.all), /* src ip */
+		  (tuple->src.l3num << 16) | tuple->dst.protonum);
+	b = jhash2(tuple->dst.u3.all, ARRAY_SIZE(tuple->dst.u3.all), /* dst ip & dst port */
+		  ((__force __u16)tuple->dst.u.all << 16) | tuple->dst.protonum);
+#else /* CONFIG_NAT_LINUX */
 	a = jhash2(tuple->src.u3.all, ARRAY_SIZE(tuple->src.u3.all),
 		   (tuple->src.l3num << 16) | tuple->dst.protonum);
 	b = jhash2(tuple->dst.u3.all, ARRAY_SIZE(tuple->dst.u3.all),
 		   (tuple->src.u.all << 16) | tuple->dst.u.all);
-
+#endif
 	return jhash_2words(a, b, rnd) % size;
 }
 
@@ -473,6 +489,59 @@ __nf_conntrack_find(const struct nf_conntrack_tuple *tuple,
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(__nf_conntrack_find);
+
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+static inline int nf_ct_cone_tuple_equal(const struct nf_conntrack_tuple *t1,
+                                    const struct nf_conntrack_tuple *t2)
+{
+#if defined (CONFIG_NAT_FCONE)    /* Full Cone */
+	return nf_ct_tuple_dst_equal(t1, t2);
+#elif defined (CONFIG_NAT_RCONE)  /* Restricted Cone */
+	return (nf_ct_tuple_dst_equal(t1, t2) &&
+		t1->src.u3.all[0] == t2->src.u3.all[0] &&
+		t1->src.u3.all[1] == t2->src.u3.all[1] &&
+		t1->src.u3.all[2] == t2->src.u3.all[2] &&
+		t1->src.u3.all[3] == t2->src.u3.all[3] &&
+		t1->src.l3num == t2->src.l3num &&
+		t1->dst.protonum == t2->dst.protonum);
+#endif
+}
+
+static struct nf_conntrack_tuple_hash *
+__nf_cone_conntrack_find(const struct nf_conntrack_tuple *tuple,
+        const struct nf_conn *ignored_conntrack)
+{
+	struct nf_conntrack_tuple_hash *h;
+	unsigned int hash = hash_conntrack(tuple);
+
+	list_for_each_entry(h, &nf_conntrack_hash[hash], list) {
+		if (nf_ct_tuplehash_to_ctrack(h) != ignored_conntrack &&
+		    nf_ct_cone_tuple_equal(tuple, &h->tuple)) {
+			NF_CT_STAT_INC(found);
+			return h;
+		}
+		NF_CT_STAT_INC(searched);
+	}
+	
+	return NULL;
+}
+
+struct nf_conntrack_tuple_hash *
+nf_cone_conntrack_find_get(const struct nf_conntrack_tuple *tuple)
+{
+	struct nf_conntrack_tuple_hash *h;
+
+	read_lock_bh(&nf_conntrack_lock);
+	h = __nf_cone_conntrack_find(tuple, NULL);
+	if (h)
+		atomic_inc(&nf_ct_tuplehash_to_ctrack(h)->ct_general.use);
+	read_unlock_bh(&nf_conntrack_lock);
+
+	return h;
+}
+EXPORT_SYMBOL_GPL(nf_cone_conntrack_find_get);
+
+#endif
 
 /* Find a connection corresponding to a tuple. */
 struct nf_conntrack_tuple_hash *
@@ -942,9 +1011,20 @@ resolve_normal_ct(struct sk_buff *skb,
 		DEBUGP("resolve_normal_ct: Can't get tuple\n");
 		return NULL;
 	}
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+	struct iphdr *iph = ip_hdr(skb);
+        if( (skb->dev != NULL) && (iph != NULL) && 
+	    (strcmp(skb->dev->name, wan_name) == 0) &&
+	    (iph->protocol == IPPROTO_UDP)) {
+		h = nf_cone_conntrack_find_get(&tuple);
+	} else {
+		h = nf_conntrack_find_get(&tuple, NULL);
+	}
+#else /* CONFIG_NAT_LINUX */
 
 	/* look for tuple match */
 	h = nf_conntrack_find_get(&tuple, NULL);
+#endif
 	if (!h) {
 		h = init_conntrack(&tuple, l3proto, l4proto, skb, dataoff);
 		if (!h)
