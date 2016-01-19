@@ -103,6 +103,8 @@ int ralink_gpio_ioctl(struct inode *inode, struct file *file, unsigned int req,
 		*(volatile u32 *)(RALINK_REG_PIODIR) = cpu_to_le32(arg);
 		break;
 	case RALINK_GPIO_SET_DIR_IN:
+		if(arg > 15)
+			return -EINVAL;
 		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIODIR));
 		DBGPRINT(GPIO_TRACE_IO, "read DIR: %lu, val: %x\n", tmp, ~(0x3<<(arg*2)));
 		tmp &= ~(0x3<<(arg*2));
@@ -115,6 +117,8 @@ int ralink_gpio_ioctl(struct inode *inode, struct file *file, unsigned int req,
 		*(volatile u32 *)(RALINK_REG_GPIOOE) = cpu_to_le32(tmp);
 		break;
 	case RALINK_GPIO_SET_DIR_OUT:
+		if(arg > 15)
+			return -EINVAL;
 		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIODIR));
 		DBGPRINT(GPIO_TRACE_IO, "read DIR: %lu, val: %x\n", tmp, 0x1<<(arg*2));
 		tmp |= 0x1<<(arg*2);
@@ -157,14 +161,32 @@ int ralink_gpio_ioctl(struct inode *inode, struct file *file, unsigned int req,
 		*(volatile u32 *)(RALINK_REG_PIO3116DIR) = cpu_to_le32(arg);
 		break;
 	case RALINK_GPIO3116_SET_DIR_IN:
+		if((arg < 16) || (arg > 31))
+			return -EINVAL;
 		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO3116DIR));
-		tmp &= ~cpu_to_le32(arg);
-		*(volatile u32 *)(RALINK_REG_PIO3116DIR) = tmp;
+		DBGPRINT(GPIO_TRACE_IO, "read DIR3116: %lu, val: %x\n", tmp, ~(0x3<<((arg-16)*2)));
+		tmp &= ~(0x3<<((arg-16)*2));
+		DBGPRINT(GPIO_TRACE_IO, "write DIR3116: %lu\n", tmp);
+		*(volatile u32 *)(RALINK_REG_PIO3116DIR) = cpu_to_le32(tmp);
+		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_GPIOOE));
+		DBGPRINT(GPIO_TRACE_IO, "read GPO: %lu, val: %x\n", tmp, ~(0x1<<arg));
+		tmp &= ~(0x1<<arg);
+		DBGPRINT(GPIO_TRACE_IO, "write GPO: %lu\n", tmp);
+		*(volatile u32 *)(RALINK_REG_GPIOOE) = cpu_to_le32(tmp);
 		break;
 	case RALINK_GPIO3116_SET_DIR_OUT:
+		if((arg < 16) || (arg > 31))
+			return -EINVAL;
 		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_PIO3116DIR));
-		tmp |= cpu_to_le32(arg);
-		*(volatile u32 *)(RALINK_REG_PIO3116DIR) = tmp;
+		DBGPRINT(GPIO_TRACE_IO, "read DIR3116: %lu, val: %x\n", tmp, 0x1<<((arg-16)*2));
+		tmp |= 0x1<<((arg-16)*2);
+		DBGPRINT(GPIO_TRACE_IO, "write DIR3116: %lu\n", tmp);
+		*(volatile u32 *)(RALINK_REG_PIO3116DIR) = cpu_to_le32(tmp);
+		tmp = le32_to_cpu(*(volatile u32 *)(RALINK_REG_GPIOOE));
+		DBGPRINT(GPIO_TRACE_IO, "read GPO: %lu, val: %x\n", tmp, 0x1<<arg);
+		tmp |= 0x1<<arg;
+		DBGPRINT(GPIO_TRACE_IO, "write GPO: %lu\n", tmp);
+		*(volatile u32 *)(RALINK_REG_GPIOOE) = cpu_to_le32(tmp);
 		break;
 	default:
 		return -ENOIOCTLCMD;
