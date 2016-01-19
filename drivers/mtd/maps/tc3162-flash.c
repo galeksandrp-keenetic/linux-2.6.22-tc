@@ -100,6 +100,10 @@ static struct mtd_partition tc3162_parts[] = {
                 size:           0x270000,
                 offset:         0x180000,
         }, {
+                name:           "Firmware", /* mtdblock5 */
+                size:           0x3A0000,
+                offset:         0x50000,
+        },{
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
                 offset:         0x3f0000,
@@ -120,6 +124,10 @@ static struct mtd_partition tc3162_parts[] = {
                 size:           0x550000,
                 offset:         0x1a0000,
         }, {
+                name:           "Firmware", /* mtdblock5 */
+                size:           0x6A0000,
+                offset:         0x50000,
+        },{
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
                 offset:         0x6f0000,
@@ -140,6 +148,10 @@ static struct mtd_partition tc3162_parts[] = {
                 size:           0xd50000,
                 offset:         0x1a0000,
         }, {
+                name:           "Firmware", /* mtdblock5 */
+                size:           0xEA0000,
+                offset:         0x50000,
+        },{
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
                 offset:         0xef0000,
@@ -159,6 +171,10 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "RootFS", /* mtdblock4 */
                 size:           0x1d50000,
                 offset:         0x1a0000,
+        },{
+                name:           "Firmware", /* mtdblock5 */
+                size:           0x1EA0000,
+                offset:         0x50000,
         }, {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
