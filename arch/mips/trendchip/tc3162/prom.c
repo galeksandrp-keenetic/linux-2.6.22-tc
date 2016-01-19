@@ -122,7 +122,11 @@ const char *get_system_type(void)
 		return "Ralink RT63165 SOC";
 	} else if (isRT63368) {
 		io_swap_noneed = 1;
+#ifdef __BIG_ENDIAN
 		return "Ralink RT63368 SOC";
+#else
+		return "Ralink RT6856 SOC";
+#endif
 	} else if (isRT63365) {
 		io_swap_noneed = 1;
 		return "Ralink RT63365 SOC";

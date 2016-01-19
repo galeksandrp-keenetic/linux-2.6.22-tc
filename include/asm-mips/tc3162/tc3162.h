@@ -183,7 +183,11 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #define isRT65168 	(((VPint(0xbfb00064)&0xffff0000))==0x00020000)
 #define isRT63165 	(((VPint(0xbfb00064)&0xffff0000))==0x00030000)
 #define isRT63365 	(((VPint(0xbfb00064)&0xffff0000))==0x00040000)
+#ifdef __BIG_ENDIAN
 #define isRT63368   (isRT63365 ? ((((VPint(0xbfb0008c)>>8) & 0x3) == 0x3) ? 1 : 0): 0)
+#else
+#define isRT63368   (isRT63365 ? 1 : 0) /* fixup for RT6856 in little_endian */
+#endif
 
 #ifdef TC3162L2
 #define RT63260_SYS_HCLK ((12*(((VPint(0xbfb000b0))&0x1ff)+1)/(((VPint(0xbfb000b0)>>9)&0x1f)+1))/5)
