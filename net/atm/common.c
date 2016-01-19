@@ -40,6 +40,73 @@
 struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 DEFINE_RWLOCK(vcc_sklist_lock);
 
+#ifdef TCSUPPORT_SHARE_PVC
+#define BR2684_VIRDEV_NUM 8
+struct _share_atmdev
+{
+	short vpi;
+	int vci;
+	int refcnt;
+};
+static struct _share_atmdev share_atmdev[BR2684_VIRDEV_NUM];
+
+static void add_share_atmdev(short vpi,int vci)
+{
+	int i;
+	int j = -1;
+	for(i=0;i<BR2684_VIRDEV_NUM;i++)
+	{
+		if(share_atmdev[i].vpi==vpi && share_atmdev[i].vci==vci)
+		{
+			share_atmdev[i].refcnt++;
+			return;
+		}
+		if(share_atmdev[i].vpi==0 && share_atmdev[i].vci==0 && j <0)
+		{
+			j = i;
+		}
+	}
+	if (j>=0)
+	{
+		share_atmdev[j].vpi = vpi;
+		share_atmdev[j].vci = vci;
+		share_atmdev[j].refcnt = 1;
+	}
+	return;
+
+}
+
+int get_share_refcnt(short vpi,int vci)
+{
+	int i;
+	for(i=0;i<BR2684_VIRDEV_NUM;i++)
+	{
+		if(share_atmdev[i].vpi==vpi && share_atmdev[i].vci==vci)
+		{
+			return share_atmdev[i].refcnt;
+		}
+	}
+	return 0;
+}
+
+static void del_share_atmdev(short vpi,int vci)
+{
+	int i;
+	for(i=0;i<BR2684_VIRDEV_NUM;i++)
+	{
+		if(share_atmdev[i].vpi == vpi && share_atmdev[i].vci == vci)
+		{
+			share_atmdev[i].refcnt-- ;
+			if (share_atmdev[i].refcnt <= 0)
+			{
+				share_atmdev[i].vpi = 0;
+				share_atmdev[i].vci = 0;	
+			}
+			return;
+		}
+	}
+}
+#endif
 static void __vcc_insert_socket(struct sock *sk)
 {
 	struct atm_vcc *vcc = atm_sk(sk);
@@ -169,6 +236,9 @@ static void vcc_destroy_socket(struct sock *sk)
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
+#ifdef TCSUPPORT_SHARE_PVC
+	struct atm_vcc* atmvcc;
+#endif
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	clear_bit(ATM_VF_READY, &vcc->flags);
 	if (vcc->dev) {
@@ -177,6 +247,17 @@ static void vcc_destroy_socket(struct sock *sk)
 		if (vcc->push)
 			vcc->push(vcc, NULL); /* atmarpd has no push */
 
+#ifdef TCSUPPORT_SHARE_PVC
+		del_share_atmdev(vcc->vpi,vcc->vci);
+		if (get_share_refcnt(vcc->vpi,vcc->vci) > 0 )
+		{
+			atmvcc = find_next_atmvcc(vcc->vpi,vcc->vci,vcc);
+			if (atmvcc && atmvcc->dev->ops->open)
+			{
+				atmvcc->dev->ops->open(atmvcc);
+			}
+		}
+#endif
 		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			atm_return(vcc,skb->truesize);
 			kfree_skb(skb);
@@ -359,11 +440,20 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 		return error;
 	vcc->dev = dev;
 	write_lock_irq(&vcc_sklist_lock);
+#ifdef TCSUPPORT_SHARE_PVC	
+	if (test_bit(ATM_DF_REMOVED, &dev->flags)) 
+	{
+		write_unlock_irq(&vcc_sklist_lock);
+		goto fail_module_put;
+	}
+	add_share_atmdev(vpi,vci);
+#else
 	if (test_bit(ATM_DF_REMOVED, &dev->flags) ||
 	    (error = find_ci(vcc, &vpi, &vci))) {
 		write_unlock_irq(&vcc_sklist_lock);
 		goto fail_module_put;
 	}
+#endif
 	vcc->vpi = vpi;
 	vcc->vci = vci;
 	__vcc_insert_socket(sk);
@@ -398,10 +488,20 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
 
+#ifdef TCSUPPORT_SHARE_PVC
+	if ( get_share_refcnt(vpi,vci) == 1)
+	{
+		if (dev->ops->open) {
+			if ((error = dev->ops->open(vcc)))
+				goto fail;
+		}
+	}
+#else
 	if (dev->ops->open) {
 		if ((error = dev->ops->open(vcc)))
 			goto fail;
 	}
+#endif
 	return 0;
 
 fail:
@@ -776,7 +876,9 @@ int vcc_getsockopt(struct socket *sock, int level, int optname,
 static int __init atm_init(void)
 {
 	int error;
-
+#ifdef TCSUPPORT_SHARE_PVC
+	memset(share_atmdev,0,sizeof(share_atmdev));
+#endif
 	if ((error = proto_register(&vcc_proto, 0)) < 0)
 		goto out;
 

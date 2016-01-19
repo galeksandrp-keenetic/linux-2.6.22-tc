@@ -29,6 +29,15 @@ Authors: Marcell GAL, 2000, XDSL Ltd, Hungary
 #include <linux/foe_hook.h>
 #endif
 
+#ifdef TCSUPPORT_SHARE_PVC
+#ifdef RA_MTD_RW_BY_NUM
+int ra_mtd_read(int num, loff_t from, size_t len, u_char *buf);
+#else
+int ra_mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf);
+#endif
+#define ADSL_OFFSET 4 /* Get MAC address from flash */
+#endif
+
 /*
  * Define this to use a version of the code which interacts with the higher
  * layers in a more intellegent way, by always reserving enough space for
@@ -511,6 +520,119 @@ static void br2684_destroy(struct atm_vcc *atmvcc)
 	}
 }
 #endif
+#ifdef TCSUPPORT_SHARE_PVC
+static unsigned char s_macaddr[8];
+
+struct atm_vcc* find_next_atmvcc(short vpi,int vci,struct atm_vcc* vcc)
+{
+	struct list_head *lh;
+	struct net_device *net_dev;
+	struct br2684_vcc *brvcc ;
+	struct br2684_dev *brdev;
+	struct atm_vcc *atmvcc;
+	list_for_each(lh, &br2684_devs)
+	{
+		net_dev = list_entry_brdev(lh);
+		brdev = BRPRIV(net_dev);
+		brvcc = list_empty(&brdev->brvccs) ? NULL :list_entry_brvcc(brdev->brvccs.next); 
+		if (brvcc == NULL)
+			continue;
+		atmvcc = brvcc->atmvcc;
+		if (atmvcc == NULL)
+			continue;
+		if (atmvcc->vpi == vpi && atmvcc->vci == vci && atmvcc != vcc)
+		{
+			return atmvcc;
+		}	
+	}
+	return NULL;
+}
+
+static void copy_to_others(short vpi,int vci,struct sk_buff *skb)
+{
+	struct list_head *lh;
+	struct net_device *net_dev;
+	struct br2684_vcc *brvcc ;
+	struct br2684_dev *brdev;
+	struct atm_vcc *atmvcc;
+	struct sk_buff *new_skb;
+
+	list_for_each(lh, &br2684_devs)
+	{
+		net_dev = list_entry_brdev(lh);
+		brdev = BRPRIV(net_dev);
+		brvcc = list_empty(&brdev->brvccs) ? NULL :list_entry_brvcc(brdev->brvccs.next); 
+		if (brvcc == NULL)
+		{
+			continue;
+		}
+		atmvcc = brvcc->atmvcc;
+		if (atmvcc == NULL)
+		{
+			continue;
+		}
+		if (atmvcc->vpi != vpi || atmvcc->vci != vci )
+		{
+			continue;
+		}
+		new_skb = skb_copy(skb,GFP_ATOMIC);
+		if (new_skb==NULL)
+		{
+			continue;
+		}
+		brdev->stats.rx_packets++;
+		brdev->stats.rx_bytes += skb->len;
+		new_skb->pkt_type = PACKET_BROADCAST;
+		new_skb->dev = 	net_dev;	
+		netif_rx(new_skb);
+	}
+	if (skb)
+		dev_kfree_skb(skb);
+	return ;
+}
+
+static void mod_share_atmdev(short vpi,int vci,struct sk_buff *skb)
+{
+	struct list_head *lh;
+	struct net_device *net_dev;
+	struct br2684_vcc *brvcc ;
+	struct br2684_dev *brdev;
+	struct atm_vcc *atmvcc;
+	struct ethhdr* eth = eth_hdr(skb);
+	struct net_device *bridge_dev = NULL;
+
+
+	list_for_each(lh, &br2684_devs)
+	{
+		net_dev = list_entry_brdev(lh);
+		brdev = BRPRIV(net_dev);
+		brvcc = list_empty(&brdev->brvccs) ? NULL :list_entry_brvcc(brdev->brvccs.next); 
+		if (brvcc == NULL)
+			continue;
+		atmvcc = brvcc->atmvcc;
+		if (atmvcc == NULL)
+			continue;
+		if (atmvcc->vpi == vpi && atmvcc->vci == vci && !compare_ether_addr(eth->h_dest, net_dev->dev_addr) )
+		{
+			skb->dev = net_dev;
+			skb->pkt_type = PACKET_HOST;
+			return ;
+		}
+		if (atmvcc->vpi == vpi && atmvcc->vci == vci && !compare_ether_addr(eth->h_dest,s_macaddr))
+		{
+			bridge_dev = net_dev;
+		}
+	}
+	if (bridge_dev)
+	{
+		skb->dev = bridge_dev;
+		skb->pkt_type = PACKET_HOST;
+	}
+	return ;
+}
+#endif
+
+
 /* when AAL5 PDU comes in: */
 __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 {
@@ -637,6 +759,20 @@ __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	}
 #endif /* CONFIG_ATM_BR2684_IPFILTER */
 	skb->dev = net_dev;
+#ifdef TCSUPPORT_SHARE_PVC
+	if (get_share_refcnt(atmvcc->vpi,atmvcc->vci) > 1)
+	{
+		if (skb->pkt_type == PACKET_BROADCAST ||skb->pkt_type == PACKET_MULTICAST )
+		{
+			return copy_to_others(atmvcc->vpi,atmvcc->vci,skb);
+		}
+		else
+		{
+			mod_share_atmdev(atmvcc->vpi,atmvcc->vci,skb);
+		}
+	}
+	brdev = BRPRIV(skb->dev);
+#endif
 	ATM_SKB(skb)->vcc = atmvcc;	/* needed ? */
 	DPRINTK("received packet's protocol: %x\n", ntohs(skb->protocol));
 	skb_debug(skb);
@@ -1015,6 +1151,11 @@ extern struct proc_dir_entry *atm_proc_root;	/* from proc.c */
 
 static int __init br2684_init(void)
 {
+#ifdef TCSUPPORT_SHARE_PVC
+	int i;
+	unsigned char mac_zero[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	unsigned char mac_ff[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+#endif
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *p;
 	if ((p = create_proc_entry("br2684", 0, atm_proc_root)) == NULL)
@@ -1022,6 +1163,26 @@ static int __init br2684_init(void)
 	p->proc_fops = &br2684_proc_ops;
 #endif
 	register_atm_ioctl(&br2684_ioctl_ops);
+
+#ifdef TCSUPPORT_SHARE_PVC
+	memset(s_macaddr,0,sizeof(s_macaddr));
+    /* Get mac address from flash */
+#ifdef RA_MTD_RW_BY_NUM
+    i = ra_mtd_read(2, ADSL_OFFSET, 6, s_macaddr);
+#else
+    i = ra_mtd_read_nm("RF-EEPROM", ADSL_OFFSET, 6, s_macaddr);
+#endif
+
+    if (i < 0 || (memcmp(s_macaddr, mac_zero, 6) == 0) ||
+        (memcmp(s_macaddr, mac_ff, 6) == 0)) {
+        unsigned char mac_addr01234[5] = { 0x00, 0x0C, 0x43, 0x28, 0x81 };
+        net_srandom(jiffies);
+        memcpy(s_macaddr, mac_addr01234, 5);
+        s_macaddr[5] = net_random() & 0xFF;
+    } else
+        s_macaddr[5] += 0x02;
+    s_macaddr[6] = 0x00;
+#endif
 	return 0;
 }
 

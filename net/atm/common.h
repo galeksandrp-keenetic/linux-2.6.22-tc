@@ -9,6 +9,10 @@
 #include <linux/net.h>
 #include <linux/poll.h> /* for poll_table */
 
+#ifdef TCSUPPORT_SHARE_PVC
+int get_share_refcnt(short vpi,int vci);
+struct atm_vcc* find_next_atmvcc(short vpi,int vci,struct atm_vcc* vcc);
+#endif
 
 int vcc_create(struct socket *sock, int protocol, int family);
 int vcc_release(struct socket *sock);
