@@ -14,6 +14,34 @@ menuconfig MTD
 
 if MTD
 
+choice
+	prompt "Root File System Type"
+	default ROOTFS_IN_FLASH
+
+config  ROOTFS_IN_RAM
+        bool "RootFS_in_RAM"
+	select BLK_DEV_INITRD 
+	select BLK_DEV_RAM 
+
+config  ROOTFS_IN_FLASH
+        bool "RootFS_in_FLASH"
+endchoice
+
+choice
+       prompt "Flash Size"
+       default FLASH_8M
+
+config FLASH_4M
+       bool "4M"
+
+config FLASH_8M
+       bool "8M"
+
+config FLASH_16M
+       bool "16M"
+
+endchoice
+
 
 config MTD_PURE_BRIDGE
 	bool "Kernel Max Size:640KB"
