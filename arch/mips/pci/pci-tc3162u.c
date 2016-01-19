@@ -71,11 +71,11 @@ void setahbstat(int val){
 }
 EXPORT_SYMBOL(setahbstat);
 
-void pcieReset(void){	
+int pcieReset(void){	
 	int i;
 	
 	if(isRT63165){
-		return;		
+		return -1;		
 	}
 
 	if(isRT63365){
@@ -180,6 +180,8 @@ void pcieReset(void){
 			VPint(KSEG1ADDR(pcie_config_data)) = 0x20;
 		}
 	}
+	
+	return 0;
 }
 
 EXPORT_SYMBOL(pcieReset);
@@ -388,7 +390,8 @@ ahbErrChk(void){
 		printk("CR_AHB_ABEA:0x%08lx\n", VPint(CR_AHB_ABEA));
 		local_irq_save(flags);
 		ahb_status=1;
-		pcieReset();
+		if(pcieReset() != 0)
+			return;
 		pcieRegInitConfig();
 		local_irq_restore(flags);
 	}
@@ -411,7 +414,8 @@ void chkAhbErr(int force){
 		val= pcie_read_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x54);
 		if((val!=0x0) || (force==0x1) ){
 			/*Reset pcie and refill pcie-registers*/
-			pcieReset();
+			if(pcieReset() != 0)
+				return;
 			pcieRegInitConfig();
 			ahb_status = 1;
 		}
@@ -424,7 +428,8 @@ void chkAhbErr(int force){
 		if((VPint(0xbfb82060)!=0x0) || (VPint(0xbfb82064)!=0x0) || (force==0x1) ){
 			printk("PCI-E L-crc %x E-crc %x!!\n",VPint(0xbfb82060),VPint(0xbfb82064));
 			/*Reset pcie and refill pcie-registers*/
-			pcieReset();
+			if(pcieReset() != 0)
+				return;
 			pcieRegInitConfig();
 			ahb_status = 1;
 		}
@@ -474,7 +479,8 @@ static int ahb_status_write_proc(struct file *file, const char *buffer,
 	if(val==0x2){
 		/*Reset pcie and refill pcie-registers*/
 		local_irq_save(flags);
-		pcieReset();
+		if(pcieReset() != 0)
+			return -1;
 		pcieRegInitConfig();
 		local_irq_restore(flags);
 	}
@@ -522,6 +528,9 @@ static __init int tc3162_pcie_init(void)
 			mdelay(1);
 		}else{
 			if(dual_band_support){
+				/* enabled PCIe port 1 */
+				VPint(0xbfb00088) |= (1<<22);
+				mdelay(1);
 				VPint(0xbfb00834) |= ((1<<26) | (1<<27) | (1<<29));
 				mdelay(1);
 				VPint(0xbfb00834) &= ~((1<<26) | (1<<27) | (1<<29));
