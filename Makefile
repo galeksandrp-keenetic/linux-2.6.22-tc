@@ -745,12 +745,6 @@ endif
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost $@
 	$(Q)rm -f .old_version
 
-linux.7z: vmlinux
-#	$(STRIP) -o vmlinux.strip vmlinux
-	$(OBJCOPY) -O binary vmlinux linux.bin
-	../tools/lzma e linux.bin linux.7z
-	../tools/trx/trx -f linux.7z -o linux.7z.trx -c ../tools/trx/trx_config
-
 # The actual objects are generated when descending, 
 # make sure no implicit rule kicks in
 $(sort $(vmlinux-init) $(vmlinux-main)) $(vmlinux-lds): $(vmlinux-dirs) ;
