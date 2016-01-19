@@ -1441,7 +1441,13 @@ static int devfs_mk_dev(dev_t dev, umode_t mode, const char *fmt, va_list args)
 	de->u.dev = dev;
 
 	error = _devfs_append_entry(dir, de, NULL);
-	if (error) {
+	if (error == -EEXIST) {
+		/*
+		 * _devfs_append_entry() of an already-existing directory will
+		 * return success.
+		 */
+		error = 0;
+	} else if (error) {
 		printk(KERN_WARNING "%s: could not append to parent for %s\n",
 		       __FUNCTION__, buf);
 		goto out;
