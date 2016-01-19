@@ -22,6 +22,9 @@
 #include <linux/mutex.h>
 #include <linux/kthread.h>
 #include <asm/uaccess.h>
+#ifdef CONFIG_DEVFS_FS
+#include <linux/devfs_fs_kernel.h>
+#endif
 
 #ifdef CONFIG_PREEMPT_SOFTIRQS
 #include <linux/interrupt.h>
@@ -286,6 +289,11 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 		snprintf(gd->disk_name, sizeof(gd->disk_name),
 			 "%s%d", tr->name, new->devnum);
 
+#ifdef CONFIG_DEVFS_FS
+		snprintf(gd->devfs_name, sizeof(gd->devfs_name),
+			 "%s/%c", tr->name, (tr->part_bits?'a':'0') + new->devnum);
+#endif
+
 	/* 2.5 has capacity in units of 512 bytes while still
 	   having BLOCK_SIZE_BITS set to 10. Just to keep us amused. */
 	set_capacity(gd, (new->size * tr->blksize) >> 9);
@@ -401,6 +409,10 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 		return PTR_ERR(tr->blkcore_priv->thread);
 	}
 
+#ifdef CONFIG_DEVFS_FS
+	devfs_mk_dir(tr->name);
+#endif
+
 	INIT_LIST_HEAD(&tr->devs);
 	list_add(&tr->list, &blktrans_majors);
 
@@ -430,6 +442,9 @@ int deregister_mtd_blktrans(struct mtd_blktrans_ops *tr)
 		struct mtd_blktrans_dev *dev = list_entry(this, struct mtd_blktrans_dev, list);
 		tr->remove_dev(dev);
 	}
+#ifdef CONFIG_DEVFS_FS
+	devfs_remove(tr->name);
+#endif
 
 	blk_cleanup_queue(tr->blkcore_priv->rq);
 	unregister_blkdev(tr->major, tr->name);

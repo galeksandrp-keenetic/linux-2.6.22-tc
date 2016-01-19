@@ -62,6 +62,7 @@
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/init.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
@@ -1422,6 +1423,7 @@ static struct loop_device *loop_alloc(int i)
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
 	sprintf(disk->disk_name, "loop%d", i);
+        sprintf(disk->devfs_name, "loop/%d", i);
 	return lo;
 
 out_free_queue:
@@ -1511,6 +1513,9 @@ static int __init loop_init(void)
 	if (register_blkdev(LOOP_MAJOR, "loop"))
 		return -EIO;
 
+ 	devfs_mk_dir("loop");
+ 
+
 	for (i = 0; i < nr; i++) {
 		lo = loop_alloc(i);
 		if (!lo)
@@ -1535,6 +1540,7 @@ Enomem:
 	list_for_each_entry_safe(lo, next, &loop_devices, lo_list)
 		loop_free(lo);
 
+ 	devfs_remove("loop");
 	unregister_blkdev(LOOP_MAJOR, "loop");
 	return -ENOMEM;
 }
@@ -1550,8 +1556,8 @@ static void __exit loop_exit(void)
 		loop_del_one(lo);
 
 	blk_unregister_region(MKDEV(LOOP_MAJOR, 0), range);
-	if (unregister_blkdev(LOOP_MAJOR, "loop"))
-		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
+  	devfs_remove("loop");
+	unregister_blkdev(LOOP_MAJOR, "loop");
 }
 
 module_init(loop_init);

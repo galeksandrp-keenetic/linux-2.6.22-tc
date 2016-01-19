@@ -177,6 +177,7 @@ static int print_unex = 1;
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/platform_device.h>
 #include <linux/buffer_head.h>	/* for invalidate_buffers() */
 #include <linux/mutex.h>
@@ -223,6 +224,7 @@ static struct completion device_release;
 static unsigned short virtual_dma_port = 0x3f0;
 irqreturn_t floppy_interrupt(int irq, void *dev_id);
 static int set_dor(int fdc, char mask, char data);
+static void register_devfs_entries(int drive) __init;
 
 #define K_64	0x10000		/* 64KB */
 
@@ -3652,6 +3654,7 @@ static void __init config_types(void)
 				first = 0;
 			}
 			printk("%s fd%d is %s", prepend, drive, name);
+			register_devfs_entries(drive);
 		}
 		*UDP = *params;
 	}
@@ -3920,6 +3923,22 @@ static struct block_device_operations floppy_fops = {
 	.media_changed	= check_floppy_change,
 	.revalidate_disk = floppy_revalidate,
 };
+static void __init register_devfs_entries(int drive)
+{
+	int base_minor = (drive < 4) ? drive : (124 + drive);
+
+	if (UDP->cmos < ARRAY_SIZE(default_drive_params)) {
+		int i = 0;
+		do {
+			int minor = base_minor + (table_sup[UDP->cmos][i] << 2);
+
+			devfs_mk_bdev(MKDEV(FLOPPY_MAJOR, minor),
+				      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
+				      S_IWGRP, "floppy/%d%s", drive,
+				      table[table_sup[UDP->cmos][i]]);
+		} while (table_sup[UDP->cmos][i++]);
+	}
+}
 
 /*
  * Floppy Driver initialization
@@ -4201,9 +4220,11 @@ static int __init floppy_init(void)
 		motor_off_timer[dr].function = motor_off_callback;
 	}
 
+	devfs_mk_dir("floppy");
+
 	err = register_blkdev(FLOPPY_MAJOR, "fd");
 	if (err)
-		goto out_put_disk;
+		goto out_devfs_remove;
 
 	floppy_queue = blk_init_queue(do_fd_request, &floppy_lock);
 	if (!floppy_queue) {
@@ -4359,6 +4380,8 @@ out_unreg_region:
 	blk_cleanup_queue(floppy_queue);
 out_unreg_blkdev:
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
+out_devfs_remove:
+	devfs_remove("floppy");
 out_put_disk:
 	while (dr--) {
 		del_timer(&motor_off_timer[dr]);
@@ -4519,6 +4542,19 @@ static void floppy_release_irq_and_dma(void)
 
 static char *floppy;
 
+static void unregister_devfs_entries(int drive)
+{
+	int i;
+
+	if (UDP->cmos < ARRAY_SIZE(default_drive_params)) {
+		i = 0;
+		do {
+			devfs_remove("floppy/%d%s", drive,
+				     table[table_sup[UDP->cmos][i]]);
+		} while (table_sup[UDP->cmos][i++]);
+	}
+}
+
 static void __init parse_floppy_cfg_string(char *cfg)
 {
 	char *ptr;
@@ -4555,11 +4591,13 @@ void cleanup_module(void)
 		if ((allowed_drive_mask & (1 << drive)) &&
 		    fdc_state[FDC(drive)].version != FDC_NONE) {
 			del_gendisk(disks[drive]);
+			unregister_devfs_entries(drive);
 			device_remove_file(&floppy_device[drive].dev, &dev_attr_cmos);
 			platform_device_unregister(&floppy_device[drive]);
 		}
 		put_disk(disks[drive]);
 	}
+	devfs_remove("floppy");
 
 	del_timer_sync(&fd_timeout);
 	del_timer_sync(&fd_timer);

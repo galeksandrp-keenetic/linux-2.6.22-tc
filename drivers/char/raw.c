@@ -10,6 +10,7 @@
 
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/major.h>
 #include <linux/blkdev.h>
 #include <linux/module.h>
@@ -285,6 +286,13 @@ static int __init raw_init(void)
 	}
 	device_create(raw_class, NULL, MKDEV(RAW_MAJOR, 0), "rawctl");
 
+	devfs_mk_cdev(MKDEV(RAW_MAJOR, 0),
+		      S_IFCHR | S_IRUGO | S_IWUGO,
+		      "raw/rawctl");
+	for (i = 1; i < MAX_RAW_MINORS; i++)
+		devfs_mk_cdev(MKDEV(RAW_MAJOR, i),
+			      S_IFCHR | S_IRUGO | S_IWUGO,
+			      "raw/raw%d", i);
 	return 0;
 
 error_region:
@@ -295,6 +303,13 @@ error:
 
 static void __exit raw_exit(void)
 {
+ 	int i;
+ 
+ 	for (i = 1; i < MAX_RAW_MINORS; i++)
+ 		devfs_remove("raw/raw%d", i);
+ 	devfs_remove("raw/rawctl");
+ 	devfs_remove("raw");
+
 	device_destroy(raw_class, MKDEV(RAW_MAJOR, 0));
 	class_destroy(raw_class);
 	cdev_del(&raw_cdev);

@@ -44,7 +44,7 @@ static void __init handle_initrd(void)
 	int pid;
 
 	real_root_dev = new_encode_dev(ROOT_DEV);
-	create_dev("/dev/root.old", Root_RAM0);
+	create_dev("/dev/root.old", Root_RAM0, NULL);
 	/* mount initrd on rootfs' /root */
 	mount_block_root("/dev/root.old", root_mountflags & ~MS_RDONLY);
 	sys_mkdir("/old", 0700);
@@ -54,14 +54,14 @@ static void __init handle_initrd(void)
 	sys_chdir("/root");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
+	mount_devfs_fs ();
 
 	pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
-	if (pid > 0) {
+	if (pid > 0)
 		while (pid != sys_wait4(-1, NULL, 0, NULL)) {
 			try_to_freeze();
 			yield();
 		}
-	}
 
 	/* move initrd to rootfs' /old */
 	sys_fchdir(old_fd);
@@ -71,6 +71,7 @@ static void __init handle_initrd(void)
 	sys_chroot(".");
 	sys_close(old_fd);
 	sys_close(root_fd);
+	umount_devfs("/old/dev");
 
 	if (new_decode_dev(real_root_dev) == Root_RAM0) {
 		sys_chdir("/old");
@@ -106,7 +107,7 @@ static void __init handle_initrd(void)
 int __init initrd_load(void)
 {
 	if (mount_initrd) {
-		create_dev("/dev/ram", Root_RAM0);
+		create_dev("/dev/ram", Root_RAM0, NULL);
 		/*
 		 * Load the initrd data into /dev/ram0. Execute it as initrd
 		 * unless /dev/ram0 is supposed to be our actual root device,

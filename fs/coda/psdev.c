@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -364,12 +365,22 @@ static int init_coda_psdev(void)
 		err = PTR_ERR(coda_psdev_class);
 		goto out_chrdev;
 	}		
-	for (i = 0; i < MAX_CODADEVS; i++)
+	devfs_mk_dir ("coda");
+	for (i = 0; i < MAX_CODADEVS; i++) {
 		class_device_create(coda_psdev_class, NULL,
 				MKDEV(CODA_PSDEV_MAJOR,i), NULL, "cfs%d", i);
+		err = devfs_mk_cdev(MKDEV(CODA_PSDEV_MAJOR, i),
+				S_IFCHR|S_IRUSR|S_IWUSR, "coda/%d", i);
+		if (err)
+			goto out_class;
+	}
 	coda_sysctl_init();
 	goto out;
 
+out_class:
+	for (i = 0; i < MAX_CODADEVS; i++) 
+		class_device_destroy(coda_psdev_class, MKDEV(CODA_PSDEV_MAJOR, i));
+	class_destroy(coda_psdev_class);
 out_chrdev:
 	unregister_chrdev(CODA_PSDEV_MAJOR, "coda");
 out:
@@ -408,9 +419,12 @@ static int __init init_coda(void)
 	}
 	return 0;
 out:
-	for (i = 0; i < MAX_CODADEVS; i++)
+	for (i = 0; i < MAX_CODADEVS; i++) {
 		class_device_destroy(coda_psdev_class, MKDEV(CODA_PSDEV_MAJOR, i));
+		devfs_remove("coda/%d", i);
+	}
 	class_destroy(coda_psdev_class);
+	devfs_remove("coda");
 	unregister_chrdev(CODA_PSDEV_MAJOR, "coda");
 	coda_sysctl_clean();
 out1:

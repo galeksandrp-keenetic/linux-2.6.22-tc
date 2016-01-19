@@ -18,6 +18,7 @@
 #include <linux/raw.h>
 #include <linux/tty.h>
 #include <linux/capability.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/ptrace.h>
 #include <linux/device.h>
 #include <linux/highmem.h>
@@ -982,10 +983,13 @@ static int __init chr_dev_init(void)
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 
 	mem_class = class_create(THIS_MODULE, "mem");
-	for (i = 0; i < ARRAY_SIZE(devlist); i++)
+	for (i = 0; i < ARRAY_SIZE(devlist); i++){
 		device_create(mem_class, NULL,
 			      MKDEV(MEM_MAJOR, devlist[i].minor),
 			      devlist[i].name);
+ 		devfs_mk_cdev(MKDEV(MEM_MAJOR, devlist[i].minor),
+ 				S_IFCHR | devlist[i].mode, devlist[i].name);
+ 	}
 
 	return 0;
 }

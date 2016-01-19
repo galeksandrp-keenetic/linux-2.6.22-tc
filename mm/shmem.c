@@ -25,6 +25,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>
 #include <linux/xattr.h>
 #include <linux/generic_acl.h>
@@ -2516,6 +2517,9 @@ static int __init init_tmpfs(void)
 		goto out2;
 	}
 
+#ifdef CONFIG_TMPFS
+	devfs_mk_dir("shm");
+#endif
 	shm_mnt = vfs_kern_mount(&tmpfs_fs_type, MS_NOUSER,
 				tmpfs_fs_type.name, NULL);
 	if (IS_ERR(shm_mnt)) {

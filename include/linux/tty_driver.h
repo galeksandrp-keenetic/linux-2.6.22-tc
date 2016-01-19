@@ -164,6 +164,7 @@ struct tty_driver {
 	struct cdev cdev;
 	struct module	*owner;
 	const char	*driver_name;
+	const char	*devfs_name;
 	const char	*name;
 	int	name_base;	/* offset of printed name */
 	int	major;		/* major device number */
@@ -260,6 +261,8 @@ void tty_set_operations(struct tty_driver *driver,
  *	called.  This is to be used by drivers that have tty devices
  *	that can appear and disappear while the main tty driver is
  *	registered with the tty core.
+ * TTY_DRIVER_NO_DEVFS --- if set, do not create devfs entries. This
+ *	is only used by tty_register_driver().
  *
  * TTY_DRIVER_DEVPTS_MEM -- don't use the standard arrays, instead
  *	use dynamic memory keyed through the devpts filesystem.  This
@@ -269,6 +272,7 @@ void tty_set_operations(struct tty_driver *driver,
 #define TTY_DRIVER_RESET_TERMIOS	0x0002
 #define TTY_DRIVER_REAL_RAW		0x0004
 #define TTY_DRIVER_DYNAMIC_DEV		0x0008
+#define TTY_DRIVER_NO_DEVFS		0x0008
 #define TTY_DRIVER_DEVPTS_MEM		0x0010
 
 /* tty driver types */

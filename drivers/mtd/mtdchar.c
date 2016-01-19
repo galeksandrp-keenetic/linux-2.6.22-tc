@@ -19,7 +19,13 @@
 
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_DEVFS_FS
+#include <linux/devfs_fs_kernel.h>
+#else
+#include <linux/device.h>
+
 static struct class *mtd_class;
+#endif
 
 #if defined(TCSUPPORT_VOIP)
 /*#11542: For voice afftected by Flash action issue*/
@@ -32,12 +38,20 @@ static void mtd_notify_add(struct mtd_info* mtd)
 	if (!mtd)
 		return;
 
+#ifdef CONFIG_DEVFS_FS
+	devfs_mk_cdev(MKDEV(MTD_CHAR_MAJOR, mtd->index*2),
+			S_IFCHR | S_IRUGO | S_IWUGO, "mtd/%d", mtd->index);
+
+	devfs_mk_cdev(MKDEV(MTD_CHAR_MAJOR, mtd->index*2+1),
+			S_IFCHR | S_IRUGO, "mtd/%dro", mtd->index);
+#else
 	class_device_create(mtd_class, NULL, MKDEV(MTD_CHAR_MAJOR, mtd->index*2),
 			    NULL, "mtd%d", mtd->index);
 
 	class_device_create(mtd_class, NULL,
 			    MKDEV(MTD_CHAR_MAJOR, mtd->index*2+1),
 			    NULL, "mtd%dro", mtd->index);
+#endif
 }
 
 static void mtd_notify_remove(struct mtd_info* mtd)
@@ -45,14 +59,34 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 	if (!mtd)
 		return;
 
+#ifdef CONFIG_DEVFS_FS
+	devfs_remove("mtd/%d", mtd->index);
+	devfs_remove("mtd/%dro", mtd->index);
+#else
 	class_device_destroy(mtd_class, MKDEV(MTD_CHAR_MAJOR, mtd->index*2));
 	class_device_destroy(mtd_class, MKDEV(MTD_CHAR_MAJOR, mtd->index*2+1));
+#endif
 }
 
 static struct mtd_notifier notifier = {
 	.add	= mtd_notify_add,
 	.remove	= mtd_notify_remove,
 };
+#ifdef CONFIG_DEVFS_FS
+	static inline void mtdchar_devfs_init(void)
+	{
+		devfs_mk_dir("mtd");
+		register_mtd_user(&notifier);
+	}
+	static inline void mtdchar_devfs_exit(void)
+	{
+		unregister_mtd_user(&notifier);
+		devfs_remove("mtd");
+	}
+	#else /* !DEVFS */
+	#define mtdchar_devfs_init() do { } while(0)
+	#define mtdchar_devfs_exit() do { } while(0)
+#endif
 
 /*
  * Data structure to hold the pointer to the mtd device as well
@@ -830,6 +864,10 @@ static int __init init_mtdchar(void)
 #if defined(TCSUPPORT_VOIP)
 	atomic_set(&eraseAction, 0);
 #endif
+
+#ifdef CONFIG_DEVFS_FS
+	mtdchar_devfs_init();
+#else
 	mtd_class = class_create(THIS_MODULE, "mtd");
 
 	if (IS_ERR(mtd_class)) {
@@ -839,13 +877,18 @@ static int __init init_mtdchar(void)
 	}
 
 	register_mtd_user(&notifier);
+#endif
 	return 0;
 }
 
 static void __exit cleanup_mtdchar(void)
 {
+#ifdef CONFIG_DEVFS_FS
+	mtdchar_devfs_exit();
+#else
 	unregister_mtd_user(&notifier);
 	class_destroy(mtd_class);
+#endif
 	unregister_chrdev(MTD_CHAR_MAJOR, "mtd");
 }
 

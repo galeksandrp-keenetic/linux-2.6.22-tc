@@ -25,6 +25,7 @@ int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 int root_mountflags = MS_RDONLY | MS_SILENT;
 char * __initdata root_device_name;
 static char __initdata saved_root_name[64];
+static int __initdata root_wait;
 
 dev_t ROOT_DEV;
 
@@ -149,11 +150,13 @@ dev_t name_to_dev_t(char *name)
 		goto out;
 #endif
 
+	printk(KERN_INFO "decoding %s...\n", name);
 	if (strncmp(name, "/dev/", 5) != 0) {
 		unsigned maj, min;
 
 		if (sscanf(name, "%u:%u", &maj, &min) == 2) {
 			res = MKDEV(maj, min);
+			printk(KERN_DEBUG "maj %d, min %d %X\n", maj, min, res);
 			if (maj != MAJOR(res) || min != MINOR(res))
 				goto fail;
 		} else {
@@ -215,6 +218,16 @@ static int __init root_dev_setup(char *line)
 }
 
 __setup("root=", root_dev_setup);
+
+static int __init rootwait_setup(char *str)
+{
+	if (*str)
+		return 0;
+	root_wait = 1;
+	return 1;
+}
+
+__setup("rootwait", rootwait_setup);
 
 static char * __initdata root_mount_data;
 static int __init root_data_setup(char *str)
@@ -341,7 +354,7 @@ static int __init mount_nfs_root(void)
 {
 	void *data = nfs_root_data();
 
-	create_dev("/dev/root", ROOT_DEV);
+	create_dev("/dev/root", ROOT_DEV, root_device_name);
 	if (data &&
 	    do_mount_root("/dev/root", "nfs", root_mountflags, data) == 0)
 		return 1;
@@ -403,7 +416,7 @@ void __init mount_root(void)
 	}
 #endif
 #ifdef CONFIG_BLOCK
-	create_dev("/dev/root", ROOT_DEV);
+	create_dev("/dev/root", ROOT_DEV, root_device_name);
 	mount_block_root("/dev/root", root_mountflags);
 #endif
 }
@@ -414,6 +427,8 @@ void __init mount_root(void)
 void __init prepare_namespace(void)
 {
 	int is_floppy;
+
+	mount_devfs();
 
 	if (root_delay) {
 		printk(KERN_INFO "Waiting %dsec before mounting root device...\n",
@@ -438,18 +453,29 @@ void __init prepare_namespace(void)
 			root_device_name += 5;
 	}
 
-	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
-
 	if (initrd_load())
 		goto out;
+
+	/* wait for any asynchronous scanning to complete */
+	if ((ROOT_DEV == 0) && root_wait) {
+		printk(KERN_INFO "Waiting for root device %s...\n",
+			saved_root_name);
+		while (driver_probe_done() != 0 ||
+			(ROOT_DEV = name_to_dev_t(saved_root_name)) == 0)
+			msleep(100);
+	}
+
+	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
 
 	mount_root();
 out:
+	umount_devfs("/dev");
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
 	security_sb_post_mountroot();
+	mount_devfs_fs ();
 }
 
