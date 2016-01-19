@@ -86,10 +86,6 @@
 #if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
 #include <linux/imq.h>
 #endif
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-#include <linux/if_vlan.h>
-#include <linux/if_ether.h>
-#endif
 /*
    Assumptions:
    - if device has no dev->hard_header routine, it adds and removes ll header
@@ -463,9 +459,6 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 	u8 * skb_head = skb->data;
 	int skb_len = skb->len;
 	unsigned int snaplen, res;
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-	u16 *proto;
-#endif
 
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
@@ -485,13 +478,6 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 		 */
 		if (sk->sk_type != SOCK_DGRAM) {
 			skb_push(skb, skb->data - skb_mac_header(skb));
-	#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-			proto = (u16*)(skb->data + 12);
-			if (*proto == htons(ETH_P_8021Q)) {
-				memmove(skb->data + VLAN_HLEN, skb->data, 12);
-				skb_pull(skb, VLAN_HLEN);
-			}
-	#endif
 		}
 		else if (skb->pkt_type == PACKET_OUTGOING) {
 			/* Special case: outgoing packets have ll header at head */

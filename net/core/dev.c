@@ -160,14 +160,6 @@
  *		86DD	IPv6
  */
 
-#if !defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-int (*hook_bridge_shortcut_process)(struct net_device *net_dev, struct sk_buff *skb);
-EXPORT_SYMBOL(hook_bridge_shortcut_process);
-void (*hook_dev_shortcut_learn)(struct sk_buff *skb, struct net_device *dev);
-EXPORT_SYMBOL(hook_dev_shortcut_learn);
-#endif
-#endif
 
 static DEFINE_SPINLOCK(ptype_lock);
 __DMEM static struct list_head ptype_base[16] __read_mostly;	/* 16 way hashed list */
@@ -1482,13 +1474,6 @@ __IMEM int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				goto gso;
 		}
 
-#if !defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-		if(hook_dev_shortcut_learn){
-			hook_dev_shortcut_learn(skb, dev);
-		}
-#endif	
-#endif
 		return dev->hard_start_xmit(skb, dev);
 	}
 
@@ -1578,21 +1563,6 @@ static inline __be16 pppoe_proto(const struct sk_buff *skb)
 u32 qos_queue_mask = 0;
 #endif
 
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
-int (*insert_vtag_hook)(struct sk_buff **pskb);
-#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-int (*check_vtag_hook)(void);
-#endif
-int (*get_vtag_hook)(struct net_device *dev, struct sk_buff *skb);
-EXPORT_SYMBOL(remove_vtag_hook);
-EXPORT_SYMBOL(insert_vtag_hook);
-#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-EXPORT_SYMBOL(check_vtag_hook);
-#endif
-EXPORT_SYMBOL(get_vtag_hook);
-#endif
-
 #if !defined(CONFIG_TCSUPPORT_CT) 
 __IMEM int dev_queue_xmit(struct sk_buff *skb)
 {
@@ -1613,14 +1583,6 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 #endif
 	unsigned int /*ifidx,*/ newtos, oldtos;
 	int ret, rule_no, rtp_match;
-#endif
-
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-	#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-	if (check_vtag_hook && (check_vtag_hook()) == 1)
-	#endif
-		if (insert_vtag_hook && (-1 == insert_vtag_hook(&skb)))
-			return rc;
 #endif
 
 #ifdef CONFIG_QOS
@@ -2346,27 +2308,6 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 		skb->iif = skb->dev->ifindex;
 
 	orig_dev = skb_bond(skb);
-#if !defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-	if(hook_bridge_shortcut_process)
-	{
-		if( hook_bridge_shortcut_process(skb->dev, skb) ){
-			return NET_RX_DROP;
-		}	
-	}
-#endif
-#endif
-
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-	#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-	if (check_vtag_hook && (check_vtag_hook() == 1))
-	#endif
-		if (get_vtag_hook)
-			if (-1 == get_vtag_hook(orig_dev, skb)) {
-				kfree_skb(skb);
-				return NET_RX_DROP;
-			}
-#endif
 
 	if (!orig_dev)
 		return NET_RX_DROP;
@@ -2432,13 +2373,6 @@ ncls:
 		smux_pkt_recv_hook) {
 		atomic_inc(&skb->users);
               ret = smux_pkt_recv_hook(skb, skb->dev, orig_dev);		  
-#if (defined(CONFIG_TCSUPPORT_WAN_ETHER) || defined(CONFIG_TCSUPPORT_WAN_ATM)) && defined(CONFIG_TCSUPPORT_MULTISERVICE_ON_WAN)
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-			  if (skb) {
-			  	skb->vlan_tag_flag |= VLAN_TAG_FROM_INDEV;
-			  }
-#endif			  
-#endif
         }
         else {
 #endif /* CONFIG_SMUX */

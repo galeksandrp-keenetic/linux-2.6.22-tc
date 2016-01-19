@@ -540,12 +540,6 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			skb_pull(skb, sizeof(llc_oui_pid_pad));
 			skb->protocol = eth_type_trans(skb, net_dev);
 
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-#if !defined(CONFIG_TCSUPPORT_CT) 
-			skb->fb_flags |= FB_WAN_ENABLE;
-#endif
-#endif
-
 		/* accept packets that have "ipv[46]" in the snap header */
 		}
         else if ((skb->len >= (sizeof(llc_oui_ipv4))) && 
@@ -580,12 +574,6 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			}
 			skb_pull(skb, BR2684_PAD_LEN); /* pad, dstmac, srcmac, ethtype */
 			skb->protocol = eth_type_trans(skb, net_dev);
-
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-#if !defined(CONFIG_TCSUPPORT_CT) 
-			skb->fb_flags |= FB_WAN_ENABLE;
-#endif
-#endif		
 
 		} else {
 			skb->protocol = __constant_htons(ETH_P_IP);

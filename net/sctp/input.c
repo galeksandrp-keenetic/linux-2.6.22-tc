@@ -248,8 +248,14 @@ int sctp_rcv(struct sk_buff *skb)
 	sctp_bh_lock_sock(sk);
 
 	if (sock_owned_by_user(sk)) {
+		if (sctp_add_backlog(sk, skb)) {
+			sctp_bh_unlock_sock(sk);
+			sctp_chunk_free(chunk);
+			skb = NULL; /* sctp_chunk_free already freed the skb */
+			goto discard_release;
+		}
+
 		SCTP_INC_STATS_BH(SCTP_MIB_IN_PKT_BACKLOG);
-		sctp_add_backlog(sk, skb);
 	} else {
 		SCTP_INC_STATS_BH(SCTP_MIB_IN_PKT_SOFTIRQ);
 		sctp_inq_push(&chunk->rcvr->inqueue, chunk);
@@ -319,7 +325,9 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 		sctp_bh_lock_sock(sk);
 
 		if (sock_owned_by_user(sk)) {
-			sk_add_backlog(sk, skb);
+			if (sk_add_backlog(sk, skb))
+ 				sctp_chunk_free(chunk);
+ 			else
 			backloged = 1;
 		} else
 			sctp_inq_push(inqueue, chunk);
@@ -349,9 +357,13 @@ static void sctp_add_backlog(struct sock *sk, struct sk_buff *skb)
 {
 	struct sctp_chunk *chunk = SCTP_INPUT_CB(skb)->chunk;
 	struct sctp_ep_common *rcvr = chunk->rcvr;
+	int ret;
 
+	ret = sk_add_backlog(sk, skb);
+	if (!ret) {
 	/* Hold the assoc/ep while hanging on the backlog queue.
-	 * This way, we know structures we need will not disappear from us
+		 * This way, we know structures we need will not disappear
+		 * from us
 	 */
 	if (SCTP_EP_TYPE_ASSOCIATION == rcvr->type)
 		sctp_association_hold(sctp_assoc(rcvr));
@@ -359,8 +371,8 @@ static void sctp_add_backlog(struct sock *sk, struct sk_buff *skb)
 		sctp_endpoint_hold(sctp_ep(rcvr));
 	else
 		BUG();
-
-	sk_add_backlog(sk, skb);
+	}
+	return ret;
 }
 
 /* Handle icmp frag needed error. */

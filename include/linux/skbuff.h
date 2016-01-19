@@ -281,10 +281,6 @@ struct sk_buff {
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	int				(*skb_recycling_callback)(struct sk_buff *skb);
-	int				skb_recycling_ind;
-#endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct nf_conntrack	*nfct;
 	struct sk_buff		*nfct_reasm;
@@ -308,18 +304,8 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
-#ifdef	CONFIG_TCSUPPORT_VLAN_TAG
-	__u16		vlan_tags[2];
-#define		VLAN_PACKET				(1<<0)
-#define		VLAN_2TAGS_PACKET		(1<<1)
-#define		ROUTING_MODE_PACKET		(1<<2)
-#define		VLAN_TAG_FROM_INDEV		(1<<3)	
-#define		VLAN_TAG_INSERT_FLAG	(1<<4)
-#define		VLAN_TAG_CHECK_FLAG		(1<<5)
-#define		VLAN_TAG_FROM_WAN		(1<<6)
-	__u32	vlan_tag_flag;
-#endif
-#if 1//def CONFIG_QOS
+
+#ifdef CONFIG_QOS
 #define QOS_DEFAULT_MARK 			0x8
 #define QOS_FILTER_MARK 			0xf0
 /* no queue marked packets to default queue */
@@ -336,17 +322,6 @@ struct sk_buff {
 #define ROUTE_POLICY_MASK			(1 << 24)
 //#define QOS_WANIF_MARK			0xff000
 //#define QOS_DSCP_MARK  			0x3f00000
-#endif
-#if !defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-#define FB_WAN_ENABLE 	(1<<0)
-#define FB_FLOOD_PKT 	(1<<1)
-	__u8	fb_flags;
-	__u8    sc_mac_learned;
-#endif
-#endif
-#if defined(CONFIG_MIPS_RT63365) && defined(CONFIG_TCSUPPORT_WAN_ETHER)
-	__u8    wan_port_flag;
 #endif
 	__u32			mark;  /*The first 4 bits are used to identify LAN interfaces. 0x10000000~0x90000000:LAN1~LAN4,ra0~ra3,usb0*/
 
@@ -1217,19 +1192,7 @@ static inline int skb_network_offset(const struct sk_buff *skb)
  * headroom, you should not reduce this.
  */
 #ifndef NET_SKB_PAD
-#if !defined(CONFIG_TCSUPPORT_CT) 
-/* Temporary set NET_SKB_PAD as 16 for RT65168 */
-#if defined(CONFIG_MIPS_RT65168)
-//#define NET_SKB_PAD	16
-#define NET_SKB_PAD	32 //for pppoa vc crash issue,change from 16 to 32
-#else
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 #define NET_SKB_PAD	32
-#else
-#define NET_SKB_PAD	16
-#endif
-#endif
-#endif
 
 #endif
 
@@ -1356,8 +1319,6 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
  */
 static inline struct sk_buff *dev_alloc_skb(unsigned int length)
 {
-	//return __dev_alloc_skb(length, GFP_ATOMIC);
-	/*Not to printk warring message, it will be wasted cpu resource*/
 	return __dev_alloc_skb(length, GFP_ATOMIC|__GFP_NOWARN);
 }
 
@@ -1399,16 +1360,15 @@ static inline struct sk_buff *netdev_alloc_skb(struct net_device *dev,
 static inline int __skb_cow(struct sk_buff *skb, unsigned int headroom,
 			    int cloned)
 {
-	int delta = 0;
+	int delta = (headroom > NET_SKB_PAD ? headroom : NET_SKB_PAD) -
+			skb_headroom(skb);
 
-	if (headroom < NET_SKB_PAD)
-		headroom = NET_SKB_PAD;
-	if (headroom > skb_headroom(skb))
-		delta = headroom - skb_headroom(skb);
+	if (delta < 0)
+		delta = 0;
 
 	if (delta || cloned)
-		return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD), 0,
-					GFP_ATOMIC);
+		return pskb_expand_head(skb, (delta + (NET_SKB_PAD-1)) &
+				~(NET_SKB_PAD-1), 0, GFP_ATOMIC);
 	return 0;
 }
 
@@ -1778,11 +1738,6 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 	dst->nf_bridge  = src->nf_bridge;
 	nf_bridge_get(src->nf_bridge);
 #endif
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-	dst->vlan_tags[0] = src->vlan_tags[0];
-	dst->vlan_tags[1] = src->vlan_tags[1];
-	dst->vlan_tag_flag = src->vlan_tag_flag;
-#endif
 }
 
 static inline void nf_copy(struct sk_buff *dst, const struct sk_buff *src)
@@ -1827,45 +1782,6 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 		skb->ip_summed = CHECKSUM_NONE;
 }
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-
-struct sk_buff *skbmgr_alloc_skb2k(void);
-int skbmgr_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb2k(void)
-{
-	struct sk_buff *skb = skbmgr_alloc_skb2k();
-	if (likely(skb))
-		skb_reserve(skb, NET_SKB_PAD);
-	return skb;
-}
-struct sk_buff *skbmgr_alloc_skb4k(void);
-int skbmgr_4k_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb4k(void)
-{
-	struct sk_buff *skb = skbmgr_alloc_skb4k();
-	if (likely(skb))
-		skb_reserve(skb, NET_SKB_PAD);
-	return skb;
-}
-
-
-#if defined(CONFIG_MIPS_TC3262)
-
-struct sk_buff *skbmgr_alloc_skb128(void);
-int skbmgr_sg_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb128(void)
-{
-	struct sk_buff *skb = skbmgr_alloc_skb128();
-	if (likely(skb))
-		skb_reserve(skb, NET_SKB_PAD);
-	return skb;
-}
-
-#endif
-#endif
 
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

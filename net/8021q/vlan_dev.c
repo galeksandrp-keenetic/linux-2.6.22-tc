@@ -37,14 +37,6 @@
 #include <linux/if_vlan.h>
 #include <net/ip.h>
 
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-extern int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
-extern int (*insert_vtag_hook)(struct sk_buff **pskb);
-#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-extern int (*check_vtag_hook)(void);
-#endif
-#endif
-
 /*
  *	Rebuild the Ethernet MAC header. This is called after an ARP
  *	(or in future other address resolution) has completed on this
@@ -166,112 +158,12 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	if (!skb->dev) {
 		rcu_read_unlock();
 
-#ifdef CONFIG_TCSUPPORT_VLAN_TAG
-#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-		if (check_vtag_hook && (check_vtag_hook() == 1)) {
-			if (remove_vtag_hook) {
-				 if (remove_vtag_hook(skb, orig_dev) == -1) {
-				 	/* must free skb !! */
-					kfree_skb(skb);
-					return -1;
-				 }
-				 else {
-				 	netif_rx(skb);
-					return 0;
-				 }
-			}
-			else {
-				goto Normal_Handle;
-			}
-		}
-		else {
-Normal_Handle:
-			if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n'))) {
-				proto = vhdr->h_vlan_encapsulated_proto;
-				skb->protocol = proto;
-				/* Take off the VLAN header (4 bytes currently) */
-				skb_pull_rcsum(skb, VLAN_HLEN);
-				skb->dev = orig_dev;
-				
-				netif_rx(skb);
-				return 0;
-			}
-			else {
 #ifdef VLAN_DEBUG
 				printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
 					__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
 #endif
 				kfree_skb(skb);
 				return -1;
-
-			}
-		}
-#else
-			if (remove_vtag_hook) {
-				 if (remove_vtag_hook(skb, orig_dev) == -1) {
-					/* must free skb !! */
-					kfree_skb(skb);
-					return -1;
-				 }
-				 else {
-				 	netif_rx(skb);
-					return 0;
-				 }
-			}
-			else {
-				if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n'))) {
-					proto = vhdr->h_vlan_encapsulated_proto;
-					skb->protocol = proto;
-					/* Take off the VLAN header (4 bytes currently) */
-					skb_pull_rcsum(skb, VLAN_HLEN);
-					skb->dev = orig_dev;
-					
-					netif_rx(skb);
-					return 0;
-				}
-				else {
-#ifdef VLAN_DEBUG
-					printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
-						__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
-#endif
-					kfree_skb(skb);
-					return -1;
-				}
-			}	
-#endif
-#else
-#if 0
-#ifdef VLAN_DEBUG
-		printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
-			__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
-#endif
-		kfree_skb(skb);
-		return -1;
-#else
-#if !defined(CONFIG_TCSUPPORT_CT) 
-		if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n')))
-#endif
-		{
-			proto = vhdr->h_vlan_encapsulated_proto;
-			skb->protocol = proto;
-			/* Take off the VLAN header (4 bytes currently) */
-			skb_pull_rcsum(skb, VLAN_HLEN);
-			skb->dev = orig_dev;
-			netif_rx(skb);
-			return 0;
-		}
-		else
-		{
-#ifdef VLAN_DEBUG
-		printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
-			__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
-#endif
-		kfree_skb(skb);
-		return -1;
-
-		}
-#endif
-#endif
 	}
 
 	skb->dev->last_rx = jiffies;
@@ -307,10 +199,6 @@ Normal_Handle:
 	 */
 	skb->priority = vlan_get_ingress_priority(skb->dev, ntohs(vhdr->h_vlan_TCI));
 
-#if 0  /*Rodney_20090724*/
-	skb->mark |= EBT_VLAN_MARK;
-	skb->mark |= (ntohs(vlan_TCI) << 5);
-#endif
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG "%s: priority: %lu  for TCI: %hu (hbo)\n",
 		__FUNCTION__, (unsigned long)(skb->priority),
@@ -422,35 +310,7 @@ Normal_Handle:
 	rcu_read_unlock();
 	return 0;
 }
-#if 0  /*Rodney_20090724*/
-static inline unsigned short vlan_dev_get_egress_qos_mask(struct net_device* dev,
-							  struct sk_buff* skb)
-{
-	struct vlan_priority_tci_mapping *mp;
 
-    /* bits 18~20 hold the QoS 8021p value only if the valid bit 4 is set */
-    if (skb->mark & EBT_VLAN_REMARKING){
-       unsigned short vlan_qos;
-
-       vlan_qos = ((skb->mark >> 18) & 0x7) << 13;
-       /*after remarking, clear EBT_VLAN_REMARKING bit*/
-       skb->mark &= (~EBT_VLAN_REMARKING);
-       return vlan_qos;
-	}
-	else{
-		mp = VLAN_DEV_INFO(dev)->egress_priority_map[(skb->priority & 0xF)];
-		while (mp) {
-			if (mp->priority == skb->priority) {
-				return mp->vlan_qos; /* This should already be shifted to mask
-					      * correctly with the VLAN's TCI
-					      */
-			}
-			mp = mp->next;
-		}
-	}
-	return 0;
-}
-#else
 static inline unsigned short vlan_dev_get_egress_qos_mask(struct net_device* dev,
 							  struct sk_buff* skb)
 {
@@ -468,7 +328,6 @@ static inline unsigned short vlan_dev_get_egress_qos_mask(struct net_device* dev
 	return 0;
 }
 
-#endif
 /*
  *	Create the VLAN header for an arbitrary protocol layer
  *
@@ -587,37 +446,6 @@ int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 
 	return rc;
 }
-#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
-
-int vlan_dev_fastbridge_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-	struct net_device_stats *stats = vlan_dev_get_stats(dev);
-	unsigned short veth_TCI;
-
-	/* Construct the second two bytes. This field looks something
-	 * like:
-	 * usr_priority: 3 bits	 (high bits)
-	 * CFI		 1 bit
-	 * VLAN ID	 12 bits (low bits)
-	 */
-	veth_TCI = VLAN_DEV_INFO(dev)->vlan_id;
-	veth_TCI |= vlan_dev_get_egress_qos_mask(dev, skb);
-	skb = __vlan_put_tag(skb, veth_TCI);
-
-	if (!skb) {
-		stats->tx_dropped++;
-		return 0;
-	}
-
-	stats->tx_packets++;
-	stats->tx_bytes += skb->len;
-
-	skb->dev = VLAN_DEV_INFO(dev)->real_dev;
-
-	return skb->dev->hard_start_xmit(skb, skb->dev);
-}
-EXPORT_SYMBOL(vlan_dev_fastbridge_hard_start_xmit);
-#endif
 
 int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -630,10 +458,7 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * OTHER THINGS LIKE FDDI/TokenRing/802.3 SNAPs...
 	 */
 
-#if !defined(CONFIG_TCSUPPORT_CT) 
-	/* if interface is ethernet interface, let it insert more than one vlan header */
-	if ((veth->h_vlan_proto != htons(ETH_P_8021Q)) || (skb->dev->name[0] == 'e')) {
-#endif
+	if (veth->h_vlan_proto != htons(ETH_P_8021Q)) {
 		int orig_headroom = skb_headroom(skb);
 		unsigned short veth_TCI;
 
