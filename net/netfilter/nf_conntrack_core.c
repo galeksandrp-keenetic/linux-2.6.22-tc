@@ -1069,6 +1069,10 @@ resolve_normal_ct(struct sk_buff *skb,
 extern int gre_input(struct sk_buff *skb);
 #endif
 
+#if defined (CONFIG_PPPOL2TP)
+extern int l2tp_input(struct sk_buff *skb);
+#endif
+
 
 #ifdef CONFIG_MIPS_TC3262
 __IMEM
@@ -1115,6 +1119,19 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	    protonum == IPPROTO_GRE ) {
 		
 		if( gre_input(*pskb) == 1 ) return NF_STOLEN;
+	}
+#endif
+
+#if defined (CONFIG_PPPOL2TP)
+   if( hooknum == NF_IP_PRE_ROUTING &&
+	    (*pskb)->pkt_type == PACKET_HOST && 
+	    protonum == IPPROTO_UDP &&
+	    (iph = ip_hdr(*pskb)) &&
+		 (udp = (struct udphdr*)((*pskb)->data + (iph->ihl << 2))) &&
+		 udp->dest == htons(1701) && 
+		 udp->source == htons(1701) ) {
+		
+		if( l2tp_input(*pskb) == 1 ) return NF_STOLEN;
 	}
 #endif
 
