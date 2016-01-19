@@ -108,6 +108,11 @@
 #include "./int_source.h" /*shnwind add*/
 #endif
 
+#ifdef __BIG_ENDIAN
+#define __OFS 0x03
+#else
+#define __OFS 0x00
+#endif
 
 #ifndef INT32
 #define INT32
@@ -368,21 +373,21 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
  * UART Module Registers *
  *************************/
 #define	CR_UART_BASE    	0xBFBF0000
-#define	CR_UART_RBR     	(0x00+CR_UART_BASE+0x03)
-#define	CR_UART_THR     	(0x00+CR_UART_BASE+0x03)
-#define	CR_UART_IER     	(0x04+CR_UART_BASE+0x03)
-#define	CR_UART_IIR     	(0x08+CR_UART_BASE+0x03)
-#define	CR_UART_FCR     	(0x08+CR_UART_BASE+0x03)
-#define	CR_UART_LCR     	(0x0c+CR_UART_BASE+0x03)
-#define	CR_UART_MCR     	(0x10+CR_UART_BASE+0x03)
-#define	CR_UART_LSR     	(0x14+CR_UART_BASE+0x03)
-#define	CR_UART_MSR     	(0x18+CR_UART_BASE+0x03)
-#define	CR_UART_SCR     	(0x1c+CR_UART_BASE+0x03)
-#define	CR_UART_BRDL    	(0x00+CR_UART_BASE+0x03)
-#define	CR_UART_BRDH    	(0x04+CR_UART_BASE+0x03)
+#define	CR_UART_RBR     	(0x00+CR_UART_BASE+__OFS)
+#define	CR_UART_THR     	(0x00+CR_UART_BASE+__OFS)
+#define	CR_UART_IER     	(0x04+CR_UART_BASE+__OFS)
+#define	CR_UART_IIR     	(0x08+CR_UART_BASE+__OFS)
+#define	CR_UART_FCR     	(0x08+CR_UART_BASE+__OFS)
+#define	CR_UART_LCR     	(0x0c+CR_UART_BASE+__OFS)
+#define	CR_UART_MCR     	(0x10+CR_UART_BASE+__OFS)
+#define	CR_UART_LSR     	(0x14+CR_UART_BASE+__OFS)
+#define	CR_UART_MSR     	(0x18+CR_UART_BASE+__OFS)
+#define	CR_UART_SCR     	(0x1c+CR_UART_BASE+__OFS)
+#define	CR_UART_BRDL    	(0x00+CR_UART_BASE+__OFS)
+#define	CR_UART_BRDH    	(0x04+CR_UART_BASE+__OFS)
 #define	CR_UART_WORDA		(0x20+CR_UART_BASE+0x00)
 #define	CR_UART_HWORDA		(0x28+CR_UART_BASE+0x00)
-#define	CR_UART_MISCC		(0x24+CR_UART_BASE+0x03)
+#define	CR_UART_MISCC		(0x24+CR_UART_BASE+__OFS)
 #define	CR_UART_XYD     	(0x2c+CR_UART_BASE)
 
 #define	UART_BRD_ACCESS		0x80
@@ -439,21 +444,21 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
  * HSUART Module Registers *
  *************************/
 #define	CR_HSUART_BASE    	0xBFBF0300
-#define	CR_HSUART_RBR     	(0x00+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_THR     	(0x00+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_IER     	(0x04+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_IIR     	(0x08+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_FCR     	(0x08+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_LCR     	(0x0c+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_MCR     	(0x10+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_LSR     	(0x14+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_MSR     	(0x18+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_SCR     	(0x1c+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_BRDL    	(0x00+CR_HSUART_BASE+0x03)
-#define	CR_HSUART_BRDH    	(0x04+CR_HSUART_BASE+0x03)
+#define	CR_HSUART_RBR     	(0x00+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_THR     	(0x00+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_IER     	(0x04+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_IIR     	(0x08+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_FCR     	(0x08+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_LCR     	(0x0c+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_MCR     	(0x10+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_LSR     	(0x14+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_MSR     	(0x18+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_SCR     	(0x1c+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_BRDL    	(0x00+CR_HSUART_BASE+__OFS)
+#define	CR_HSUART_BRDH    	(0x04+CR_HSUART_BASE+__OFS)
 #define	CR_HSUART_WORDA		(0x20+CR_HSUART_BASE+0x00)
 #define	CR_HSUART_HWORDA	(0x28+CR_HSUART_BASE+0x00)
-#define	CR_HSUART_MISCC		(0x24+CR_HSUART_BASE+0x03)
+#define	CR_HSUART_MISCC		(0x24+CR_HSUART_BASE+__OFS)
 #define	CR_HSUART_XYD     	(0x2c+CR_HSUART_BASE)
 
 /**********************************
