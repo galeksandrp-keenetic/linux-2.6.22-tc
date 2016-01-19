@@ -213,6 +213,8 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	clear_bit(TTY_OTHER_CLOSED, &tty->link->flags);
 	set_bit(TTY_THROTTLED, &tty->flags);
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
+	/* Force set Low Latency in enabled */
+	tty->low_latency = 1;
 	retval = 0;
 out:
 	return retval;
