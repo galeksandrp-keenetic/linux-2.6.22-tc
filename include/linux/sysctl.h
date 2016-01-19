@@ -238,6 +238,7 @@ enum
 	NET_LLC=18,
 	NET_NETFILTER=19,
 	NET_DCCP=20,
+	NET_IGMPSN=21,
 };
 
 /* /proc/sys/kernel/random */
@@ -351,6 +352,14 @@ enum
 	NET_NF_CONNTRACK_L2TP_ENABLE=37,
 	NET_NF_CONNTRACK_IPSEC_ENABLE=38,
     	NET_NF_FULLCONE_ENABLE=39,
+};
+
+/* /proc/sys/net/igmpsn */
+enum
+{
+	NET_IGMPSN_SWITCH_SNOOPING_ENABLE = 1,
+	NET_IGMPSN_UNICAST_SENDING_ENABLE = 2,
+	NET_IGMPSN_DEBUG_ENABLE = 3,
 };
 
 /* /proc/sys/net/ipv4 */
