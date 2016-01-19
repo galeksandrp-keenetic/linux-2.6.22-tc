@@ -35,9 +35,6 @@
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/netfilter_ipv4.h>
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-#define NAT_DNS_PORT 53
-#endif
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_l3proto.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
@@ -74,14 +71,6 @@ EXPORT_SYMBOL_GPL(nf_conntrack_htable_size);
 
 int nf_conntrack_max __read_mostly;
 EXPORT_SYMBOL_GPL(nf_conntrack_max);
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-int nf_conntrack_reserve __read_mostly = 500;
-EXPORT_SYMBOL_GPL(nf_conntrack_reserve);
-int nf_conntrack_reserve_proto __read_mostly = 6;
-EXPORT_SYMBOL_GPL(nf_conntrack_reserve_proto);
-int nf_conntrack_reserve_port __read_mostly = 80;
-EXPORT_SYMBOL_GPL(nf_conntrack_reserve_port);
-#endif
 
 struct list_head *nf_conntrack_hash __read_mostly;
 EXPORT_SYMBOL_GPL(nf_conntrack_hash);
@@ -689,13 +678,6 @@ static int early_drop(struct list_head *chain)
 	/* Traverse backwards: gives us oldest, which is roughly LRU */
 	struct nf_conntrack_tuple_hash *h;
 	struct nf_conn *ct = NULL, *tmp = NULL;
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-	struct nf_conn *ct2 = NULL;
-	__be16 dstport;
-	u_int8_t protonum;
-	int flag = 0;
-	int flag2 = 0;
-#endif
 	int dropped = 0;
 
 	read_lock_bh(&nf_conntrack_lock);
@@ -703,40 +685,10 @@ static int early_drop(struct list_head *chain)
 		tmp = nf_ct_tuplehash_to_ctrack(h);	
 		if (!test_bit(IPS_ASSURED_BIT, &tmp->status)) {
 			ct = tmp;
-#if !defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 			atomic_inc(&ct->ct_general.use);
-#endif
 			break;
 		}
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-		else{
-			if(!flag){
-				protonum = tmp->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum;
-				if((protonum ==  IPPROTO_TCP) || (protonum ==IPPROTO_UDP) ){
-					//only support to kick TCP, UDP conntrack now
-					dstport = ntohs(tmp->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u.all);
-					if(nf_conntrack_reserve_port == 80){
-						if(dstport == 80 || dstport == 8080)
-							flag2 = 1;
-					}
-					if((tmp->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == nf_conntrack_reserve_proto) 
-						&& (flag2 || (dstport == nf_conntrack_reserve_port))){
-							ct2 = tmp;
-							flag = 1;
-					}
-				}
-			}
-		}
-#endif
 	}
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-	if(ct == NULL && ct2 != NULL){
-		ct = ct2;	
-	}
-	if(ct != NULL){
-		atomic_inc(&ct->ct_general.use);
-	}
-#endif
 	read_unlock_bh(&nf_conntrack_lock);
 
 	if (!ct)
@@ -750,36 +702,7 @@ static int early_drop(struct list_head *chain)
 	nf_ct_put(ct);
 	return dropped;
 }
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-static int allowToCreateSession(const struct nf_conntrack_tuple *orig){
-	/*return value
-	only support reserve TCP UDP proto now
-	1: allow to create nat session
-	0: not allow to create nat session
-	*/
-	__be16 dstport;
-	u_int8_t protonum = orig->dst.protonum;
-	int flag = 0;
-	if((protonum ==  IPPROTO_TCP) || (protonum ==IPPROTO_UDP) )
-		dstport = ntohs(orig->dst.u.all);
-	else
-		return 0;
-	
-	if(NAT_DNS_PORT== dstport)
-		return 1;//allow dns request
-		
-	if(nf_conntrack_reserve_port == 80){
-		if(dstport == 80 || dstport == 8080)
-			flag = 1;
-	}
 
-	if(protonum == nf_conntrack_reserve_proto 
-		&& (flag || dstport == nf_conntrack_reserve_port)){
-		return 1;
-	}
-	return 0;
-}
-#endif
 static struct nf_conn *
 __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 		     const struct nf_conntrack_tuple *repl,
@@ -788,7 +711,6 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 {
 	struct nf_conn *conntrack = NULL;
 	struct nf_conntrack_helper *helper;
-	int max;
 
 	if (unlikely(!nf_conntrack_hash_rnd_initted)) {
 		get_random_bytes(&nf_conntrack_hash_rnd, 4);
@@ -797,20 +719,9 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 
 	/* We don't want any race condition at early drop stage */
 	atomic_inc(&nf_conntrack_count);
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-	max = nf_conntrack_max-nf_conntrack_reserve;
-#else
-	max = nf_conntrack_max;
-#endif
-	volatile int  tmp_nf_conntrack_count = atomic_read(&nf_conntrack_count);
 
 	if (nf_conntrack_max
-	    && tmp_nf_conntrack_count > max) 
-	{
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-		if (tmp_nf_conntrack_count > nf_conntrack_max)
-#endif
-		{
+	    && atomic_read(&nf_conntrack_count) > nf_conntrack_max) {
 			unsigned int hash = hash_conntrack(orig);
 			/* Try dropping from this hash chain. */
 			if (!early_drop(&nf_conntrack_hash[hash])) {
@@ -819,20 +730,8 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 					printk(KERN_WARNING
 					       "nf_conntrack: table full, dropping"
 					       " packet.\n");
-				goto error;
-			}
+			return ERR_PTR(-ENOMEM);
 		}
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-		else{
-			/*	here has some limitation. if session count get to max ,but not get to nf_conntrack_max
-			 *	,any session request excpet tcp+80 will drop ,without call early_drop function.
-			 */
-	    		if(!allowToCreateSession(orig)){
-				atomic_dec(&nf_conntrack_count);			
-				goto error;
-	    		}
-		}
-#endif
 	}
 
 	/*  find features needed by this conntrack. */
@@ -878,8 +777,6 @@ out:
 	read_unlock_bh(&nf_ct_cache_lock);
 	atomic_dec(&nf_conntrack_count);
 	return conntrack;
-error:
-	return ERR_PTR(-ENOMEM);
 	
 }
 
@@ -1103,6 +1000,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	int set_reply = 0;
 	int ret;
 	struct nf_conn_help *phelp;
+	struct nf_conntrack_helper *helper;
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	int (*fast_nat_bind_hook)(struct nf_conn *ct,
@@ -1168,8 +1066,10 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	if( !(is_helper = skip_offload_nat(pskb, protonum)) ) {
 	phelp = nfct_help(ct);
-	if (phelp && phelp->helper)
+		if (phelp && (helper = rcu_dereference(phelp->helper)) ) {
 		is_helper = 1;
+			//printk("nat helper found, name: %s\n", helper->name);
+		}
 	}
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)

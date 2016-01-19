@@ -341,32 +341,6 @@ static ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-	{
-		.ctl_name	= NET_NF_CONNTRACK_RESERVE,
-		.procname	= "nf_conntrack_reserve",
-		.data		= &nf_conntrack_reserve,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= NET_NF_CONNTRACK_RESERVE_PROTO,
-		.procname	= "nf_conntrack_reserve_proto",
-		.data		= &nf_conntrack_reserve_proto,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= NET_NF_CONNTRACK_RESERVE_PORT,
-		.procname	= "nf_conntrack_reserve_port",
-		.data		= &nf_conntrack_reserve_port,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-#endif
 	{
 		.ctl_name	= NET_NF_CONNTRACK_COUNT,
 		.procname	= "nf_conntrack_count",

@@ -340,7 +340,7 @@ help_out(struct sk_buff **pskb, unsigned char *rb_ptr, unsigned int datalen,
 
                 if (expinfo.pbtype == pb_range) {
                         DEBUGP("Changing expectation mask to handle multiple ports\n");
-			//exp->mask.dst.u.udp.port  = 0xfffe;
+							exp->mask.dst.u.udp.port  = 0xfffe;
                 }
 
                 DEBUGP("expect_related %u.%u.%u.%u:%u-%u.%u.%u.%u:%u\n",
@@ -477,11 +477,10 @@ init(void)
         for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
                 hlpr = &rtsp_helpers[i];
                 memset(hlpr, 0, sizeof(struct nf_conntrack_helper));
-		hlpr->tuple.src.l3num = AF_INET;
                 hlpr->tuple.src.u.tcp.port = htons(ports[i]);
                 hlpr->tuple.dst.protonum = IPPROTO_TCP;
-		//hlpr->mask.src.u.tcp.port = 0xFFFF;
-		//hlpr->mask.dst.protonum = 0xFF;
+					 hlpr->mask.src.u.tcp.port = 0xFFFF;
+					 hlpr->mask.dst.protonum = 0xFF;
                 hlpr->max_expected = max_outstanding;
                 hlpr->timeout = setup_timeout;
                 hlpr->me = THIS_MODULE;

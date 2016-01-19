@@ -281,11 +281,6 @@ extern unsigned int nf_conntrack_htable_size;
 extern int nf_conntrack_checksum;
 extern atomic_t nf_conntrack_count;
 extern int nf_conntrack_max;
-#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-extern int nf_conntrack_reserve;
-extern int nf_conntrack_reserve_port;
-extern int nf_conntrack_reserve_proto;
-#endif
 /*for alg switch*/
 extern int nf_conntrack_ftp_enable;
 extern int nf_conntrack_sip_enable;
