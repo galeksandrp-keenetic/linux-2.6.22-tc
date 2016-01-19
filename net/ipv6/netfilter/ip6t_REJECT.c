@@ -206,6 +206,9 @@ static unsigned int reject6_target(struct sk_buff **pskb,
 	case IP6T_ICMP6_PORT_UNREACH:
 		send_unreach(*pskb, ICMPV6_PORT_UNREACH, hooknum);
 		break;
+	case IP6T_ICMP6_SOURCE_FAILED_POLICY:
+		send_unreach(*pskb, ICMPV6_SOURCE_FAILED_POLICY, hooknum);
+		break;
 	case IP6T_ICMP6_ECHOREPLY:
 		/* Do nothing */
 		break;
