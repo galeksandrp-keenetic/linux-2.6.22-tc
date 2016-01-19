@@ -134,6 +134,18 @@ unsigned int nf_iterate(struct list_head *head,
 	list_for_each_continue_rcu(*i, head) {
 		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
 
+		if (((elem == NULL) || (elem->hook == NULL)) && (*skb != NULL))
+		{
+			printk ("Big problem in nf_hook_slow, return NF_DROP\n");
+			return NF_DROP;
+		}
+		
+		if(*skb == NULL)
+		{
+			printk ("Big problem in nf_hook_slow, return NF_STOP\n");
+			return NF_STOP;
+		}
+		
 		if (hook_thresh > elem->priority)
 			continue;
 
