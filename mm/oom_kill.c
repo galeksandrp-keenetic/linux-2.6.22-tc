@@ -26,6 +26,11 @@
 #include <linux/notifier.h>
 
 int sysctl_panic_on_oom;
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS
+extern int auto_kill_process_flag;
+#endif
+#endif
 /* #define DEBUG */
 
 /**
@@ -343,12 +348,28 @@ static int oom_kill_task(struct task_struct *p)
 	return 0;
 }
 
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS	
+extern void drop_pagecache(void);
+#endif
+#endif
 static int oom_kill_process(struct task_struct *p, unsigned long points,
 		const char *message)
 {
 	struct task_struct *c;
 	struct list_head *tsk;
 
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS	
+//when out of memory,no need to kill process
+	if(auto_kill_process_flag)
+	{
+	//	printk("\r\noom_kill_process:no need to kill process when out of memory and drop cache!");
+		drop_pagecache();
+		return 0;
+	}
+#endif
+#endif
 	/*
 	 * If the task is already exiting, don't alarm the sysadmin or kill
 	 * its children or threads, just set TIF_MEMDIE so it can die quickly

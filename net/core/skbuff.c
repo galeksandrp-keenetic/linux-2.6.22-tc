@@ -2230,7 +2230,11 @@ __IMEM struct sk_buff *skbmgr_alloc_skb2k(void)
 try_normal:
 	if ((skbmgr_limit == 0) || (atomic_read(&skbmgr_alloc_no) < skbmgr_limit)) {
 #if !defined(TCSUPPORT_CT) 
-#if !defined(TCSUPPORT_MEMORY_CONTROL) 
+#if defined(TCSUPPORT_MEMORY_CONTROL)
+	#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+		skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN | __GFP_TCMC);/*jlliu*/
+	#endif
+#else
 		skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN);
 #endif
 #endif

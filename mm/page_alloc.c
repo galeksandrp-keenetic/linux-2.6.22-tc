@@ -46,6 +46,12 @@
 #include <asm/div64.h>
 #include "internal.h"
 
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS
+extern int auto_clear_cache_flag;
+extern void tc3162wdog_kick(void);
+#endif
+#endif
 /*
  * MCD - HACK: Find somewhere to initialize this EARLY, or make this
  * initializer cleaner
@@ -1295,6 +1301,9 @@ nofail_alloc:
 			if (page)
 				goto got_pg;
 			if (gfp_mask & __GFP_NOFAIL) {
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+				tc3162wdog_kick();
+#endif
 				congestion_wait(WRITE, HZ/50);
 				goto nofail_alloc;
 			}
@@ -1338,6 +1347,9 @@ nofail_alloc:
 		if (page)
 			goto got_pg;
 
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+		tc3162wdog_kick();
+#endif
 
 		out_of_memory(zonelist, gfp_mask, order);
 		goto restart;
@@ -1358,6 +1370,9 @@ nofail_alloc:
 			do_retry = 1;
 	}
 	if (do_retry) {
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+		tc3162wdog_kick();
+#endif
 		congestion_wait(WRITE, HZ/50);
 		goto rebalance;
 	}
@@ -1367,6 +1382,16 @@ nopage:
 		printk(KERN_WARNING "%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
 			p->comm, order, gfp_mask);
+#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+		#ifdef CONFIG_PROC_FS
+		if(auto_clear_cache_flag)
+		{
+			printk("\r\n__alloc_pages : clear cache when alloc page fail!");
+			drop_pagecache();
+		}
+		tc3162wdog_kick();
+		#endif
+#endif
 		
 		dump_stack();
 		show_mem();
