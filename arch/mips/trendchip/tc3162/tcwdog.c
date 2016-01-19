@@ -54,10 +54,14 @@
 #include <linux/miscdevice.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/timer.h>
 #include <linux/proc_fs.h>
 #include <asm/tc3162/tc3162.h>
 #include <asm/tc3162/TCIfSetQuery_os.h>
 
+#if defined(CONFIG_RALINK_TIMER) /* Standalone Mode, McMCC, 27.04.2012 */
+struct timer_list wdg_timer;
+#else
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
 #else
@@ -70,6 +74,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #endif
 
 static int watchdog_enabled = 0;
+#endif
 
 extern void timer_Configure(uint8  timer_no, uint8 timer_enable, uint8 timer_mode, uint8 timer_halt);
 extern void timerSet(uint32 timer_no, uint32 timerTime, uint32 enable, uint32 mode, uint32 halt);
@@ -84,7 +89,7 @@ void watchDogReset(void)
 	    adsl_dev_ops->set(ADSL_SET_DMT_CLOSE, NULL, NULL); 
 #endif
 
-/*watchdog reset*/
+	/*watchdog reset*/
 	timerSet(5, 10 * TIMERTICKS_10MS, ENABLE, TIMER_TOGGLEMODE, TIMER_HALTDISABLE);
 	timer_WatchDogConfigure(ENABLE, ENABLE);
 
@@ -108,8 +113,14 @@ void tc3162wdog_kick(void)
 }
 EXPORT_SYMBOL(tc3162wdog_kick);
 
+#if defined(CONFIG_RALINK_TIMER) /* Standalone Mode, McMCC, 27.04.2012 */
+static void wdt_reload(unsigned long data)
+{
+	tc3162wdog_kick();
+	mod_timer(&wdg_timer, jiffies + HZ * CONFIG_RALINK_WDG_REFRESH_INTERVAL);
+}
+#else
 /* handle open device */
-
 static int tc3162wdog_open(struct inode *inode, struct file *file)
 {
 	/*	Allow only one person to hold it open */
@@ -165,19 +176,19 @@ static struct miscdevice tc3162wdog_miscdev = {
 	name:		"watchdog",
 	fops:		&tc3162wdog_fops,
 };
+#endif
 
 static int watchdog_reset_read_proc(char *page, char **start, off_t off,
 		int count, int *eof, void *data){
 
 	return 0;
 }
+
 static int watchdog_reset_write_proc(struct file *file, const char *buffer,
 	unsigned long count, void *data){
 	watchDogReset();	
 	return 0;
 }
-
-
 
 static int __init tc3162_watchdog_init(void)
 {
@@ -186,16 +197,34 @@ static int __init tc3162_watchdog_init(void)
 	watchdog_proc->read_proc = watchdog_reset_read_proc;
 	watchdog_proc->write_proc = watchdog_reset_write_proc;
 
+#if defined(CONFIG_RALINK_TIMER) /* Standalone Mode, McMCC, 27.04.2012 */
+	timerSet(5, 2000 * TIMERTICKS_10MS, ENABLE, TIMER_TOGGLEMODE, TIMER_HALTDISABLE);
+	timer_WatchDogConfigure(ENABLE, ENABLE);
+	printk("TC3162 hardware watchdog initialized\n");
+	init_timer(&wdg_timer);
+	wdg_timer.expires = jiffies + HZ * CONFIG_RALINK_WDG_REFRESH_INTERVAL;
+	wdg_timer.data = 0;
+	wdg_timer.function = wdt_reload;
+	add_timer(&wdg_timer);
+#else
 	misc_register(&tc3162wdog_miscdev);
+#endif
+
 	printk("TC3162 hardware watchdog module loaded.\n");
 	return 0;
 }
 
 static void __exit tc3162_watchdog_exit(void)
 {
+#if defined(CONFIG_RALINK_TIMER) /* Standalone Mode, McMCC, 27.04.2012 */
+	/* Stop watchdog timer */
+	timer_WatchDogConfigure(DISABLE, DISABLE);
+	printk("TC3162 hardware watchdog stopped\n");
+	del_timer_sync(&wdg_timer);
+#else
 	misc_deregister(&tc3162wdog_miscdev);
+#endif
 }
 
 module_init(tc3162_watchdog_init);
 module_exit(tc3162_watchdog_exit);
-
