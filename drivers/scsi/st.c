@@ -35,6 +35,7 @@ static const char *verstr = "20070203";
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>
 #include <linux/moduleparam.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/cdev.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
@@ -4062,6 +4063,20 @@ static int st_probe(struct device *dev)
 		if (error)
 			goto out_free_tape;
 	}
+	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+		/* Make sure that the minor numbers corresponding to the four
+			first modes always get the same names */
+		i = mode << (4 - ST_NBR_MODE_BITS);
+		/*  Rewind entry  */
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, 0)),
+					S_IFCHR | S_IRUGO | S_IWUGO,
+					"%s/mt%s", SDp->devfs_name, st_formats[i]);
+		/*  No-rewind entry  */
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, 1)),
+					S_IFCHR | S_IRUGO | S_IWUGO,
+					"%s/mt%sn", SDp->devfs_name, st_formats[i]);
+	}
+	disk->number = devfs_register_tape(SDp->devfs_name);
 
 	sdev_printk(KERN_NOTICE, SDp,
 		    "Attached scsi tape %s\n", tape_name(tpnt));
@@ -4116,9 +4131,13 @@ static int st_remove(struct device *dev)
 			scsi_tapes[i] = NULL;
 			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
+			devfs_unregister_tape(tpnt->disk->number);
 			sysfs_remove_link(&tpnt->device->sdev_gendev.kobj,
 					  "tape");
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+				j = mode << (4 - ST_NBR_MODE_BITS);
+				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[j]);
+				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[j]);
 				for (j=0; j < 2; j++) {
 					class_device_destroy(st_sysfs_class,
 							     MKDEV(SCSI_TAPE_MAJOR,

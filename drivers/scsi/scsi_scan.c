@@ -833,9 +833,9 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 			sdev->inq_periph_qual, inq_result[2] & 0x07,
 			(inq_result[3] & 0x0f) == 1 ? " CCS" : "");
 
-	/*
-	 * End sysfs code.
-	 */
+	sprintf(sdev->devfs_name, "scsi/host%d/bus%d/target%d/lun%d",
+				sdev->host->host_no, sdev->channel,
+				sdev->id, sdev->lun);
 
 	if ((sdev->scsi_level >= SCSI_2) && (inq_result[7] & 2) &&
 	    !(*bflags & BLIST_NOTQ))

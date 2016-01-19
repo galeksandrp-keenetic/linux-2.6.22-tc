@@ -48,6 +48,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/poll.h>
@@ -981,6 +982,8 @@ static int usblp_probe(struct usb_interface *intf,
 		goto abort_intfdata;
 	}
 	usblp->minor = intf->minor;
+	devfs_mk_cdev(MKDEV(USB_MAJOR, usblp->minor), S_IFCHR | S_IRUGO | S_IWUGO,
+						"usblp%d", usblp->minor);
 	info("usblp%d: USB %sdirectional printer dev %d "
 		"if %d alt %d proto %d vid 0x%4.4X pid 0x%4.4X",
 		usblp->minor, usblp->bidir ? "Bi" : "Uni", dev->devnum,
@@ -1185,6 +1188,7 @@ static void usblp_disconnect(struct usb_interface *intf)
 		BUG ();
 	}
 
+	devfs_remove("usblp%d", usblp->minor);
 	device_remove_file(&intf->dev, &dev_attr_ieee1284_id);
 
 	mutex_lock (&usblp_mutex);

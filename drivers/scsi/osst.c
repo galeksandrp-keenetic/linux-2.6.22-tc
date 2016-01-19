@@ -48,6 +48,7 @@ static const char * osst_version = "0.99.4";
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
 #include <linux/moduleparam.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/delay.h>
 #include <linux/jiffies.h>
 #include <asm/uaccess.h>
@@ -5860,6 +5861,18 @@ static int osst_probe(struct device *dev)
 		STps->drv_block = (-1);
 		STps->drv_file = (-1);
 	}
+	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+		/*  Rewind entry  */
+		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5)),
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				"%s/ot%s", SDp->devfs_name, osst_formats[mode]);
+
+		/*  No-rewind entry  */
+		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5) + 128),
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				"%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
+	}
+	drive->number = devfs_register_tape(SDp->devfs_name);
 
 	tpnt->current_mode = 0;
 	tpnt->modes[0].defined = 1;
@@ -5915,6 +5928,11 @@ static int osst_remove(struct device *dev)
 			osst_sysfs_destroy(MKDEV(OSST_MAJOR, i));
 			osst_sysfs_destroy(MKDEV(OSST_MAJOR, i+128));
 			tpnt->device = NULL;
+			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+				devfs_remove("%s/ot%s", SDp->devfs_name, osst_formats[mode]);
+				devfs_remove("%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
+			}
+			devfs_unregister_tape(tpnt->drive->number);
 			put_disk(tpnt->drive);
 			os_scsi_tapes[i] = NULL;
 			osst_nr_dev--;
