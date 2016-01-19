@@ -57,7 +57,6 @@ ifeq ($(CONFIG_NET),y)
 obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
 endif
 
-ifeq ($(TCSUPPORT_RA_HWNAT),1)
+ifneq ($(CONFIG_RA_NAT_NONE),y)
 obj-y 						+= nat/foe_hook/
 endif
-

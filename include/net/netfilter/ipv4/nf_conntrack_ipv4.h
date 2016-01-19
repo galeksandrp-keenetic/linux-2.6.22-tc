@@ -13,7 +13,7 @@
 #include <net/netfilter/nf_nat.h>
 #include <linux/netfilter/nf_conntrack_pptp.h>
 
-/* per conntrack: nat application helper private data */
+/* Returns new sk_buff, or NULL */
 union nf_conntrack_nat_help {
         /* insert nat helper private data here */
 	struct nf_nat_pptp nat_pptp_info;

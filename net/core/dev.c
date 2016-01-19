@@ -1170,11 +1170,7 @@ static void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		if ((ptype->dev == dev || !ptype->dev) &&
 		    (ptype->af_packet_priv == NULL ||
 		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
-#if defined(TCSUPPORT_HWNAT)		
-			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
-#else
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
-#endif
 			if (!skb2)
 				break;
 

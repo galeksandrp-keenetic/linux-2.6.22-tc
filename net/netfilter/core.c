@@ -125,12 +125,14 @@ unsigned int nf_iterate(struct list_head *head,
 			int (*okfn)(struct sk_buff *),
 			int hook_thresh)
 {
-	unsigned int verdict;
+	unsigned int verdict, fnat;
 
 	/*
 	 * The caller must not block between calls to this
 	 * function because of risk of continuing from deleted element.
 	 */
+	 
+	fnat = 0;
 	list_for_each_continue_rcu(*i, head) {
 		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
 
@@ -152,7 +154,13 @@ unsigned int nf_iterate(struct list_head *head,
 		/* Optimization: we don't need to hold module
 		   reference here, since function can't sleep. --RR */
 		verdict = elem->hook(hook, skb, indev, outdev, okfn);
-		if (verdict != NF_ACCEPT) {
+
+		if (verdict != NF_ACCEPT 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)		
+			&& verdict != NF_FAST_NAT
+#endif
+			) {
+
 #ifdef CONFIG_NETFILTER_DEBUG
 			if (unlikely((verdict & NF_VERDICT_MASK)
 							> NF_MAX_VERDICT)) {
@@ -165,8 +173,16 @@ unsigned int nf_iterate(struct list_head *head,
 				return verdict;
 			*i = (*i)->prev;
 		}
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)		
+		else if( verdict == NF_FAST_NAT ) fnat = 1;
 	}
+
+	return fnat ? NF_FAST_NAT : NF_ACCEPT;
+#else 
+	}
+	
 	return NF_ACCEPT;
+#endif
 }
 
 
@@ -202,6 +218,12 @@ next_hook:
 			      verdict >> NF_VERDICT_BITS))
 			goto next_hook;
 	}
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	else if( verdict == NF_FAST_NAT ) {
+		ret = 0xDEAD; /* hack for okfn */
+		goto unlock;
+	}
+#endif	
 unlock:
 	rcu_read_unlock();
 	return ret;

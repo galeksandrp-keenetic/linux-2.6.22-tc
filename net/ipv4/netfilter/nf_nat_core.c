@@ -352,8 +352,10 @@ nf_nat_setup_info(struct nf_conn *ct,
 EXPORT_SYMBOL(nf_nat_setup_info);
 
 /* Returns true if succeeded. */
-static int
-manip_pkt(u_int16_t proto,
+#if !defined(CONFIG_FAST_NAT) && !defined(CONFIG_FAST_NAT_MODULE)
+static
+#endif
+int manip_pkt(u_int16_t proto,
 	  struct sk_buff **pskb,
 	  unsigned int iphdroff,
 	  const struct nf_conntrack_tuple *target,
@@ -385,6 +387,9 @@ manip_pkt(u_int16_t proto,
 	}
 	return 1;
 }
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+EXPORT_SYMBOL(manip_pkt);
+#endif
 
 /* Do packet manipulations according to nf_nat_setup_info. */
 unsigned int nf_nat_packet(struct nf_conn *ct,

@@ -374,6 +374,11 @@ static const struct file_operations ct_cpu_seq_fops = {
 	.release = seq_release_private,
 };
 
+static int conntrack_flush(char *buffer, char **start, off_t offset, int length)
+{
+	nf_conntrack_flush();
+	return 0;
+}
 int __init nf_conntrack_ipv4_compat_init(void)
 {
 	struct proc_dir_entry *proc, *proc_exp, *proc_stat;
@@ -382,6 +387,9 @@ int __init nf_conntrack_ipv4_compat_init(void)
 	if (!proc)
 		goto err1;
 
+	proc = proc_net_create("ip_conntrack_flush", 0440, conntrack_flush);
+	if (!proc)
+		goto err1;
 	proc_exp = proc_net_fops_create("ip_conntrack_expect", 0440,
 					&ip_exp_file_ops);
 	if (!proc_exp)
@@ -399,6 +407,7 @@ int __init nf_conntrack_ipv4_compat_init(void)
 err3:
 	proc_net_remove("ip_conntrack_expect");
 err2:
+	proc_net_remove("ip_conntrack_flush");
 	proc_net_remove("ip_conntrack");
 err1:
 	return -ENOMEM;

@@ -21,7 +21,7 @@
  */
 
 /*
- *  ==FILEVERSION 20050812==
+ *  ==FILEVERSION 20000724==
  *
  *  NOTE TO MAINTAINERS:
  *     If you modify this file at all, please set the above date.
@@ -110,6 +110,19 @@ struct ifpppcstatsreq {
 	struct ppp_comp_stats stats;
 };
 
+struct pppol2tp_ioc_stats {
+	__u16		tunnel_id;	/* redundant */
+	__u16		session_id;	/* if zero, get tunnel stats */
+	__u32		using_ipsec:1;	/* valid only for session_id == 0 */
+	aligned_u64	tx_packets;
+	aligned_u64	tx_bytes;
+	aligned_u64	tx_errors;
+	aligned_u64	rx_packets;
+	aligned_u64	rx_bytes;
+	aligned_u64	rx_seq_discards;
+	aligned_u64	rx_oos_packets;
+	aligned_u64	rx_errors;
+};
 #define ifr__name       b.ifr_ifrn.ifrn_name
 #define stats_ptr       b.ifr_ifru.ifru_data
 
@@ -146,6 +159,7 @@ struct ifpppcstatsreq {
 #define PPPIOCDISCONN	_IO('t', 57)		/* disconnect channel */
 #define PPPIOCATTCHAN	_IOW('t', 56, int)	/* attach to ppp channel */
 #define PPPIOCGCHAN	_IOR('t', 55, int)	/* get ppp channel number */
+#define PPPIOCGL2TPSTATS _IOR('t', 54, struct pppol2tp_ioc_stats)
 
 #define SIOCGPPPSTATS   (SIOCDEVPRIVATE + 0)
 #define SIOCGPPPVER     (SIOCDEVPRIVATE + 1)	/* NEVER change this!! */

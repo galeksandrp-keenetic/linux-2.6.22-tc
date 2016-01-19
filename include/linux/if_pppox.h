@@ -27,6 +27,7 @@
 #include <asm/semaphore.h>
 #include <linux/ppp_channel.h>
 #endif /* __KERNEL__ */
+#include <linux/if_pppol2tp.h>
 
 /* For user-space programs to pick up these definitions
  * which they wouldn't get otherwise without defining __KERNEL__
@@ -46,20 +47,37 @@ struct pppoe_addr{
        char            dev[IFNAMSIZ];          /* Local device to use */ 
 }; 
  
+struct pptp_addr{
+       __u16           call_id;
+       struct in_addr  sin_addr;
+       __u32           magic_num;
+};
 /************************************************************************ 
  * Protocols supported by AF_PPPOX 
  */ 
 #define PX_PROTO_OE    0 /* Currently just PPPoE */
-#define PX_MAX_PROTO   1	
- 
+#define PX_PROTO_OL2TP 1 /* Now L2TP also */
+#define PX_PROTO_PPTP  2
+#define PX_MAX_PROTO   3
 struct sockaddr_pppox { 
        sa_family_t     sa_family;            /* address family, AF_PPPOX */ 
        unsigned int    sa_protocol;          /* protocol identifier */ 
        union{ 
                struct pppoe_addr       pppoe; 
+	       struct pptp_addr        pptp; 
        }sa_addr; 
 }__attribute__ ((packed)); 
 
+/* The use of the above union isn't viable because the size of this
+ * struct must stay fixed over time -- applications use sizeof(struct
+ * sockaddr_pppox) to fill it. We use a protocol specific sockaddr
+ * type instead.
+ */
+struct sockaddr_pppol2tp {
+	sa_family_t     sa_family;      /* address family, AF_PPPOX */
+	unsigned int    sa_protocol;    /* protocol identifier */
+	struct pppol2tp_addr pppol2tp;
+}__attribute__ ((packed));
 
 /*********************************************************************
  *
@@ -114,6 +132,7 @@ struct pppoe_hdr {
 /* Length of entire PPPoE + PPP header */
 #define PPPOE_SES_HLEN	8
 
+#define PPTP_SO_TIMEOUT 1
 #ifdef __KERNEL__
 #include <linux/skbuff.h>
 
@@ -129,6 +148,15 @@ struct pppoe_opt {
 	struct sockaddr_pppox	relay;	  /* what socket data will be
 					     relayed to (PPPoE relaying) */
 };
+struct pptp_opt {
+        struct pptp_addr        src_addr;
+        struct pptp_addr        dst_addr;
+        __u32 ack_sent, ack_recv;
+        __u32 seq_sent, seq_recv;
+        int ppp_flags;
+};
+#define PPTP_FLAG_PAUSE 0
+#define PPTP_FLAG_PROC 1
 
 #include <net/sock.h>
 
@@ -139,6 +167,7 @@ struct pppox_sock {
 	struct pppox_sock	*next;	  /* for hash table */
 	union {
 		struct pppoe_opt pppoe;
+		struct pptp_opt pptp;
 	} proto;
 	unsigned short		num;
 };

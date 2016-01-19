@@ -46,14 +46,6 @@ struct vm_area_struct;
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
 
-#if defined(TCSUPPORT_HWNAT)
-#define __GFP_SKIP_PKTFLOW	((__force gfp_t)0x400000u)
-#define GFP_SKIP_PKTFLOW	__GFP_SKIP_PKTFLOW
-#else
-#define __GFP_SKIP_PKTFLOW	((__force gfp_t)0x0u)
-#define GFP_SKIP_PKTFLOW	__GFP_SKIP_PKTFLOW
-#endif
-
 #if !defined(TCSUPPORT_CT) 
 #if defined(TCSUPPORT_MEMORY_CONTROL)
 #define __GFP_TCMC	((__force gfp_t)0x80000u)/* Memory control flag,used by skbmgr_alloc_skb2k,jlliu */
@@ -69,14 +61,13 @@ struct vm_area_struct;
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
 			__GFP_NOFAIL|__GFP_NORETRY|__GFP_COMP| \
-			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_TCMC|__GFP_TC_CRITICAL| \
-			__GFP_SKIP_PKTFLOW)
+			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_TCMC|__GFP_TC_CRITICAL)
 #else
 /* if you forget to add the bitmask here kernel will crash, period */
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
 			__GFP_NOFAIL|__GFP_NORETRY|__GFP_COMP| \
-			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_SKIP_PKTFLOW)
+			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE)
 #endif
 
 #endif

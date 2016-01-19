@@ -71,12 +71,6 @@
 #include <asm/system.h>
 
 #include "kmap_skb.h"
-#if defined(TCSUPPORT_HWNAT)		
-#include <linux/pktflow.h>	
-#endif			
-#ifdef TCSUPPORT_RA_HWNAT
-#include <linux/foe_hook.h>
-#endif
 
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 //only one skbmgr pool for every CPU. shnwind 20101215.
@@ -339,14 +333,6 @@ void kfree_skbmem(struct sk_buff *skb)
 	struct sk_buff *other;
 	atomic_t *fclone_ref;
 
-#if defined(TCSUPPORT_HWNAT)		
-	pktflow_free(skb);		
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-	if (ra_sw_nat_hook_free)
-		ra_sw_nat_hook_free(skb);
-#endif
-
 	skb_release_data(skb);
 	switch (skb->fclone) {
 	case SKB_FCLONE_UNAVAILABLE:
@@ -464,11 +450,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 {
 	struct sk_buff *n;
 
-#if defined(TCSUPPORT_HWNAT)		
-	int skip_pktflow = gfp_mask & GFP_SKIP_PKTFLOW;
-	gfp_mask &= ~GFP_SKIP_PKTFLOW;
-#endif
-
 	n = skb + 1;
 	if (skb->fclone == SKB_FCLONE_ORIG &&
 	    n->fclone == SKB_FCLONE_UNAVAILABLE) {
@@ -519,16 +500,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	skb->skb_recycling_callback = NULL;
 #endif
 	C(mark);
-#if defined(TCSUPPORT_HWNAT)		
-	if (skip_pktflow)
-		n->pktflow_p = NULL;
-	else
-	pktflow_xfer(n, skb);	
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-	if (ra_sw_nat_hook_xfer)
-		ra_sw_nat_hook_xfer(n, skb);
-#endif
 	__nf_copy(n, skb);
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
@@ -593,13 +564,6 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->skb_recycling_ind = 0;
 #endif
 	new->mark	= old->mark;
-#if defined(TCSUPPORT_HWNAT)		
-	pktflow_xfer(new, old);	
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-	if (ra_sw_nat_hook_xfer)
-		ra_sw_nat_hook_xfer(new, old);
-#endif
 	__nf_copy(new, old);
 #if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
 	new->ipvs_property = old->ipvs_property;
@@ -2277,14 +2241,6 @@ __IMEM int skbmgr_recycling_callback(struct sk_buff *skb)
 			return 0;
 		}
 
-#if defined(TCSUPPORT_HWNAT)		
-		pktflow_free(skb);		
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-
 		if (skb_queue_len(list) > skbmgr_max_list_len)
 			skbmgr_max_list_len = skb_queue_len(list) + 1;
 
@@ -2438,14 +2394,6 @@ int skbmgr_4k_recycling_callback(struct sk_buff *skb)
 			return 0;
 		}
 
-#if defined(TCSUPPORT_HWNAT)		
-		pktflow_free(skb);		
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-
 		if (skb_queue_len(list) > skbmgr_4k_max_list_len)
 			skbmgr_4k_max_list_len = skb_queue_len(list) + 1;
 
@@ -2545,14 +2493,6 @@ int skbmgr_sg_recycling_callback(struct sk_buff *skb)
 			return 0;
 		}
 		
-#if defined(TCSUPPORT_HWNAT)		
-		pktflow_free(skb);		
-#endif
-#ifdef TCSUPPORT_RA_HWNAT
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-
 		if (skb_queue_len(list) > skbmgr_sg_max_list_len)
 			skbmgr_sg_max_list_len = skb_queue_len(list) + 1;
 

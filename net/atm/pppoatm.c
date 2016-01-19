@@ -197,6 +197,9 @@ static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
  * support this yet.  We just return 'DROP_PACKET' which we actually define
  * as success, just to be clear what we're really doing.
  */
+ 
+struct ppp *ppp_find_unit(int unit);
+ 
 #define DROP_PACKET 1
 static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 {
@@ -207,7 +210,7 @@ static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 #ifdef CONFIG_NET_SCHED  /*Rodney_20091115*/
 	if(chan != NULL){
 	    int unit = ppp_unit_number(chan);
-	    struct ppp *ppp= ppp_find_unit(unit);
+	    struct ppp *ppp = ppp_find_unit(unit);
 	    if(ppp != NULL)
 	        ATM_SKB(skb)->vcc->_dev = ppp->dev;
 	}

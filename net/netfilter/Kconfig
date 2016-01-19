@@ -695,5 +695,15 @@ config NETFILTER_XT_MATCH_HASHLIMIT
 	  destination address' or `500pps from any given source address'
 	  with a single rule.
 
+config FAST_NAT
+	tristate 'Support Fast NAT module'
+	depends on NF_CONNTRACK
+
+config RA_NAT_NONE
+	bool 'Disable support Ralink NAT modules'
+	default y
+
+source "net/nat/hw_nat/Kconfig"
+
 endmenu
 

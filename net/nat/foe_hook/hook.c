@@ -36,19 +36,7 @@
 
 int (*ra_sw_nat_hook_rx) (struct sk_buff * skb) = NULL;
 int (*ra_sw_nat_hook_tx) (struct sk_buff * skb, int gmac_no) = NULL;
-int (*ra_sw_nat_hook_free) (struct sk_buff * skb) = NULL;
-int (*ra_sw_nat_hook_rxinfo) (struct sk_buff * skb, int magic, char *data, int data_length) = NULL;
-int (*ra_sw_nat_hook_txq) (struct sk_buff * skb, int txq) = NULL;
-int (*ra_sw_nat_hook_magic) (struct sk_buff * skb, int magic) = NULL;
-int (*ra_sw_nat_hook_set_magic) (struct sk_buff * skb, int magic) = NULL;
-int (*ra_sw_nat_hook_xfer) (struct sk_buff *skb, const struct sk_buff *prev_p) = NULL;
 
 EXPORT_SYMBOL(ra_sw_nat_hook_rx);
 EXPORT_SYMBOL(ra_sw_nat_hook_tx);
-EXPORT_SYMBOL(ra_sw_nat_hook_free);
-EXPORT_SYMBOL(ra_sw_nat_hook_rxinfo);
-EXPORT_SYMBOL(ra_sw_nat_hook_txq);
-EXPORT_SYMBOL(ra_sw_nat_hook_magic);
-EXPORT_SYMBOL(ra_sw_nat_hook_set_magic);
-EXPORT_SYMBOL(ra_sw_nat_hook_xfer);
 

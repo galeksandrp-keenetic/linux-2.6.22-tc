@@ -83,6 +83,10 @@
 #include <linux/netlink.h>
 #include <linux/tcp.h>
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include <linux/../../net/nat/hw_nat/ra_nat.h>
+#endif
+
 #if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
 #include <linux/imq.h>
 #endif
@@ -320,6 +324,9 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
+	int iskip_nf;
+	iskip_nf = (ipfragok & 0x8000);
+	ipfragok &= ~0x8000;
 
 	/* Skip all of this if the packet is already routed,
 	 * f.e. by something like SCTP.
@@ -394,7 +401,19 @@ packet_routed:
 
 	skb->priority = sk->sk_priority;
 
-	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
+	if( iskip_nf ) {
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+			if( IS_SPACE_AVAILABLED(skb) &&
+				((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+				(FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+				(FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))) {
+					FOE_ALG(skb)=1;
+			}
+#endif
+		
+		return dst_output(skb);
+	} else return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		       dst_output);
 
 no_route:

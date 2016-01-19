@@ -15,6 +15,11 @@
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter/xt_MARK.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <linux/netfilter/nf_conntrack_common.h>
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marc Boucher <marc@mbsi.ca>");
 MODULE_DESCRIPTION("ip[6]tables MARK modification module");
@@ -44,11 +49,21 @@ target_v1(struct sk_buff **pskb,
 	  const void *targinfo)
 {
 	const struct xt_mark_target_info_v1 *markinfo = targinfo;
-	int mark = 0;
+	int mark;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	struct	nf_conn *ct;
+	enum ip_conntrack_info ctinfo;
+	ct = nf_ct_get(*pskb, &ctinfo);
+#endif	
+	mark = 0;
+	
 
 	switch (markinfo->mode) {
 	case XT_MARK_SET:
 		mark = markinfo->mark;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+		if( ct ) ct->fast_ext = 1;
+#endif
 		break;
 
 	case XT_MARK_AND:

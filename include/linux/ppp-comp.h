@@ -24,11 +24,11 @@
  * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
  * OR MODIFICATIONS.
  *
- * $Id: ppp-comp.h,v 1.1.1.1 2010/04/09 09:39:31 feiyan Exp $
+ * $Id: ppp-comp.h,v 1.6 1997/11/27 06:04:44 paulus Exp $
  */
 
 /*
- *  ==FILEVERSION 980319==
+ *  ==FILEVERSION 20040509==
  *
  *  NOTE TO MAINTAINERS:
  *     If you modify this file at all, please set the above date.
@@ -111,8 +111,6 @@ struct compressor {
 
 	/* Used in locking compressor modules */
 	struct module *owner;
-	/* Extra skb space needed by the compressor algorithm */
-	unsigned int comp_extra;
 };
 
 /*
@@ -193,11 +191,40 @@ struct compressor {
 #define DEFLATE_CHK_SEQUENCE	0
 
 /*
- * Definitions for MPPE.
+ * Definitions for MPPE/MPPC.
  */
 
 #define CI_MPPE                18      /* config option for MPPE */
 #define CILEN_MPPE              6      /* length of config option */
+
+#define MPPE_OVHD		4	/* MPPE overhead */
+#define MPPE_MAX_KEY_LEN	16	/* largest key length (128-bit) */
+
+#define MPPE_STATELESS          0x01	/* configuration bit H */
+#define MPPE_40BIT              0x20	/* configuration bit L */
+#define MPPE_56BIT              0x80	/* configuration bit M */
+#define MPPE_128BIT             0x40	/* configuration bit S */
+#define MPPE_MPPC               0x01	/* configuration bit C */
+
+/*
+ * Definitions for Stac LZS.
+ */
+
+#define CI_LZS			17	/* config option for Stac LZS */
+#define CILEN_LZS		5	/* length of config option */
+
+#define LZS_OVHD		4	/* max. LZS overhead */
+#define LZS_HIST_LEN		2048	/* LZS history size */
+#define LZS_MAX_CCOUNT		0x0FFF	/* max. coherency counter value */
+
+#define LZS_MODE_NONE		0
+#define LZS_MODE_LCB		1
+#define LZS_MODE_CRC		2
+#define LZS_MODE_SEQ		3
+#define LZS_MODE_EXT		4
+
+#define LZS_EXT_BIT_FLUSHED	0x80	/* bit A */
+#define LZS_EXT_BIT_COMP	0x20	/* bit C */
 
 /*
  * Definitions for other, as yet unsupported, compression methods.

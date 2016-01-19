@@ -146,16 +146,23 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 
-#ifdef TCSUPPORT_RA_HWNAT
-#include <linux/foe_hook.h>
-#endif
-
 extern unsigned int dbgEnable;
 /*
  *	SNMP management statistics
  */
 
 __DMEM DEFINE_SNMP_STAT(struct ipstats_mib, ip_statistics) __read_mostly;
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+int (*fast_nat_hit_hook_func)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(fast_nat_hit_hook_func);
+#endif
+
+
 
 /*
  *	Process Router Attention IP option
@@ -275,11 +282,14 @@ int ip_local_deliver(struct sk_buff *skb)
 			return 0;
 	}
 
-#ifdef TCSUPPORT_RA_HWNAT
-	if (ra_sw_nat_hook_free)
-		ra_sw_nat_hook_free(skb);
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(skb) &&
+		((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+	    FOE_ALG(skb)=1;
+	}
 #endif
-
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
 		       ip_local_deliver_finish);
 }
@@ -387,6 +397,24 @@ drop:
 	return NET_RX_DROP;
 }
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+static inline int ip_fast_nat_finish(struct sk_buff *skb) {
+	int ret;
+	int (*fast_nat_hit_hook)(struct sk_buff *skb);
+	
+	ret = 0;
+	
+	if( (fast_nat_hit_hook = rcu_dereference(fast_nat_hit_hook_func)) ) {
+		ret = fast_nat_hit_hook(skb);
+	} else {
+		kfree_skb(skb);
+		ret = -EPERM;
+	}
+	
+	return ret;
+}
+#endif
+
 #ifdef CONFIG_TC_VOIP
 #ifdef CONFIG_CM
 typedef int (*send_to_cm_t)(char* buf, int byteCnt, int channel);
@@ -419,6 +447,7 @@ __IMEM int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_typ
 {
 	struct iphdr *iph;
 	u32 len;
+	int ret;
 
 #ifdef CONFIG_TC_VOIP
 	//cputime64_t user, nice, system, idle, iowait, irq, softirq, steal;
@@ -524,8 +553,27 @@ __IMEM int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_typ
 	/* Remove any debris in the socket control block */
 	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
 
-	return NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
+	ret = NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
 		       ip_rcv_finish);
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if( ret == 0xDEAD ) {
+		if (skb->dst == NULL) {
+			struct iphdr *iph = ip_hdr(skb);
+			struct net_device *dev = skb->dev;
+
+			if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos, dev)) {
+				goto drop;
+			}
+
+			skb->dev = skb->dst->dev;
+		}
+		
+		ret = NF_HOOK(PF_INET, NF_IP_FORWARD, skb, dev, skb->dev,
+		       ip_fast_nat_finish);
+	}
+#endif
+
+	return ret;
 
 inhdr_error:
 	IP_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);

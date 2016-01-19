@@ -50,3 +50,10 @@ obj-$(CONFIG_CRYPTO_MICHAEL_MIC) += michael_mic.o
 obj-$(CONFIG_CRYPTO_CRC32C) += crc32c.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
+obj-$(CONFIG_OCF_OCF) += ocf/
+
+#
+# generic algorithms and the async_tx api
+#
+obj-$(CONFIG_XOR_BLOCKS) += xor.o
+obj-$(CONFIG_ASYNC_CORE) += async_tx/

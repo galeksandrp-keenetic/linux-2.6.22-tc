@@ -50,7 +50,7 @@
 #define IP_CMSG_RETOPTS		16
 #define IP_CMSG_PASSSEC		32
 
-#define	TCSUPPORT_IGMP_QOS
+//#define	TCSUPPORT_IGMP_QOS
 #if defined(TCSUPPORT_IGMP_QOS) || defined(TCSUPPORT_CT_DNSBIND)
 #define IP_CMSG_SKB_MARK    64
 #endif

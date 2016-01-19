@@ -48,10 +48,6 @@
 #define SKB_MAX_HEAD(X)		(SKB_MAX_ORDER((X), 0))
 #define SKB_MAX_ALLOC		(SKB_MAX_ORDER(0, 2))
 
-#if defined(TCSUPPORT_HWNAT)
-struct pktflow_t;
-#endif
-
 /* A. Checksumming of received packets by device.
  *
  *	NONE: device failed to checksum this packet.
@@ -288,12 +284,6 @@ struct sk_buff {
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 	int				(*skb_recycling_callback)(struct sk_buff *skb);
 	int				skb_recycling_ind;
-#endif
-#if defined(TCSUPPORT_HWNAT)
-	struct pktflow_t	*pktflow_p;
-#endif
-#if defined(TCSUPPORT_RA_HWNAT)
-	char				foe[8];
 #endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct nf_conntrack	*nfct;
@@ -1414,18 +1404,53 @@ static inline struct sk_buff *netdev_alloc_skb(struct net_device *dev,
  *	The result is skb with writable area skb->head...skb->tail
  *	and at least @headroom of space at head.
  */
+
+static inline int __skb_cow(struct sk_buff *skb, unsigned int headroom,
+			    int cloned)
+{
+	int delta = 0;
+
+	if (headroom < NET_SKB_PAD)
+		headroom = NET_SKB_PAD;
+	if (headroom > skb_headroom(skb))
+		delta = headroom - skb_headroom(skb);
+
+	if (delta || cloned)
+		return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD), 0,
+					GFP_ATOMIC);
+	return 0;
+}
+
+/**
+ *	skb_cow - copy header of skb when it is required
+ *	@skb: buffer to cow
+ *	@headroom: needed headroom
+ *
+ *	If the skb passed lacks sufficient headroom or its data part
+ *	is shared, data is reallocated. If reallocation fails, an error
+ *	is returned and original skb is not changed.
+ *
+ *	The result is skb with writable area skb->head...skb->tail
+ *	and at least @headroom of space at head.
+ */
 static inline int skb_cow(struct sk_buff *skb, unsigned int headroom)
 {
-	int delta = (headroom > NET_SKB_PAD ? headroom : NET_SKB_PAD) -
-			skb_headroom(skb);
+	return __skb_cow(skb, headroom, skb_cloned(skb));
+}
 
-	if (delta < 0)
-		delta = 0;
-
-	if (delta || skb_cloned(skb))
-		return pskb_expand_head(skb, (delta + (NET_SKB_PAD-1)) &
-				~(NET_SKB_PAD-1), 0, GFP_ATOMIC);
-	return 0;
+/**
+ *	skb_cow_head - skb_cow but only making the head writable
+ *	@skb: buffer to cow
+ *	@headroom: needed headroom
+ *
+ *	This function is identical to skb_cow except that we replace the
+ *	skb_cloned check by skb_header_cloned.  It should be used when
+ *	you only need to push on some header and do not need to modify
+ *	the data.
+ */
+static inline int skb_cow_head(struct sk_buff *skb, unsigned int headroom)
+{
+	return __skb_cow(skb, headroom, skb_header_cloned(skb));
 }
 
 /**

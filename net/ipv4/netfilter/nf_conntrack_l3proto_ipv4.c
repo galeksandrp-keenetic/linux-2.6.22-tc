@@ -30,6 +30,14 @@
 #define DEBUGP(format, args...)
 #endif
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+int ipv4_fastnat_conntrack = 1;
+EXPORT_SYMBOL(ipv4_fastnat_conntrack);
+#endif
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
 static int ipv4_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
 			     struct nf_conntrack_tuple *tuple)
 {
@@ -69,7 +77,8 @@ static int ipv4_print_conntrack(struct seq_file *s,
 }
 
 /* Returns new sk_buff, or NULL */
-static struct sk_buff *
+static 
+struct sk_buff *
 nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
 {
 	skb_orphan(skb);
@@ -147,6 +156,14 @@ static unsigned int ipv4_conntrack_help(unsigned int hooknum,
 	helper = rcu_dereference(help->helper);
 	if (!helper)
 		return NF_ACCEPT;
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+   if( IS_SPACE_AVAILABLED(*pskb)  &&
+       ((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
+        (FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
+        (FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE))){
+      FOE_ALG(*pskb)=1;
+   }
+#endif
 	return helper->help(pskb, skb_network_offset(*pskb) + ip_hdrlen(*pskb),
 			    ct, ctinfo);
 }
@@ -314,6 +331,16 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.extra1		= &log_invalid_proto_min,
 		.extra2		= &log_invalid_proto_max,
 	},
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+    {
+		.ctl_name   = NET_IPV4_NF_CONNTRACK_FASTNAT,
+		.procname   = "ip_conntrack_fastnat",
+		.data       = &ipv4_fastnat_conntrack,
+		.maxlen     = sizeof(int),
+		.mode       = 0644,
+		.proc_handler   = &proc_dointvec,
+	},
+#endif
 	{
 		.ctl_name	= 0
 	}

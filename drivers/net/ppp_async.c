@@ -36,11 +36,7 @@
 
 #define PPP_VERSION	"2.4.2"
 
-#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262) //Increase buffer size. shnwind
-#define OBUFSIZE    518
-#else
 #define OBUFSIZE    256
-#endif
 
 /* Structure for storing local state. */
 struct asyncppp {
@@ -163,12 +159,11 @@ ppp_asynctty_open(struct tty_struct *tty)
 	int err;
 
 	err = -ENOMEM;
-	ap = kmalloc(sizeof(*ap), GFP_KERNEL);
+	ap = kzalloc(sizeof(*ap), GFP_KERNEL);
 	if (ap == 0)
 		goto out;
 
 	/* initialize the asyncppp structure */
-	memset(ap, 0, sizeof(*ap));
 	ap->tty = tty;
 	ap->mru = PPP_MRU;
 	spin_lock_init(&ap->xmit_lock);
@@ -361,20 +356,9 @@ ppp_asynctty_receive(struct tty_struct *tty, const unsigned char *buf,
 
 	if (ap == 0)
 		return;
-#if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
-	/*USB host change to polling mode, do not need disable interrupt here.
-	  This modules only use for 3G dongle. shnwind 20101129.*/
-	spin_lock(&ap->recv_lock);
-#else
 	spin_lock_irqsave(&ap->recv_lock, flags);
-#endif
 	ppp_async_input(ap, buf, cflags, count);
-#if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
-	spin_unlock(&ap->recv_lock);
-#else
 	spin_unlock_irqrestore(&ap->recv_lock, flags);
-#endif	
-
 	if (!skb_queue_empty(&ap->rqueue))
 		tasklet_schedule(&ap->tsk);
 	ap_put(ap);

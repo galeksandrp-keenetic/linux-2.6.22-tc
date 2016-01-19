@@ -26,6 +26,11 @@
 #include <net/netfilter/nf_conntrack_l3proto.h>
 #include <net/netfilter/nf_conntrack_core.h>
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
+
+
 #if 0
 #define DEBUGP printk
 #else
@@ -187,6 +192,14 @@ static unsigned int ipv6_confirm(unsigned int hooknum,
 		return NF_ACCEPT;
 	}
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(*pskb)  &&
+		((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
+		 (FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
+		 (FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE))){
+	    FOE_ALG(*pskb)=1;
+	}
+#endif
 	ret = helper->help(pskb, protoff, ct, ctinfo);
 	if (ret != NF_ACCEPT)
 		return ret;

@@ -130,7 +130,12 @@ config IP_NF_MATCH_ADDRTYPE
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-# `filter', generic and specific targets
+config IP_NF_MATCH_IPP2P
+	tristate "IPP2P"
+	depends on IP_NF_IPTABLES
+	help
+	  Module for matching traffic of various Peer-to-Peer applications
+
 config IP_NF_FILTER
 	tristate "Packet filtering"
 	depends on IP_NF_IPTABLES
@@ -422,6 +427,14 @@ config IP_NF_ARP_MANGLE
 	help
 	  Allows altering the ARP packet payload: source and destination
 	  hardware and network addresses.
+config IP_NF_MATCH_WEBSTR
+        tristate "Webstr match support (EXPERIMENTAL)"
+
+config IP_NF_AUTOFW
+        tristate "Automatic port forwarding (autofw) target support"
+
+config IP_NF_TARGET_TRIGGER
+	tristate "port triggering match support"
 
 endmenu
 

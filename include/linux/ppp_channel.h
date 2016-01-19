@@ -22,7 +22,7 @@
 #include <linux/list.h>
 #include <linux/skbuff.h>
 #include <linux/poll.h>
-#include <linux/ppp_defs.h>  /*Rodney_20091115*/
+#include <linux/ppp_defs.h>
 
 struct ppp_channel;
 
@@ -70,16 +70,10 @@ extern int ppp_channel_index(struct ppp_channel *);
 extern int ppp_unit_number(struct ppp_channel *);
 
 /*
- * SMP locking notes:
- * The channel code must ensure that when it calls ppp_unregister_channel,
- * nothing is executing in any of the procedures above, for that
- * channel.  The generic layer will ensure that nothing is executing
- * in the start_xmit and ioctl routines for the channel by the time
- * that ppp_unregister_channel returns.
+ * An instance of /dev/ppp can be associated with either a ppp
+ * interface unit or a ppp channel.  In both cases, file->private_data
+ * points to one of these.
  */
-
-#if 1  /*Rodney_20091115*/  /*move these definition from ppp_generic.c to ppp_channel.h*/
-#define NUM_NP	6		/* Number of NPs. */
 struct ppp_file {
 	enum {
 		INTERFACE=1, CHANNEL
@@ -92,6 +86,14 @@ struct ppp_file {
 	int		index;		/* interface unit / channel number */
 	int		dead;		/* unit/channel has been shut down */
 };
+
+#define NUM_NP	6		/* Number of NPs. */
+/*
+ * Data structure describing one ppp unit.
+ * A ppp unit corresponds to a ppp network interface device
+ * and represents a multilink bundle.
+ * It can have 0 or more ppp channels connected to it.
+ */
 struct ppp {
 	struct ppp_file	file;		/* stuff for read/write/poll 0 */
 	struct file	*owner;		/* file that owns this unit 48 */
@@ -100,6 +102,7 @@ struct ppp {
 	spinlock_t	rlock;		/* lock for receive side 58 */
 	spinlock_t	wlock;		/* lock for transmit side 5c */
 	int		mru;		/* max receive unit 60 */
+	int		mru_alloc;	/* MAX(1500,MRU) for dev_alloc_skb() */
 	unsigned int	flags;		/* control bits 64 */
 	unsigned int	xstate;		/* transmit state bits 68 */
 	unsigned int	rstate;		/* receive state bits 6c */
@@ -129,7 +132,15 @@ struct ppp {
 	unsigned pass_len, active_len;
 #endif /* CONFIG_PPP_FILTER */
 };
-#endif
+
+/*
+ * SMP locking notes:
+ * The channel code must ensure that when it calls ppp_unregister_channel,
+ * nothing is executing in any of the procedures above, for that
+ * channel.  The generic layer will ensure that nothing is executing
+ * in the start_xmit and ioctl routines for the channel by the time
+ * that ppp_unregister_channel returns.
+ */
 
 #endif /* __KERNEL__ */
 #endif
