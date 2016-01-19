@@ -1173,16 +1173,17 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	}
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if( is_helper || hooknum == NF_IP_LOCAL_OUT ) 
+	if( is_helper ) {
 		FOE_ALG_SKIP(*pskb);
-#endif
+	} else if( hooknum == NF_IP_LOCAL_OUT && IS_SPACE_AVAILABLED(*pskb) ) {
+		FOE_AI(*pskb) = UN_HIT;
+	}
+#endif //defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	if( is_helper )
 		ct->fast_ext = 1;
-#endif
 
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	if( pf == PF_INET &&
 		 !ct->fast_ext &&
 			ipv4_fastnat_conntrack && 
@@ -1206,7 +1207,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 				goto pass;
 			}
 		}
-#endif
+#endif //defined(CONFIG_IP_NF_MATCH_WEBSTR) || defined(CONFIG_IP_NF_MATCH_WEBSTR_MODULE)
 		t1 = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
 		t2 = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
 		if (!(t1->dst.u3.ip == t2->src.u3.ip &&
@@ -1218,10 +1219,10 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		}
 	}
 	pass:
-#endif
+#endif //defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
+#endif //defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
-#endif
 	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 		if( hooknum == NF_IP_LOCAL_OUT )
