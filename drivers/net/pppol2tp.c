@@ -395,7 +395,7 @@ int l2tp_input_proc(struct sk_buff *skb) {
 	struct pppox_sock *po;
 
 	if( atomic_read(&chan_cnt) ) {
-		if( !pskb_may_pull(skb, 14) ) goto skip;
+		if( unlikely(14 > skb->len) ) goto skip;
 
 		iph = ip_hdr(skb);
 		ptr = psh = (u8 *)((char *)iph + iph->ihl * 4 + sizeof(struct udphdr));
@@ -438,7 +438,7 @@ int l2tp_input_proc(struct sk_buff *skb) {
 			offset = (int)(ptr - psh) + iph->ihl * 4 + sizeof(struct udphdr) ;
 	
       if( hdrflags & L2TP_HDRFLAG_T ) { /* control packet, process hello and send to userspace */
-     		if( !(hdrflags & L2TP_HDRFLAG_S) || !pskb_may_pull(skb, offset + 8) ) goto skip_put;
+     		if( !(hdrflags & L2TP_HDRFLAG_S) || unlikely(offset + 8 > skb->len) ) goto skip_put;
 
      		ptr += 6;
      		if( ntohs(*(u16 *) ptr) != 0x6 ) goto skip_put; /* check hello avp type */
@@ -465,7 +465,7 @@ int l2tp_input_proc(struct sk_buff *skb) {
 			
 			l2tp_xmit_dev(pses, sk, skb, NULL);
 			} else {
-     		if( !pskb_may_pull(skb, offset + 2) ) goto skip_put; /* data packet failed to parse, back to stack */
+     		if( unlikely(offset + 2 > skb->len) ) goto skip_put; /* data packet failed to parse, back to stack */
 
      		dst_release(skb->dst);
 			skb->dst = NULL;
