@@ -76,7 +76,7 @@ struct us_unusual_dev {
 					 (1UL << US_FLIDX_DISCONNECTING))
 #define US_FLIDX_RESETTING	22  /* 0x00400000  device reset in progress */
 #define US_FLIDX_TIMED_OUT	23  /* 0x00800000  SCSI midlayer timed out  */
-
+#define US_FLIDX_REDO_READ10	24  /* redo READ(10) command */
 
 #define USB_STOR_STRING_LEN 32
 

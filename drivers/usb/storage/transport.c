@@ -685,6 +685,19 @@ void usb_stor_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 		}
 	}
 
+	/*
+	 * Some devices don't work or return incorrect data the first
+	 * time they get a READ(10) command. If the REDO_READ10 flag
+	 * is set, we return a result code that will cause the SCSI core
+	 * to retry the command immediately.
+	 */
+	if (test_bit(US_FLIDX_REDO_READ10, &us->flags) &&
+			srb->cmnd[0] == READ_10) {
+		clear_bit(US_FLIDX_REDO_READ10, &us->flags);
+		srb->result = DID_IMM_RETRY << 16;
+		srb->sense_buffer[0] = 0;
+	}
+
 	/* Did we transfer less than the minimum amount required? */
 	if (srb->result == SAM_STAT_GOOD &&
 			srb->request_bufflen - srb->resid < srb->underflow)

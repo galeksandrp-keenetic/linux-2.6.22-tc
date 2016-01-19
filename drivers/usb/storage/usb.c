@@ -1004,6 +1004,8 @@ static int storage_probe(struct usb_interface *intf,
 	if (result)
 		goto BadDevice;
 
+	set_bit(US_FLIDX_REDO_READ10, &us->flags);
+
 	/* Acquire all the other resources and add the host */
 	result = usb_stor_acquire_resources(us);
 	if (result)
