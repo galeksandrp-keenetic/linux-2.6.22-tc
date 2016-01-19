@@ -467,8 +467,10 @@ void __init prepare_namespace(void)
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
-	if (is_floppy && rd_doload && rd_load_disk(0))
+	if (rd_doload && rd_load_disk(0)) {
 		ROOT_DEV = Root_RAM0;
+		printk(KERN_INFO "Mounting ramdisk...\n");
+	}
 
 	mount_root();
 out:

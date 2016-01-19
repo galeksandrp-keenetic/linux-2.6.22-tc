@@ -7,6 +7,13 @@
 #include <linux/cramfs_fs.h>
 #include <linux/initrd.h>
 #include <linux/string.h>
+#ifdef CONFIG_SQUASHFS
+#include <linux/squashfs_fs.h>
+#include <linux/magic.h>
+#endif
+#ifdef CONFIG_SQUASHFS4
+#include <../fs/squashfs4/squashfs_fs.h>
+#endif
 
 #include "do_mounts.h"
 
@@ -51,6 +58,9 @@ identify_ramdisk_image(int fd, int start_block)
 	const int size = 512;
 	struct minix_super_block *minixsb;
 	struct ext2_super_block *ext2sb;
+#if defined(CONFIG_SQUASHFS) || defined(CONFIG_SQUASHFS4)
+	struct squashfs_super_block *sqsb;
+#endif
 	struct romfs_super_block *romfsb;
 	struct cramfs_super *cramfsb;
 	int nblocks = -1;
@@ -64,6 +74,9 @@ identify_ramdisk_image(int fd, int start_block)
 	ext2sb = (struct ext2_super_block *) buf;
 	romfsb = (struct romfs_super_block *) buf;
 	cramfsb = (struct cramfs_super *) buf;
+#if defined(CONFIG_SQUASHFS) || defined(CONFIG_SQUASHFS4)
+	sqsb = (struct squashfs_super_block *) buf;
+#endif
 	memset(buf, 0xe5, size);
 
 	/*
@@ -101,6 +114,16 @@ identify_ramdisk_image(int fd, int start_block)
 		goto done;
 	}
 
+#if defined(CONFIG_SQUASHFS)
+	if (sqsb->s_magic == SQUASHFS_MAGIC) {
+		printk(KERN_NOTICE
+		       "RAMDISK: squashfs filesystem found at block %d\n",
+		       start_block);
+		nblocks = (sqsb->bytes_used + BLOCK_SIZE - 1) >> BLOCK_SIZE_BITS;
+		goto done;
+	}
+#endif
+
 	/*
 	 * Read block 1 to test for minix and ext2 superblock
 	 */
@@ -126,6 +149,16 @@ identify_ramdisk_image(int fd, int start_block)
 			le32_to_cpu(ext2sb->s_log_block_size);
 		goto done;
 	}
+
+#if defined(CONFIG_SQUASHFS4)
+	if (le32_to_cpu(sqsb->s_magic) == SQUASHFS_MAGIC) {
+		printk(KERN_NOTICE
+		       "RAMDISK: squashfs filesystem found at block %d\n",
+		       start_block);
+		nblocks = (le64_to_cpu(sqsb->bytes_used) + BLOCK_SIZE - 1) >> BLOCK_SIZE_BITS;
+		goto done;
+	}
+#endif
 
 	printk(KERN_NOTICE
 	       "RAMDISK: Couldn't find valid RAM disk image starting at %d.\n",
