@@ -32,6 +32,11 @@ MODULE_ALIAS("ipt_CONNMARK");
 #include <linux/netfilter/xt_CONNMARK.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <linux/netfilter/nf_conntrack_common.h>
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 #include "../nat/hw_nat/ra_nat.h"
 #endif
@@ -74,6 +79,10 @@ target(struct sk_buff **pskb,
 			mark = (*pskb)->mark;
 			diff = (ct->mark ^ mark) & markinfo->mask;
 			(*pskb)->mark = mark ^ diff;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+			if( (*pskb)->mark && ct ) ct->fast_ext = 1;
+#endif
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 //			if( (*pskb)->mark )

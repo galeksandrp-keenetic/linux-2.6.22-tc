@@ -56,6 +56,9 @@
 #include <linux/../../net/nat/hw_nat/ra_nat.h>
 #endif
 
+extern int (*vpn_pthrough)(struct sk_buff *skb, int in);
+extern int (*vpn_pthrough_setup)(uint32_t sip, int add);
+
 static struct proc_dir_entry *proc_cmd = NULL;
 
 //#define L2TP_USE_UDP_CKSUM
@@ -87,8 +90,6 @@ typedef struct l2tp_sess {
 PL2TP_SESS pses_head = NULL, pses_tail = NULL;
 static spinlock_t lock_chan;
 static atomic_t chan_cnt;
-static struct tasklet_struct l2tp_tx_task;
-static struct sk_buff_head l2tp_tx_q;
 
 PL2TP_SESS l2tp_find_src(uint16_t sid, uint16_t tid) {
 	PL2TP_SESS pses;
@@ -133,6 +134,7 @@ inline PL2TP_SESS l2tp_find_dst(struct sock *sk) {
 
 PL2TP_SESS l2tp_add(struct pppol2tp_addr *pl2a, struct sock *sk) {
 	PL2TP_SESS pses;
+	int (*vsetup)(uint32_t sip, int add);
 
 	if( !(pses = (PL2TP_SESS)kmalloc(sizeof(L2TP_SESS), GFP_KERNEL)) ) return NULL;
 	memset(pses, 0, sizeof(*pses));
@@ -144,6 +146,10 @@ PL2TP_SESS l2tp_add(struct pppol2tp_addr *pl2a, struct sock *sk) {
 	else pses_tail = pses_tail->pnext = pses;
 	
 	sk->sk_user_data = (void *)pses;
+	
+	if( (vsetup = rcu_dereference(vpn_pthrough_setup)) ) 
+		vsetup(pses->l2a.addr.sin_addr.s_addr, 1);
+	
 	spin_unlock_bh(&lock_chan);
 
 	atomic_add(1, &chan_cnt);
@@ -153,6 +159,7 @@ PL2TP_SESS l2tp_add(struct pppol2tp_addr *pl2a, struct sock *sk) {
 
 int l2tp_del(struct sock *sk) {
 	PL2TP_SESS pses, *pps;
+	int (*vsetup)(uint32_t sip, int add);
 
 	spin_lock_bh(&lock_chan);
 	pps = &pses_head;
@@ -164,6 +171,10 @@ int l2tp_del(struct sock *sk) {
 				else pses_tail = (PL2TP_SESS)pps;
 		}
 	   	 *pps = pses->pnext;
+
+	   	 if( (vsetup = rcu_dereference(vpn_pthrough_setup)) ) 
+				vsetup(pses->l2a.addr.sin_addr.s_addr, 0);
+	   	 
 	   	 kfree(pses);
 	   	 sk->sk_user_data = NULL;
 	   	 break;
@@ -225,21 +236,13 @@ static inline void pppol2tp_build_l2tp_header(PL2TP_SESS pses, void *buf) {
 	*bufp++ = htons(pses->l2a.d_session);
 }
 
-void l2tp_hard_tx(unsigned long u) {
-	struct sk_buff *skb;
 	
-	while( (skb = skb_dequeue(&l2tp_tx_q)) ) {
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		FOE_ALG_SKIP(skb);
-#endif
-		dst_output(skb);
-	}
-}
 
 static inline void l2tp_xmit_dev(PL2TP_SESS pses, struct sock *sk, struct sk_buff *skb, struct rtable *rt) {
 	struct udphdr *uh;
 	struct iphdr  *iph;
 	u16 udp_len;
+	int (*vhook)(struct sk_buff *skb, int in);
 
 	if( !rt ) {
 		struct flowi fl = { 
@@ -300,8 +303,13 @@ static inline void l2tp_xmit_dev(PL2TP_SESS pses, struct sock *sk, struct sk_buf
 	ip_select_ident_more(iph, &rt->u.dst, sk, (skb_shinfo(skb)->gso_segs ?: 1) - 1);
 	ip_send_check(iph);
 
-	skb_queue_tail(&l2tp_tx_q, skb);
-	tasklet_schedule(&l2tp_tx_task);
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	FOE_ALG_SKIP(skb);
+#endif
+
+	if( !(vhook = rcu_dereference(vpn_pthrough)) || !vhook(skb, 2) ) {
+		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, dst_output);
+	}
 
 	return;
 	
@@ -532,7 +540,6 @@ int l2tp_input(struct sk_buff *skb) {
 
 						 l2tp_xmit(&po->chan, skb);
 					 } else {
-						 //skb_set_owner_r(skb, sk);
 						 skb_set_network_header(skb, skb->head - skb->data);
 						 ppp_input(&po->chan, skb);
 					 }
@@ -780,8 +787,6 @@ static int __init l2tp_init(void) {
 
 	atomic_set(&chan_cnt, 0);
 	spin_lock_init(&lock_chan);
-	skb_queue_head_init(&l2tp_tx_q);
-	tasklet_init(&l2tp_tx_task, l2tp_hard_tx, 0);
 
 	if( (err = proto_register(&l2tp_sk_proto, 0)) ) goto out;
 	if( (err = register_pppox_proto(PX_PROTO_OL2TP, &l2tp_proto)) ) goto out_unregister_l2tp_proto;

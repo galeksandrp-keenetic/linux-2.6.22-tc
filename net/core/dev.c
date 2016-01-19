@@ -2294,11 +2294,18 @@ static int ing_filter(struct sk_buff *skb)
 int (*igmp_pthrough)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(igmp_pthrough);
 
+int (*vpn_pthrough)(struct sk_buff *skb, int in) = NULL;
+EXPORT_SYMBOL(vpn_pthrough);
+
+int (*vpn_pthrough_setup)(uint32_t sip, int add) = NULL;
+EXPORT_SYMBOL(vpn_pthrough_setup);
+
 __IMEM int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
 	struct net_device *orig_dev;
 	int (*mhook)(struct sk_buff *skb);
+	int (*vhook)(struct sk_buff *skb, int in);
 	int ret = NET_RX_DROP;
 	__be16 type;
 
@@ -2326,6 +2333,11 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 	pt_prev = NULL;
 
 	rcu_read_lock();
+
+	if( (vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
+    	ret = NET_RX_SUCCESS;
+	   goto out;
+	}	
 
 	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
     	ret = NET_RX_SUCCESS;

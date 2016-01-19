@@ -274,14 +274,9 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 extern int l2tp_input(struct sk_buff *skb);
 #endif
 
-#if defined (CONFIG_PPTP)
-extern int gre_input(struct sk_buff *skb);
-#endif
-
-
 int ip_local_deliver(struct sk_buff *skb)
 {
-#if defined (CONFIG_PPPOL2TP) || defined (CONFIG_PPTP)
+#if defined (CONFIG_PPPOL2TP)
 	struct udphdr *udp;
 	struct iphdr *iph;
 #endif
@@ -296,11 +291,8 @@ int ip_local_deliver(struct sk_buff *skb)
 			return 0;
 	}
 
-#if defined (CONFIG_PPPOL2TP) || defined (CONFIG_PPTP)
-	if( skb->protocol == htons(ETH_P_IP) ) {
-		iph = ip_hdr(skb);
-		
 #if defined (CONFIG_PPPOL2TP) 
+	if( skb->protocol == htons(ETH_P_IP) && (iph = ip_hdr(skb)) ) {
 		if( iph->protocol == IPPROTO_UDP &&
 			 (udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
 			 udp->dest == htons(1701) && 
@@ -308,13 +300,6 @@ int ip_local_deliver(struct sk_buff *skb)
 			 l2tp_input(skb) == 1 ) {
 			return 0;
 	}
-#endif
-
-#if defined (CONFIG_PPTP) 
-		if( iph->protocol == IPPROTO_GRE && gre_input(skb) == 1 ) {
-			return 0;
-		}
-#endif
 	}
 #endif
  

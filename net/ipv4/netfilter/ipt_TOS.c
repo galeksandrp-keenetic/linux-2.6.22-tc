@@ -16,6 +16,16 @@
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ipt_TOS.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <linux/netfilter/nf_conntrack_common.h>
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
+
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("iptables TOS mangling module");
@@ -30,6 +40,11 @@ target(struct sk_buff **pskb,
 {
 	const struct ipt_tos_target_info *tosinfo = targinfo;
 	struct iphdr *iph = ip_hdr(*pskb);
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	struct	nf_conn *ct;
+	enum ip_conntrack_info ctinfo;
+	ct = nf_ct_get(*pskb, &ctinfo);
+#endif	
 
 	if ((iph->tos & IPTOS_TOS_MASK) != tosinfo->tos) {
 		__u8 oldtos;
@@ -40,6 +55,15 @@ target(struct sk_buff **pskb,
 		iph->tos = (iph->tos & IPTOS_PREC_MASK) | tosinfo->tos;
 		nf_csum_replace2(&iph->check, htons(oldtos), htons(iph->tos));
 	}
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if( ct ) ct->fast_ext = 1;
+#endif
+	
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	FOE_ALG_SKIP(*pskb);
+#endif
+
 	return XT_CONTINUE;
 }
 
