@@ -45,6 +45,7 @@ static struct usb_device_id id_table [] = {
 
 	{ USB_DEVICE(0x1199, 0x0112) }, /* Sierra Wireless AirCard 580 */
 	{ USB_DEVICE(0x0F3D, 0x0112) }, /* AirPrime/Sierra PC 5220 */
+	{ USB_DEVICE(0x1199, 0x0025) }, /* Sierra Wireless USB 598*/
 	{ }
 };
 MODULE_DEVICE_TABLE(usb, id_table);
@@ -68,6 +69,7 @@ static struct usb_device_id id_table_3port [] = {
 	{ USB_DEVICE(0x1199, 0x6803) },	/* Sierra Wireless MC8765 */
 	{ USB_DEVICE(0x1199, 0x6812) },	/* Sierra Wireless MC8775 */
 	{ USB_DEVICE(0x1199, 0x6820) },	/* Sierra Wireless AirCard 875 */
+	{ USB_DEVICE(0x1199, 0x0025) }, /* Sierra Wireless USB 598*/
 	{ }
 };
 
