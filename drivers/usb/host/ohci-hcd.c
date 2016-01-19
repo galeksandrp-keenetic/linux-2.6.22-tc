@@ -100,10 +100,12 @@ static void ohci_stop (struct usb_hcd *hcd);
 #endif
 
 #if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 #define PORT_CONNECT    (1<<0)      /* device connected */
 
 #define USB_PORT0_STAT_20_ADDR 0xbfba1064
 #define USB_PORT1_STAT_20_ADDR 0xbfba1068
+#endif
 #endif
 #if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
 /*USB host change to polling mode. shnwind 20101129.*/
@@ -619,6 +621,7 @@ retry:
 	ohci_writel (ohci, RH_HS_DRWE, &ohci->regs->roothub.status);
 
 #if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 	/*
 		If no device connect to host, set USB host 11 to reset state.
 		This mechanism is used to support power saving.
@@ -634,6 +637,7 @@ retry:
 	//else{
 	//	printk("No OHCI RESET\n");
 	//}
+#endif
 #endif
 	/* Choose the interrupts we care about now, others later on demand */
 	mask = OHCI_INTR_INIT;
@@ -959,6 +963,10 @@ MODULE_LICENSE ("GPL");
 #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
 #endif
 
+#if defined (CONFIG_MIPS_RT63365)
+#include "ohci-rt3xxx.c"
+#define PLATFORM_DRIVER     ohci_hcd_rt3xxx_driver
+#endif
 
 #ifdef CONFIG_USB_OHCI_HCD_PPC_OF
 #include "ohci-ppc-of.c"

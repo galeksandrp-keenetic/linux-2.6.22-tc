@@ -84,6 +84,9 @@
 
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1<<PPPOE_HASH_BITS)
+#if defined(TCSUPPORT_ETH4_WAN_PORT)
+#define STAG_EXTEND_SIZE 4
+#endif
 
 #if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
 #include <linux/imq.h>
@@ -615,9 +618,13 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		if (error < 0)
 			goto err_put;
 
+#if defined(TCSUPPORT_ETH4_WAN_PORT)
+		po->chan.hdrlen = (sizeof(struct pppoe_hdr) +
+				   dev->hard_header_len + STAG_EXTEND_SIZE);
+#else
 		po->chan.hdrlen = (sizeof(struct pppoe_hdr) +
 				   dev->hard_header_len);
-
+#endif
 		po->chan.mtu = dev->mtu - sizeof(struct pppoe_hdr);
 		po->chan.private = sk;
 		po->chan.ops = &pppoe_chan_ops;

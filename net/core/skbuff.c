@@ -71,6 +71,12 @@
 #include <asm/system.h>
 
 #include "kmap_skb.h"
+#if defined(TCSUPPORT_HWNAT)		
+#include <linux/pktflow.h>	
+#endif			
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
 
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 //only one skbmgr pool for every CPU. shnwind 20101215.
@@ -333,6 +339,14 @@ void kfree_skbmem(struct sk_buff *skb)
 	struct sk_buff *other;
 	atomic_t *fclone_ref;
 
+#if defined(TCSUPPORT_HWNAT)		
+	pktflow_free(skb);		
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
+
 	skb_release_data(skb);
 	switch (skb->fclone) {
 	case SKB_FCLONE_UNAVAILABLE:
@@ -450,6 +464,11 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 {
 	struct sk_buff *n;
 
+#if defined(TCSUPPORT_HWNAT)		
+	int skip_pktflow = gfp_mask & GFP_SKIP_PKTFLOW;
+	gfp_mask &= ~GFP_SKIP_PKTFLOW;
+#endif
+
 	n = skb + 1;
 	if (skb->fclone == SKB_FCLONE_ORIG &&
 	    n->fclone == SKB_FCLONE_UNAVAILABLE) {
@@ -500,6 +519,16 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	skb->skb_recycling_callback = NULL;
 #endif
 	C(mark);
+#if defined(TCSUPPORT_HWNAT)		
+	if (skip_pktflow)
+		n->pktflow_p = NULL;
+	else
+	pktflow_xfer(n, skb);	
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_xfer)
+		ra_sw_nat_hook_xfer(n, skb);
+#endif
 	__nf_copy(n, skb);
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
@@ -510,6 +539,10 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(iif);
 #endif
 #endif
+#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+	C(sc_mac_learned);
+#endif
+	
 	skb_copy_secmark(n, skb);
 	C(truesize);
 	atomic_set(&n->users, 1);
@@ -560,6 +593,13 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->skb_recycling_ind = 0;
 #endif
 	new->mark	= old->mark;
+#if defined(TCSUPPORT_HWNAT)		
+	pktflow_xfer(new, old);	
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_xfer)
+		ra_sw_nat_hook_xfer(new, old);
+#endif
 	__nf_copy(new, old);
 #if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
 	new->ipvs_property = old->ipvs_property;
@@ -570,6 +610,11 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 	new->tc_index	= old->tc_index;
 #endif
+
+#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+	new->sc_mac_learned = old->sc_mac_learned;
+#endif
+	
 	skb_copy_secmark(new, old);
 	atomic_set(&new->users, 1);
 	skb_shinfo(new)->gso_size = skb_shinfo(old)->gso_size;
@@ -2184,9 +2229,12 @@ __IMEM struct sk_buff *skbmgr_alloc_skb2k(void)
 
 try_normal:
 	if ((skbmgr_limit == 0) || (atomic_read(&skbmgr_alloc_no) < skbmgr_limit)) {
+#if !defined(TCSUPPORT_CT) 
 #if !defined(TCSUPPORT_MEMORY_CONTROL) 
 		skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN);
 #endif
+#endif
+
 		if (likely(skb)) {
 			skb->skb_recycling_callback = skbmgr_recycling_callback;
 			skb->skb_recycling_ind = SKBMGR_INDICATION;
@@ -2224,6 +2272,14 @@ __IMEM int skbmgr_recycling_callback(struct sk_buff *skb)
 			(skb_shinfo(skb)->frag_list)) {
 			return 0;
 		}
+
+#if defined(TCSUPPORT_HWNAT)		
+		pktflow_free(skb);		
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+		if (ra_sw_nat_hook_free)
+			ra_sw_nat_hook_free(skb);
+#endif
 
 		if (skb_queue_len(list) > skbmgr_max_list_len)
 			skbmgr_max_list_len = skb_queue_len(list) + 1;
@@ -2377,6 +2433,15 @@ int skbmgr_4k_recycling_callback(struct sk_buff *skb)
 			(skb_shinfo(skb)->frag_list)) {
 			return 0;
 		}
+
+#if defined(TCSUPPORT_HWNAT)		
+		pktflow_free(skb);		
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+		if (ra_sw_nat_hook_free)
+			ra_sw_nat_hook_free(skb);
+#endif
+
 		if (skb_queue_len(list) > skbmgr_4k_max_list_len)
 			skbmgr_4k_max_list_len = skb_queue_len(list) + 1;
 
@@ -2475,6 +2540,14 @@ int skbmgr_sg_recycling_callback(struct sk_buff *skb)
 			(skb_shinfo(skb)->frag_list)) {
 			return 0;
 		}
+		
+#if defined(TCSUPPORT_HWNAT)		
+		pktflow_free(skb);		
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+		if (ra_sw_nat_hook_free)
+			ra_sw_nat_hook_free(skb);
+#endif
 
 		if (skb_queue_len(list) > skbmgr_sg_max_list_len)
 			skbmgr_sg_max_list_len = skb_queue_len(list) + 1;
@@ -2519,30 +2592,6 @@ void skbmgr_free_all_skbs(void)
 			kfree_skbmem(skb);
 		}
 	}
-#endif
-#if 0
-	//do not need free 4k poll here. shnwind.
-#ifdef SKBMGR_SINGLE_QUEUE
-	list = &skbmgr_4k_pool[0].list;
-	while ((skb = skb_dequeue(list)) != NULL) {
-		skb->skb_recycling_callback = NULL;
-		if (skb->skb_recycling_ind == SKBMGR_4K_INDICATION)
-			atomic_dec(&skbmgr_4k_alloc_no);
-		skb->skb_recycling_ind = 0;
-		kfree_skbmem(skb);
-	}
-#else
-	for (i=0; i<NR_CPUS; i++) {
-		list = &skbmgr_4k_pool[i].list;
-		while ((skb = skb_dequeue(list)) != NULL) {
-			skb->skb_recycling_callback = NULL;
-			if (skb->skb_recycling_ind  == SKBMGR_4K_INDICATION)
-				atomic_dec(&skbmgr_4k_alloc_no);
-			skb->skb_recycling_ind = 0;
-			kfree_skbmem(skb);
-		}
-	}
-#endif
 #endif
 #if defined(CONFIG_MIPS_TC3262)
 	for (i=0; i<NR_CPUS; i++) {

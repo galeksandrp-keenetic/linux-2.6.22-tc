@@ -25,6 +25,9 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
+#if defined(TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
 
 #if 0
 #define DEBUGP printk
@@ -627,6 +630,9 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 		before(sack, receiver->td_end + 1),
 		after(ack, receiver->td_end - MAXACKWINDOW(sender)));
 
+#if defined(TCSUPPORT_HWNAT) || defined(TCSUPPORT_RA_HWNAT)
+	res = 1;
+#else
 	if (before(seq, sender->td_maxend + 1) &&
 	    after(end, sender->td_end - receiver->td_maxwin - 1) &&
 	    before(sack, receiver->td_end + 1) &&
@@ -693,6 +699,7 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 			: "SEQ is under the lower bound (already ACKed data retransmitted)"
 			: "SEQ is over the upper bound (over the window of the receiver)");
 	}
+#endif
 
 	DEBUGP("tcp_in_window: res=%i sender end=%u maxend=%u maxwin=%u "
 	       "receiver end=%u maxend=%u maxwin=%u\n",
@@ -947,6 +954,17 @@ static int tcp_packet(struct nf_conn *conntrack,
 		old_state, new_state);
 
 	conntrack->proto.tcp.state = new_state;
+
+#if defined(TCSUPPORT_HWNAT)
+	if (th->fin) {
+    	if (pktflow_nfct_close_hook) 
+        	pktflow_nfct_close_hook(conntrack);
+		clear_bit(IPS_PKTFLOW_BIT, &conntrack->status);
+	}
+	if (conntrack->proto.tcp.state != TCP_CONNTRACK_ESTABLISHED) 
+   		pktflow_free(skb);
+#endif
+
 	if (old_state != new_state
 	    && (new_state == TCP_CONNTRACK_FIN_WAIT
 		|| new_state == TCP_CONNTRACK_CLOSE))

@@ -28,7 +28,7 @@ EXPORT_SYMBOL_GPL(br_mc_deliver_hook);
 #endif
 
 #ifdef CONFIG_MLD_SNOOPING
-int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest);
+int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
 EXPORT_SYMBOL(br_mldsnooping_deliver_hook);
 #endif
 
@@ -74,7 +74,7 @@ __IMEM int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 			case ETH_P_IPV6: /*MLD Snooping*/
 				br_mldsnooping_deliver = rcu_dereference(br_mldsnooping_deliver_hook);
 				if(br_mldsnooping_deliver)
-					ret = br_mldsnooping_deliver(skb, br, dest);
+					ret = br_mldsnooping_deliver(skb, br, dest,0);
 				break;
 			#endif
 			default:

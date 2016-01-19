@@ -8,6 +8,9 @@
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/tc3162/tc3162.h>
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+#include "../chips/spiflash_tc3162.h"
+#endif
 
 #define WINDOW_ADDR 0x1fc00000
 #define WINDOW_SIZE 0x400000
@@ -106,6 +109,7 @@ static struct mtd_partition tc3162_parts[] = {
 		  offset     : MTDPART_OFS_APPEND   
 	}
 #endif
+
 };
 
 static int tc3162_parts_size = sizeof(tc3162_parts) / sizeof(tc3162_parts[0]);
@@ -130,7 +134,7 @@ static int __init tc3162_mtd_init(void)
 {
 	struct mtd_info *mtd;
 	unsigned int *header;
-	#if defined(CONFIG_DUAL_IMAGE) || defined(TCSUPPORT_MTD_ENCHANCEMENT)
+	#if defined(CONFIG_DUAL_IMAGE) || defined(TCSUPPORT_MTD_ENCHANCEMENT) || defined(TCSUPPORT_MULTI_BOOT)
 	int i = 0;
 	#endif
 	#ifdef CONFIG_DUAL_IMAGE
@@ -138,18 +142,24 @@ static int __init tc3162_mtd_init(void)
 	const char flagvalue = 1;//not change!!because we use this flag to judge which image
 	char tmp[8] = {0};
 	#endif
-#if defined(CONFIG_DUAL_IMAGE) && defined(TCSUPPORT_MTD_ENCHANCEMENT)
-#if !defined(TCSUPPORT_TTNET) 
+#if defined(CONFIG_DUAL_IMAGE) && (defined(TCSUPPORT_MTD_ENCHANCEMENT) ||defined(TCSUPPORT_MULTI_BOOT))
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE	
+	u_int32_t tclinux_slave_offset = offset+0x20000;
+#else
 	u_int32_t tclinux_slave_offset = 0x00520000;	
 #endif
 	u_int32_t tclinux_slave_size = 0;
 #endif
-#ifdef TCSUPPORT_MTD_ENCHANCEMENT
+
+#if defined(TCSUPPORT_MTD_ENCHANCEMENT) || defined(TCSUPPORT_MULTI_BOOT)
 	u_int32_t tclinux_size = 0;
 #endif
 
+
+
+
 	/*add 8M 16M flash support. shnwind*/
-	if (isTC3162U || isTC3182){
+	if (isTC3162U || isTC3182 || isRT65168 || isRT63165 || isRT63365 || isRT63260){
 		header = (unsigned int *)0xb0020000;
 		/*enable addr bigger than 4M support.*/
 		VPint(0xbfb00038) |= 0x80000000;
@@ -159,11 +169,11 @@ static int __init tc3162_mtd_init(void)
 		tc3162_map.size = 0x1000000;
 		ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 	}else{
+
 	
 		header = (unsigned int *)0xbfc20000;
 		printk("tc3162: flash device 0x%08x at 0x%08x\n", WINDOW_SIZE, WINDOW_ADDR);
 		tc3162_map.virt = ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
-
 	}
 	if (!tc3162_map.virt) {
    		printk("tc3162: Failed to ioremap\n");
@@ -192,18 +202,22 @@ static int __init tc3162_mtd_init(void)
 		{
 			tc3162_parts[i].size = KERNEL_PARTITION(header[20]);
 			tc3162_parts[i+1].size = ROOTFS_PARTITION(header[21]);
-			#ifdef TCSUPPORT_MTD_ENCHANCEMENT
+			#if defined(TCSUPPORT_MTD_ENCHANCEMENT) || defined(TCSUPPORT_MULTI_BOOT)
 			tclinux_size = tc3162_parts[i].size+tc3162_parts[i+1].size;
 			#endif
 		}
 		if(!strcmp(tc3162_parts[i].name,"kernel_slave"))
 		{
-#if !defined(TCSUPPORT_TTNET) 
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+			unsigned int *header_slave = (unsigned int *)(0xb0020000+offset);
+			tc3162_parts[i].offset = offset + 0x20000;
+			tc3162_parts[i+2].offset = offset + 0x20000;
+#else
 			unsigned int *header_slave = (unsigned int *)(0xb0020000+0x500000);			
 #endif
 			tc3162_parts[i].size = KERNEL_PARTITION(header_slave[20]);
 			tc3162_parts[i+1].size = ROOTFS_PARTITION(header_slave[21]);
-		 #ifdef TCSUPPORT_MTD_ENCHANCEMENT
+		 #if defined(TCSUPPORT_MTD_ENCHANCEMENT) || defined(TCSUPPORT_MULTI_BOOT)
 			tclinux_slave_offset = tc3162_parts[i].offset;
 		 	tclinux_slave_size = tc3162_parts[i].size + tc3162_parts[i+1].size;
 		 #endif
@@ -212,10 +226,13 @@ static int __init tc3162_mtd_init(void)
 	#else
 	tc3162_parts[2].size = KERNEL_PARTITION(header[20]);
 	tc3162_parts[3].size = ROOTFS_PARTITION(header[21]);
-	#ifdef TCSUPPORT_MTD_ENCHANCEMENT
+	#if defined(TCSUPPORT_MTD_ENCHANCEMENT) || defined(TCSUPPORT_MULTI_BOOT)
 	tclinux_size = tc3162_parts[2].size + tc3162_parts[3].size;
 	#endif
 	#endif
+
+
+
 
 //use last 4 block as reserve area for storing data(for example:syslog,backupromfile,and so on)
  #ifdef TCSUPPORT_MTD_ENCHANCEMENT
@@ -226,6 +243,8 @@ static int __init tc3162_mtd_init(void)
 			tc3162_parts[i].offset = tc3162_mtd_info->size -BLOCK_NUM_FOR_RESERVEAREA*( tc3162_mtd_info->erasesize);
 			tc3162_parts[i].size = BLOCK_NUM_FOR_RESERVEAREA*(tc3162_mtd_info->erasesize);
 		}
+
+
 		#ifdef CONFIG_DUAL_IMAGE
 		memcpy(tmp,(char*)bufaddr,sizeof(char));
 		if(flagvalue != tmp[0])//use main image
@@ -261,6 +280,7 @@ static int __init tc3162_mtd_init(void)
 		#endif
  	} 	
  #endif
+
 
 	add_mtd_partitions(tc3162_mtd_info, tc3162_parts, tc3162_parts_size);
 	#ifdef CONFIG_DUAL_IMAGE

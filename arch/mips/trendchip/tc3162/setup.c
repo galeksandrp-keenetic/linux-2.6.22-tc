@@ -17,13 +17,16 @@ void (*back_to_prom)(void) = (void (*)(void))0xbfc00000;
 
 extern void timerSet(uint32 timer_no, uint32 timerTime, uint32 enable, uint32 mode, uint32 halt);
 extern void timer_WatchDogConfigure(uint8 tick_enable, uint8 watchdog_enable);
-extern void timerSet(uint32 timer_no, uint32 timerTime, uint32 enable, uint32 mode, uint32 halt);
-extern void timer_WatchDogConfigure(uint8 tick_enable, uint8 watchdog_enable);
 
 #ifdef CONFIG_TC3162_ADSL
 adsldev_ops *adsl_dev_ops = NULL;
 EXPORT_SYMBOL(adsl_dev_ops);
+#ifdef CONFIG_RALINK_VDSL
+vdsldev_ops *vdsl_dev_ops = NULL;
+EXPORT_SYMBOL(vdsl_dev_ops);
 #endif
+#endif
+
 static void hw_reset(void)
 {
 #ifdef CONFIG_TC3162_ADSL
@@ -73,7 +76,7 @@ static void hw_reset(void)
 	/* watchdog reset */
 //#ifdef CONFIG_MIPS_TC3262
 	timerSet(5, 10 * TIMERTICKS_10MS, ENABLE, TIMER_TOGGLEMODE, TIMER_HALTDISABLE);
-	timer_WatchDogConfigure(DISABLE, ENABLE);
+	timer_WatchDogConfigure(ENABLE, ENABLE);
 
 	while (1);
 //#endif
@@ -206,6 +209,18 @@ static void tc3162_machine_power_off(void)
 	while (1);
 }
 
+static int panic_event(struct notifier_block *this, unsigned long event,
+		       void *ptr)
+{
+	machine_restart(NULL);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block panic_block = {
+	.notifier_call = panic_event,
+};
+
 void __init plat_mem_setup(void)
 {
 	_machine_restart = tc3162_machine_restart;
@@ -213,4 +228,6 @@ void __init plat_mem_setup(void)
 	pm_power_off = tc3162_machine_power_off;
 
 	board_time_init = tc3162_time_init;
+
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
 }

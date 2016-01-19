@@ -173,6 +173,10 @@ struct in6_flowlabel_req
 #define IPV6_JOIN_ANYCAST	27
 #define IPV6_LEAVE_ANYCAST	28
 
+#if 1//def TCSUPPORT_IGMP_QOS
+#define	IPV6_SKB_MARK 		50
+#endif
+
 /* IPV6_MTU_DISCOVER values */
 #define IPV6_PMTUDISC_DONT		0
 #define IPV6_PMTUDISC_WANT		1

@@ -75,12 +75,6 @@ config BLK_DEV_SD
 	  (the one containing the directory /) is located on a SCSI disk.
 	  In this case, do not compile the driver for your SCSI host adapter
 	  (below) as a module either.
-config USB_AUTOMOUNT
-	bool "USB_AUTOMOUNT"
-	depends on BLK_DEV_SD
-	---help---
-	  If you want to support AutoMount in user space, you need to turn on
-	  this feature.
 
 config CHR_DEV_ST
 	tristate "SCSI tape support"

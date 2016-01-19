@@ -87,6 +87,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	 */
 	crash_kexec(NULL);
 
+	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+
 #ifdef CONFIG_SMP
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
@@ -95,8 +97,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 	 */
 	smp_send_stop();
 #endif
-
-	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
 
 	if (!panic_blink)
 		panic_blink = no_blink;

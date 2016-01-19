@@ -56,7 +56,9 @@
 #define USB_PORT_FEAT_INDICATOR         22
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
-#define USB_HOST_LIGHT_RESET 		50 
+#if !defined(CONFIG_MIPS_RT63365)
+#define USB_HOST_LIGHT_RESET 		50
+#endif
 #endif
 /* 
  * Hub Status and Hub Change results

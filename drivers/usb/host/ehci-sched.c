@@ -1938,6 +1938,10 @@ sitd_complete (
 	struct ehci_iso_stream			*stream = sitd->stream;
 	struct usb_device			*dev;
 
+//fix web_cam bug (merged from WBU)
+#ifdef CONFIG_MIPS_RT63365
+    unsigned                retval = false;
+#endif
 	urb_index = sitd->index;
 	desc = &urb->iso_frame_desc [urb_index];
 	t = le32_to_cpup (&sitd->hw_results);
@@ -1961,13 +1965,25 @@ sitd_complete (
 	usb_put_urb (urb);
 	sitd->urb = NULL;
 	sitd->stream = NULL;
+	//fix web_cam bug (merged from WBU)
+	#ifndef CONFIG_MIPS_RT63365
 	list_move (&sitd->sitd_list, &stream->free_list);
+	#endif
 	stream->depth -= stream->interval << 3;
+	//fix web_cam bug (merged from WBU)
+	#ifndef CONFIG_MIPS_RT63365
 	iso_stream_put (ehci, stream);
+	#endif
 
 	/* handle completion now? */
-	if ((urb_index + 1) != urb->number_of_packets)
-		return 0;
+	if ((urb_index + 1) != urb->number_of_packets){
+    //fix web_cam bug (merged from WBU)
+    #ifdef CONFIG_MIPS_RT63365
+        goto done;
+    #else
+        return 0;
+    #endif
+    }
 
 	/* ASSERT: it's really the last sitd for this urb
 	list_for_each_entry (sitd, &stream->td_list, sitd_list)
@@ -1977,6 +1993,10 @@ sitd_complete (
 	/* give urb back to the driver */
 	dev = urb->dev;
 	ehci_urb_done (ehci, urb);
+//fix web_cam bug (merged from WBU)
+#ifdef CONFIG_MIPS_RT63365
+    retval = true;
+#endif
 	urb = NULL;
 
 	/* defer stopping schedule; completion can submit */
@@ -1995,7 +2015,16 @@ sitd_complete (
 	}
 	iso_stream_put (ehci, stream);
 
+    
+//fix web_cam bug (merged from WBU)
+#ifdef CONFIG_MIPS_RT63365
+done:
+    list_move (&sitd->sitd_list, &stream->free_list);
+    iso_stream_put (ehci, stream);
+    return retval;
+#else
 	return 1;
+#endif
 }
 
 

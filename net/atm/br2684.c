@@ -25,6 +25,10 @@ Authors: Marcell GAL, 2000, XDSL Ltd, Hungary
 
 #include "common.h"
 
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
+
 /*
  * Define this to use a version of the code which interacts with the higher
  * layers in a more intellegent way, by always reserving enough space for
@@ -69,8 +73,10 @@ static void skb_debug(const struct sk_buff *skb)
 #define MIN_PKT_SIZE     60
 
 #ifdef CONFIG_SMUX
+#if !defined(TCSUPPORT_CT) 
 int (*check_smuxIf_exist_hook)(struct net_device *dev);
 EXPORT_SYMBOL(check_smuxIf_exist_hook);
+#endif
 #endif
 
 __DMEM static unsigned char ethertype_ipv4[] =
@@ -231,7 +237,7 @@ static int br2684_xmit_vcc(struct sk_buff *skb, struct br2684_dev *brdev,
 
 	ATM_SKB(skb)->vcc = atmvcc = brvcc->atmvcc;
 	DPRINTK("atm_skb(%p)->vcc(%p)->dev(%p)\n", skb, atmvcc, atmvcc->dev);
-#ifndef CONFIG_CPU_TC3162
+#if !defined(CONFIG_CPU_TC3162) && !defined(CONFIG_MIPS_TC3262)
 	if (!atm_may_send(atmvcc, skb->truesize)) {
 		/* we free this here for now, because we cannot know in a higher
 			layer whether the skb point it supplied wasn't freed yet.
@@ -472,23 +478,27 @@ static void br2684_close_vcc(struct br2684_vcc *brvcc)
 	module_put(THIS_MODULE);
 }
 
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 static void br2684_destroy(struct atm_vcc *atmvcc)
 {
 	struct br2684_vcc *brvcc = BR2684_VCC(atmvcc);
 	struct net_device *net_dev = brvcc->device;
 	struct br2684_dev *brdev = BRPRIV(net_dev);
 #ifdef CONFIG_SMUX
+#if !defined(TCSUPPORT_CT)
 	unsigned char ifNum = 0;
+#endif
 #endif
 
 #ifdef CONFIG_SMUX
+#if !defined(TCSUPPORT_CT) 
 	if(check_smuxIf_exist_hook != NULL) {
 		if((ifNum = check_smuxIf_exist_hook(brvcc->device)) > 0) {
 			printk("\n==> Exist %d smux interfaces, just return and do not close PVC\n", ifNum);
 			return;//If smux interface exist, just return and do not close PVC
 		}
 	}
+#endif
 #endif
 
 	br2684_close_vcc(brvcc);
@@ -501,7 +511,6 @@ static void br2684_destroy(struct atm_vcc *atmvcc)
 	}
 }
 #endif
-
 /* when AAL5 PDU comes in: */
 __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 {
@@ -509,11 +518,16 @@ __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	struct net_device *net_dev = brvcc->device;
 	struct br2684_dev *brdev = BRPRIV(net_dev);
 
+#ifdef TCSUPPORT_RA_HWNAT
+	int hwnatFwd = 0;
+#endif
+
+
 	DPRINTK("br2684_push\n");
 
 	if (unlikely(skb == NULL)) {
 		/* skb==NULL means VCC is being destroyed */
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 		br2684_destroy(atmvcc);
 #else
 		br2684_close_vcc(brvcc);
@@ -545,8 +559,14 @@ __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 
 			skb_pull(skb, sizeof(llc_oui_pid_pad));
 			skb->protocol = eth_type_trans(skb, net_dev);
+#ifdef TCSUPPORT_RA_HWNAT
+			hwnatFwd = 1;
+#endif
 			#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(TCSUPPORT_CT) 
 			skb->fb_flags |= FB_WAN_ENABLE;
+#endif
+
 			#endif
 		/* accept packets that have "ipv[46]" in the snap header */
 		}
@@ -582,8 +602,13 @@ __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			}
 			skb_pull(skb, BR2684_PAD_LEN); /* pad, dstmac, srcmac, ethtype */
 			skb->protocol = eth_type_trans(skb, net_dev);
+#ifdef TCSUPPORT_RA_HWNAT
+			hwnatFwd = 1;
+#endif
 			#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(TCSUPPORT_CT) 
 			skb->fb_flags |= FB_WAN_ENABLE;
+#endif
 			#endif		
 		} else {
 			skb->protocol = __constant_htons(ETH_P_IP);
@@ -624,6 +649,17 @@ __IMEM static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	brdev->stats.rx_packets++;
 	brdev->stats.rx_bytes += skb->len;
 	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
+#ifdef TCSUPPORT_RA_HWNAT
+	if (hwnatFwd) {
+		if (ra_sw_nat_hook_set_magic)  
+			ra_sw_nat_hook_set_magic(skb, FOE_MAGIC_ATM);
+
+		if (ra_sw_nat_hook_rx != NULL) {
+			if (ra_sw_nat_hook_rx(skb) == 0) 
+				return;
+		}
+	}
+#endif
 	netif_rx(skb);
 }
 
@@ -771,7 +807,8 @@ static void br2684_setup_routed(struct net_device *netdev)
 	netdev->addr_len = 0;
 	netdev->mtu = 1500;
 	netdev->type = ARPHRD_PPP;
-	netdev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
+	//netdev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
+	netdev->flags = IFF_NOARP | IFF_MULTICAST;
 	netdev->tx_queue_len = 100;
 	INIT_LIST_HEAD(&brdev->brvccs);
 }

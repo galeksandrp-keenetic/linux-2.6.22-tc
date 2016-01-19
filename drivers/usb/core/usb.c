@@ -44,7 +44,9 @@
 #include "usb.h"
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 #include <asm/tc3162/tc3162.h>
+#endif
 #endif
 
 const char *usbcore_name = "usbcore";
@@ -872,6 +874,7 @@ static int __init usb_init(void)
 		return 0;
 	}
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 #ifdef CONFIG_MIPS_TC3162U	
 	/*REXT pin for TC. 
 		Reset some part of usb phy. shnwind 20100406.*/
@@ -954,6 +957,7 @@ static int __init usb_init(void)
 	x &= ~((1<<30) | (1<<29));
 	x |= ((1<<30) | (1<<29));
 	VPint(CR_AHB_SSR) = x;
+#endif
 #endif
 
 	retval = ksuspend_usb_init();

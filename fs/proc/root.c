@@ -172,6 +172,6 @@ EXPORT_SYMBOL(proc_net);
 EXPORT_SYMBOL(proc_net_stat);
 EXPORT_SYMBOL(proc_bus);
 EXPORT_SYMBOL(proc_root_driver);
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 EXPORT_SYMBOL(proc_tc3162);
 #endif

@@ -18,6 +18,15 @@
  *************************************************************************/
 /*
 ** $Log: tcwdog.c,v $
+** Revision 1.5  2011/09/23 02:04:50  shnwind
+** Add rt63365 support
+**
+** Revision 1.4  2011/07/07 07:55:51  shnwind
+** RT63260 & RT63260 auto_bench support
+**
+** Revision 1.3  2011/06/03 02:04:23  lino
+** add RT65168 support
+**
 ** Revision 1.2  2010/12/09 13:18:35  xmdai_nj
 ** #7955:When doing upgrade firmware in web page, it can not reboot.
 **
@@ -45,9 +54,9 @@
 #include <linux/miscdevice.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
-#include <asm/tc3162/tc3162.h>
 #include <linux/proc_fs.h>
-
+#include <asm/tc3162/tc3162.h>
+#include <asm/tc3162/TCIfSetQuery_os.h>
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -66,10 +75,18 @@ extern void timer_Configure(uint8  timer_no, uint8 timer_enable, uint8 timer_mod
 extern void timerSet(uint32 timer_no, uint32 timerTime, uint32 enable, uint32 mode, uint32 halt);
 
 extern void timer_WatchDogConfigure(uint8 tick_enable, uint8 watchdog_enable);
-void watchDogReset(void){
+
+void watchDogReset(void)
+{
+#ifdef CONFIG_TC3162_ADSL
+    /* stop adsl */
+	if (adsl_dev_ops)
+	    adsl_dev_ops->set(ADSL_SET_DMT_CLOSE, NULL, NULL); 
+#endif
+
 /*watchdog reset*/
 	timerSet(5, 10 * TIMERTICKS_10MS, ENABLE, TIMER_TOGGLEMODE, TIMER_HALTDISABLE);
-	timer_WatchDogConfigure(DISABLE, ENABLE);
+	timer_WatchDogConfigure(ENABLE, ENABLE);
 
 	while(1);
 	_machine_restart();
@@ -80,10 +97,14 @@ void tc3162wdog_kick(void)
 	/* Clear Watchdog timer counter */
 	uint32 word;
 
-	word = VPint(CR_TIMER_CTL); 
-	word &= 0xffc0ffff;
-	word |= 0x00200000;
-	VPint(CR_TIMER_CTL)=word;
+	if (isRT63165 || isRT63365 || isRT63260) {
+		VPint(CR_WDOG_RLD) = 0x1;
+	} else {
+		word = VPint(CR_TIMER_CTL); 
+		word &= 0xffc0ffff;
+		word |= 0x00200000;
+		VPint(CR_TIMER_CTL)=word;
+	}
 }
 EXPORT_SYMBOL(tc3162wdog_kick);
 
@@ -99,7 +120,7 @@ static int tc3162wdog_open(struct inode *inode, struct file *file)
 	}
   
 	timerSet(5, 2000 * TIMERTICKS_10MS, ENABLE, TIMER_TOGGLEMODE, TIMER_HALTDISABLE);
-	timer_WatchDogConfigure(DISABLE, ENABLE);
+	timer_WatchDogConfigure(ENABLE, ENABLE);
 
 	watchdog_enabled=1;
 	printk("TC3162 hardware watchdog initialized\n");

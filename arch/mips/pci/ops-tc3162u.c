@@ -6,8 +6,8 @@
 #include <asm/addrspace.h>
 #include <asm/tc3162/tc3162.h>
 
-#define PCIE_CONFIG_ADDR		0x1fb81cf8
-#define PCIE_CONFIG_DATA		0x1fb81cfc
+uint32 pcie_config_addr = 0x1fb81cf8;
+uint32 pcie_config_data = 0x1fb81cfc;
 
 #undef DEBUG
 
@@ -27,27 +27,37 @@ static spinlock_t pcie_lock = SPIN_LOCK_UNLOCKED;
 static inline void write_cfgaddr(u32 addr)
 {
 	__raw_writel(addr,
-			(void __iomem *)(KSEG1ADDR(PCIE_CONFIG_ADDR)));
+			(void __iomem *)(KSEG1ADDR(pcie_config_addr)));
 //	__raw_writel((addr | PCI_ENABLE),
 //		(void __iomem *)(KSEG1ADDR(PCI_CONFIG_ADDR)));
 }
 
 static inline void write_cfgdata(u32 data)
 {
-	__raw_writel(data, (void __iomem *)KSEG1ADDR(PCIE_CONFIG_DATA));
+	__raw_writel(data, (void __iomem *)KSEG1ADDR(pcie_config_data));
 }
 
 static inline u32 read_cfgdata(void)
 {
-	return __raw_readl((void __iomem *)KSEG1ADDR(PCIE_CONFIG_DATA));
+	u32 tmp;
+	if(isRT63365)
+		 tmp = __raw_readl((void __iomem *)KSEG1ADDR(pcie_config_data));
+	return __raw_readl((void __iomem *)KSEG1ADDR(pcie_config_data));
 }
 
 static inline u32 mkaddr(struct pci_bus *bus, unsigned int devfn, int where)
 {
-	u32 type=(bus->number & 0xFF)?PCIE_ENABLE:0;
+	u32 type;
 
-	return (type | ((bus->number & 0xFF) << 20) | ((devfn & 0xFF) << 12) | \
+	if(isRT63165 || isRT63365){
+		return	(((bus->number & 0xFF) << 24) | ((devfn & 0xFF) << 16) |\
+				(where & 0xFFC));
+	}else{
+		type=(bus->number & 0xFF)?PCIE_ENABLE:0;
+
+		return (type | ((bus->number & 0xFF) << 20) | ((devfn & 0xFF) << 12) | \
 			(where & 0xFFC));
+	}
 }
 
 /* -------------------------------------------------------------------------*/
@@ -59,7 +69,13 @@ static int tc3162_pciebios_read(struct pci_bus *bus, unsigned int devfn, int whe
 	u32 data;
 
 	spin_lock_irqsave(&pcie_lock, flags);
-
+	if(isRT63165 || isRT63365){
+		if((devfn & 0xFF) != 0){
+			*val = 0xffffffff;
+			spin_unlock_irqrestore(&pcie_lock, flags);
+			return PCIBIOS_SUCCESSFUL;
+		}
+	}
 	write_cfgaddr(mkaddr(bus,devfn,where));
 	data = read_cfgdata();
 

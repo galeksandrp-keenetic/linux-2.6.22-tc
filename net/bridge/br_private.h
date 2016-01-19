@@ -160,10 +160,12 @@ extern void br_fdb_changeaddr(struct net_bridge_port *p,
 extern void br_fdb_cleanup(unsigned long arg);
 extern void br_fdb_delete_by_port(struct net_bridge *br,
 				  const struct net_bridge_port *p, int do_all);
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 extern struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, 
 											 	    struct net_bridge_port *p,
 					  						        const unsigned char *addr);
+#endif
 #endif
 extern struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 						 const unsigned char *addr);
@@ -175,9 +177,15 @@ extern int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
 			 const unsigned char *addr);
+#if defined(TCSUPPORT_HWNAT)
+extern void br_fdb_update(struct net_bridge *br,
+			  struct net_bridge_port *source,
+			  const unsigned char *addr, struct sk_buff *skb);
+#else
 extern void br_fdb_update(struct net_bridge *br,
 			  struct net_bridge_port *source,
 			  const unsigned char *addr);
+#endif
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -189,11 +197,13 @@ extern int br_forward_finish(struct sk_buff *skb);
 extern void br_flood_deliver(struct net_bridge *br,
 		      struct sk_buff *skb,
 		      int clone);
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 extern void br_flood_pb_forward(struct net_bridge *br, 
 						 struct net_bridge_port *p, 
 						 struct sk_buff *skb, 
 						 int clone);
+#endif
 #endif
 extern void br_flood_forward(struct net_bridge *br,
 		      struct sk_buff *skb,
@@ -297,6 +307,8 @@ extern void (*br_igmpsnoop_set_ageing_time_hook)(struct net_bridge *br, unsigned
 extern unsigned long (*br_igmpsnoop_get_ageing_time_hook)(struct net_bridge *br);
 extern void (*br_igmpsnoop_set_quickleave_hook)(struct net_bridge *br, unsigned long val);
 extern int (*br_igmpsnoop_get_quickleave_hook)(struct net_bridge *br);
+extern void (*br_igmpsnoop_set_routeportflag_hook)(struct net_bridge *br, unsigned long val);
+extern int (*br_igmpsnoop_get_routeportflag_hook)(struct net_bridge *br);
 extern void (*br_igmpsnoop_set_dbg_hook)(struct net_bridge *br, unsigned long val);
 extern int (*br_igmpsnoop_get_dbg_hook)(struct net_bridge *br);
 extern int (*br_mc_fdb_fillbuf_hook)(struct net_bridge *br, void *buf,unsigned long maxnum, unsigned long skip);
@@ -310,11 +322,15 @@ extern void (*igmpsnoop_addtimer_hook)(void*ptr,int flag);
 
 /*MLD Snooping*/
 #ifdef CONFIG_MLD_SNOOPING
-extern int (*br_mldsnooping_forward_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest);
-extern int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest);
+extern int (*br_mldsnooping_forward_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
+extern int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
 extern int (*br_mldsnoop_start_hook)(void);
 extern int (*br_mldsnoop_cleanup_hook)(void);
 extern void (*br_mldsnoop_enable_hook)(int is_enable);
 extern void (*br_mldsnoop_set_age_hook)(struct net_bridge *br, unsigned long age);
 extern void (*br_mldsnoop_show_hook)(void);
+#endif
+
+#ifdef TCSUPPORT_HWNAT 
+extern int port_reverse;
 #endif

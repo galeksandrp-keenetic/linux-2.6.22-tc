@@ -228,7 +228,8 @@ static int ebt_filter_ip6(const struct sk_buff *skb, const struct net_device *in
 			return EBT_NOMATCH;
 #endif
 		if (!(info->bitmask & EBT_IP6_DPORT) &&
-		    !(info->bitmask & EBT_IP6_SPORT))
+		    !(info->bitmask & EBT_IP6_SPORT) 
+			)
 			//return true;
 			return EBT_MATCH;
 #if 1  

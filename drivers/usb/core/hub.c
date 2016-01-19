@@ -32,6 +32,7 @@
 #include "hub.h"
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 /******************
 usb 2.0 port status definition which is the same with ehci.h.
 	shnwind add 20101012.
@@ -53,6 +54,7 @@ usb 2.0 port status definition which is the same with ehci.h.
 #define USB_PORT1_STAT_11_ADDR 0xbfba0058
 #define OHCI_USB_CONTROL_ADDR 0xbfba0004
 
+#endif
 
 #ifdef TC_SUPPORT_3G
 //if option.c
@@ -1700,6 +1702,7 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 	for (i = 0; i < PORT_RESET_TRIES; i++) {
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 		/*Use readl/writel to replace VPint in order to match the register in usb spec.
 			shnwind add 20101012.*/	
 		if(((readl((void *)USB_PORT0_STAT_20_ADDR) & PORT_PE) == 0) && ((readl((void *)USB_PORT1_STAT_20_ADDR) & PORT_PE) == 0)){
@@ -1711,17 +1714,8 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 				writel((PORT_CSC | PORT_PEC), (void *)USB_PORT1_STAT_20_ADDR);
 			}
 			mdelay(1);
-		}
-#if 0
-		if(((VPint(0xbfba1064) & 0x04000000) == 0) && ((VPint(0xbfba1068) & 0x04000000) == 0)){
-					set_port_feature(hub->hdev, 1, USB_HOST_LIGHT_RESET);
-					if((VPint(0xbfba1064) & 0x01000000) == 0x01000000)
-						VPint(0xbfba1064) &= 0x0a000000;
-					if((VPint(0xbfba1068) & 0x01000000) == 0x01000000)
-						VPint(0xbfba1068) &= 0x0a000000;
-					mdelay(1);	
 		}	
-#endif		
+#endif
 #endif
 		status = set_port_feature(hub->hdev,
 				port1, USB_PORT_FEAT_RESET);
@@ -2672,7 +2666,9 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 	int status, i;
 	
 #if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 	unsigned long x;
+#endif
 #endif
  
 	dev_dbg (hub_dev,
@@ -2689,6 +2685,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		usb_disconnect(&hdev->children[port1-1]);
 
 #if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 		/* clear bit7,6 of 0xc0000000 (after USB flash is unpluged) 
 		 * to reset rootHub and SIE of usb1.1, so that power saving
 		 * mode can work properly  --Trey */
@@ -2701,6 +2698,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 				x &= ~((1<<7) | (1<<6));
 				writel(x, (void *)OHCI_USB_CONTROL_ADDR);
 		 }
+#endif
 #endif
 	}
 
@@ -2750,6 +2748,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 #endif
 
 #if defined(CONFIG_MIPS_TC3262) 
+#if !defined(CONFIG_MIPS_RT63365)
 	/* set bit7 and clear bit6 of 0xc0000000 (when USB flash is pluged) 
 	 * to set to normal mode for rootHub and SIE of usb1.1, so that power 
 	 * saving mode can work properly  --Trey */
@@ -2758,6 +2757,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 	x &= ~(1<<6);
 	writel(x, (void *)OHCI_USB_CONTROL_ADDR);
 	//printk("SET USB 11 OPERATION\n");	
+#endif
 #endif
 
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {

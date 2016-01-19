@@ -2086,7 +2086,7 @@ martian_source:
 	goto e_inval;
 }
 
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 static int ip_route_input_multicast(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 		   u8 tos, struct net_device *dev)
 {
@@ -2124,7 +2124,7 @@ __IMEM int ip_route_input(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	rcu_read_lock();
 	for (rth = rcu_dereference(rt_hash_table[hash].chain); rth;
 	     rth = rcu_dereference(rth->u.dst.rt_next)) {
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 		if (((rth->fl.fl4_dst ^ daddr) |
         	(rth->fl.fl4_src ^ saddr) |
            	(rth->fl.iif ^ iif) |
@@ -2163,7 +2163,7 @@ __IMEM int ip_route_input(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	   route cache entry is created eventually.
 	 */
 	if (MULTICAST(daddr)) {
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 		return ip_route_input_multicast(skb, daddr, saddr, 
 												tos, dev);
 #else

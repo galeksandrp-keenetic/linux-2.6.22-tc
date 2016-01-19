@@ -151,7 +151,15 @@ timer_action (struct ehci_hcd *ehci, enum ehci_timer_action action)
 			break;
 		// case TIMER_ASYNC_SHRINK:
 		default:
+#ifndef CONFIG_MIPS_RT63365		
 			t = EHCI_SHRINK_JIFFIES;
+#else			
+			/* add a jiffie since we synch against the
+			 * 8 KHz uframe counter.
+			 */
+			t = DIV_ROUND_UP(EHCI_SHRINK_FRAMES * HZ, 1000) + 1;
+#endif			
+
 			break;
 		}
 		t += jiffies;

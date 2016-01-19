@@ -100,6 +100,10 @@ struct nf_conn
 	/* These are my tuples; original and reply */
 	struct nf_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 
+#if defined(TCSUPPORT_HWNAT)
+	unsigned int pktflow_key[IP_CT_DIR_MAX];
+#endif
+
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 

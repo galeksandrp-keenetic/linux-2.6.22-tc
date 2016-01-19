@@ -34,6 +34,10 @@ struct pci_controller tc3162_controller = {
 static __init int tc3162_pci_init(void)
 {
 	int pci_bios;
+	unsigned long x;
+
+	if(isRT63365)
+		return -1;
 
 #ifndef CONFIG_MIPS_TC3262
 	pci_bios = VPint(CR_AHB_HWCONF) & (1<<8);
@@ -69,6 +73,41 @@ static __init int tc3162_pci_init(void)
 	ioport_resource.end = 0x1fffffff;
 	iomem_resource.end = 0xffffffff;
 
+if(isRT63165)
+{
+/* rt63165's PCI bridge has additional config registers 
+ * which can be direct-accessed, such as the first 3 
+ * registers shown below
+ */
+	//Disable PCI IO SWAP.
+	
+	x = VPint(0xbfb000ec);
+	x &= ~(1<<9);
+	VPint(0xbfb000ec) = x;
+
+    /* configure USB Host Control Register to 
+     do byte swaping in HW --Trey */
+    VPint(0xbfb000a8) = 0x00000060;
+    mdelay(10);
+    /* set space of PCI base address
+    up to 256M  --Trey*/
+    VPint(0xbfb80010) = 0x0fff0001;
+    /* configure PCIArbitor Control Register to
+    set priority scheme --Trey*/
+    VPint(0xbfb80080) = 0x00000079;
+
+    //set base address of PCI
+    VPint(0xbfb80cf8) = 0x80000410;
+    VPint(0xbfb80cfc) = 0x00000000;
+    
+    //enable PCI's master, memory functions 
+    VPint(0xbfb80cf8) = 0x80000404;
+    VPint(0xbfb80cfc) = 0xa4800016;
+    
+    //set PCI's latency-timer, cache-line-size
+    VPint(0xbfb80cf8) = 0x8000040c;
+    VPint(0xbfb80cfc) = 0x00002008;        
+}
 	register_pci_controller(&tc3162_controller);
 	return 0;
 }

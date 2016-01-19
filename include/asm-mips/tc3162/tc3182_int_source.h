@@ -38,7 +38,11 @@ interrupt_source
 		APB_DMA0_INT,	//14	IPL12
 		MAC1_INT,		//15	IPL13
 		HSUART_INT,		//16	IPL23
-		PTM_B1_INT,		//17
+#if !defined(CONFIG_MIPS_RT63365)
+		RESERVED2,		//17
+#else
+		IRQ_RT3XXX_USB,	//17	IPL24
+#endif
 		DYINGGASP_INT,	//18	IPL25
 		DMT_INT,		//19	IPL26
 		USB20_INT,		//20
@@ -47,12 +51,13 @@ interrupt_source
 		USB11_INT,
 		PCIE_A_INT,		//24
 		PCIE_SERR_INT,		//25
-		XSLV0_INT,		//26	IPL15
+		PTM_B1_INT,		//26	IPL15
 		XSLV1_INT,		//27	IPL16
 		USB_INT,		//28	IPL17
 		SI_TIMER1_INT,	//29
 		SI_TIMER_INT,	//30
-		SWR_INT 		//31	IPL4
+		SWR_INT, 		//31	IPL4
+		BUS_TOUT_INT 	//32	
 	};
 
 #endif /* _INT_SOURCE_H_ */

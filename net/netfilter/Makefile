@@ -40,7 +40,14 @@ obj-$(CONFIG_NETFILTER_XTABLES) += x_tables.o xt_tcpudp.o
 # targets
 obj-$(CONFIG_NETFILTER_XT_TARGET_CLASSIFY) += xt_CLASSIFY.o
 obj-$(CONFIG_NETFILTER_XT_TARGET_CONNMARK) += xt_CONNMARK.o
-obj-$(CONFIG_NETFILTER_XT_TARGET_DSCP) += xt_DSCP.o
+#obj-$(CONFIG_NETFILTER_XT_TARGET_DSCP) += xt_DSCP.o
+ifeq ($(CONFIG_IP_NF_MANGLE), y)
+obj-y += xt_DSCP.o
+endif
+ifeq ($(CONFIG_IP_NF_MANGLE), m)
+obj-m += xt_DSCP.o
+endif
+
 obj-$(CONFIG_NETFILTER_XT_TARGET_MARK) += xt_MARK.o
 obj-$(CONFIG_NETFILTER_XT_TARGET_NFQUEUE) += xt_NFQUEUE.o
 obj-$(CONFIG_NETFILTER_XT_TARGET_NFLOG) += xt_NFLOG.o
@@ -61,7 +68,11 @@ endif
 obj-$(CONFIG_NETFILTER_XT_MATCH_CONNMARK) += xt_connmark.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_CONNTRACK) += xt_conntrack.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_DCCP) += xt_dccp.o
+ifeq ($(TCSUPPORT_XT_MATCH_DSCP),1)
+obj-y += xt_dscp.o
+else
 obj-$(CONFIG_NETFILTER_XT_MATCH_DSCP) += xt_dscp.o
+endif
 obj-$(CONFIG_NETFILTER_XT_MATCH_ESP) += xt_esp.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_HELPER) += xt_helper.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_LENGTH) += xt_length.o

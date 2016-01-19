@@ -40,7 +40,22 @@ static void tc3162_pcie_fixup(struct pci_dev *dev)
 //	pci_write_config_dword(dev, PCI_BASE_ADDRESS_1, 0x1FBA0000);
 //	pci_write_config_dword(dev, PCI_BASE_ADDRESS_2, 0x1FBB0000);
 }
+static void tc3162_pcie_fixup_ra63165(struct pci_dev *dev)
+{
+	/* setup COMMAND register */
+	pci_write_config_word(dev, PCI_COMMAND,
+		(PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER));
+		
+	//pci-e interrupt enable_dma
+	if(isRT63365){
+		VPint(0xbfb8000c) |= (1<<20); 
+		//second band
+		//VPint(0xbfb8000c) |= (1<<21);
+	}else{
+		VPint(0xbfb8100c) |= (1<<20);
+	}	
 
+}
 #ifndef PCIE_PCI_COEXIT
 int pcibios_plat_dev_init(struct pci_dev *dev)
 {
@@ -50,4 +65,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_SIS, PCI_DEVICE_ID_SIS,
           tc3162_pcie_fixup);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_RT, PCI_DEVICE_ID_RT,
+          tc3162_pcie_fixup_ra63165);	  
 

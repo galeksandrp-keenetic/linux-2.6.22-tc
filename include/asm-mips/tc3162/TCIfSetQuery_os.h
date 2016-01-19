@@ -19,6 +19,12 @@
 //*****************************************************************************
 // $Id: TCIfSetQuery_os.h,v 1.1.1.1 2010/04/09 09:39:21 feiyan Exp $
 // $Log: TCIfSetQuery_os.h,v $
+// Revision 1.3  2011/07/22 10:24:28  treychen_hc
+// bug#10858--Trey
+//
+// Revision 1.2  2011/06/02 11:35:51  lino
+// add RT65168 support
+//
 // Revision 1.1.1.1  2010/04/09 09:39:21  feiyan
 // New TC Linux Make Flow Trunk
 //
@@ -123,6 +129,16 @@
 #define ADSL_QUERY_ATTAIN_RATE      0x0027	//Julia_051117
 #endif
 #define ADSL_QUERY_CELL_CNT1         0x002b      //zzma_091020
+#define ADSL_QUERY_RX_BEAR_TPSTC_TYPE         0x002c
+
+#if defined(TCSUPPORT_CWMP_VDSL)
+#define VDSL_QUERY_TR098_DSL_INTERFACE_CONFIG 0x2001
+#endif
+
+#define TPSTC_DISABLE      			0x00
+#define TPSTC_ATM_TC       			0x01
+#define TPSTC_PTM_TC_64_65B       	0x02
+#define TPSTC_PTM_TC_HDLC       	0x03
 
 #define ADSL_QUERY_SRA_ONOFF 0x0028 //Roger_090206
 #define ADSL_QUERY_PM_ONOFF 0x0029 //Roger_090206
@@ -141,6 +157,10 @@
 #define ADSL_SET_MODE_ADSL1_MULTI     0x100b	//yyfeng_070210
 #define ADSL_SET_MODE_ADSL2_MULTI     0x100c	//yyfeng_070210
 #define ADSL_SET_MODE_ADSL2PLUS_T1413 0x100d	// Ryan_961128
+#define ADSL_SET_MODE_VDSL2         0x100e
+#if defined(TCSUPPORT_CWMP_VDSL)
+#define ADSL_SET_MODE_ADSL2PLUS_MULTI	0x100f
+#endif
 #define ADSL_SET_R_VENDOR_ID        0x1010
 #define ADSL_SET_TX_GAIN            0x1011
 #define ADSL_SET_TX_FILTER_TYPE     0x1012
@@ -195,6 +215,7 @@
 //Jason_930706
 #define    		ME_CMD_ADSL2						0x09
 #define    		ME_CMD_ADSL2PLUS					0x0A
+#define    		ME_CMD_VDSL2						0x0B
 
 //xzwang
 #define         ME_CMD_ADSL_ANSI                    0x05
@@ -226,5 +247,15 @@ typedef struct {
 extern adsldev_ops *adsl_dev_ops;
 void adsl_dev_ops_register(adsldev_ops *ops);
 void adsl_dev_ops_deregister(void);
+
+#ifdef CONFIG_RALINK_VDSL
+typedef struct {
+	int	(*vdsl2_cmd)(int argc,char *argv[],void *p);
+} vdsldev_ops;
+
+extern vdsldev_ops *vdsl_dev_ops;
+void vdsl_dev_ops_register(vdsldev_ops *ops);
+void vdsl_dev_ops_deregister(void);
+#endif
 
 #endif

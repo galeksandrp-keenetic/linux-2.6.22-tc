@@ -15,6 +15,8 @@
  * published by the Free Software Foundation.
  *
 */
+#include <linux/proc_fs.h> 
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -25,6 +27,7 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/gen_probe.h>
 #include <asm/delay.h>
+#include <linux/timer.h>
 #include <asm/io.h>
 #include <asm/tc3162/tc3162.h>
 #include "spiflash_tc3162.h"
@@ -43,6 +46,8 @@
 #define DEVICE_ID(id)       	(id & ID_MASK)
 
 #define SIZE_64KiB      		0x10000
+#define SIZE_64MiB              0x4000000
+#define SIZE_32MiB              0x2000000
 #define SIZE_16MiB              0x1000000
 #define SIZE_8MiB       		0x800000
 #define SIZE_4MiB       		0x400000
@@ -79,6 +84,7 @@
 #define MX25L3205D				0x2016
 #define MX25L6405D              0x2017
 #define MX25L12805D             0x2018
+#define MX25L25635E  			0x2019
 
 /* SPANSION */
 #define S25FL016A          		0x0214
@@ -116,6 +122,17 @@ struct spi_flash_info {
 	const int EraseSize;
 };
 
+#if defined(TCSUPPORT_VOIP)
+/*#11542: For voice afftected by Flash action issue*/
+typedef struct spiEraseParam_s{
+	struct mtd_info* tmpMtd;
+	struct erase_info* tmpInstr;
+}spiEraseParam_t;
+spiEraseParam_t spiEraseParam;
+static struct timer_list eraseCheck_Timer;
+extern atomic_t eraseAction;
+#endif
+
 struct spi_chip_info {
 	struct spi_flash_info *flash;
 	void (*destroy)(struct spi_chip_info *chip_info);
@@ -150,6 +167,7 @@ static spinlock_t spiflash_mutex;
 static int spiflash_state;
 
 static __u8 byte_program_mode = 0;
+static __u8 four_byte_mode = 0;
 
 static __u32
 spiflash_regread32(int reg)
@@ -249,7 +267,11 @@ spiflash_erase (struct map_info *map, u32 addr)
 
 	spiflash_regwrite32(SPI_FLASH_OPCODE, temp);
 
-	reg = (reg & ~SPI_CTL_TX_RX_CNT_MASK) | ptr_opcode->tx_cnt | SPI_CTL_START;
+	if(four_byte_mode == 1){
+		reg = ((__u32)addr & 0xff000000) |(reg & ~SPI_CTL_TX_RX_CNT_MASK) | (ptr_opcode->tx_cnt+1) | SPI_CTL_START;
+	}else{
+		reg = (reg & ~SPI_CTL_TX_RX_CNT_MASK) | ptr_opcode->tx_cnt | SPI_CTL_START;
+	}
 	spiflash_regwrite32(SPI_FLASH_CTL, reg);
 
 	do {
@@ -261,6 +283,36 @@ spiflash_erase (struct map_info *map, u32 addr)
 
    	return (0);
 }
+
+#if defined(TCSUPPORT_VOIP)
+static int spiflash_wait_erase_ready(unsigned long data)
+{
+	int ret;
+	unsigned long adr, len;
+	struct mtd_info* mtd = spiEraseParam.tmpMtd;
+	struct erase_info* instr = spiEraseParam.tmpInstr;
+	struct map_info *map = mtd->priv;
+	struct spi_chip_info *chip_info = (struct spi_chip_info *)map->fldrv_priv;
+	adr = instr->addr;
+	len = instr->len;
+
+
+	while (len) {
+		ret = chip_info->erase(map, adr);
+		adr += mtd->erasesize;
+		len -= mtd->erasesize;
+
+	}
+	instr->state = MTD_ERASE_DONE;
+	if (instr->callback){
+		//printk("Damn! \n");
+		instr->callback(instr);
+	}
+	del_timer(&eraseCheck_Timer);
+	up(&SPI_SEM);
+	return 0;
+}
+#endif
 
 /* wait until the flash chip is ready and grab a lock */
 static int spiflash_wait_ready(int state)
@@ -390,11 +442,15 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
         if (!byte_program_mode){
         	/*20101119 pork modified for Slic lower SPI speed request*/
         	reg_value = VPint(SPI_REG_MASTER);
-//			VPint(SPI_REG_MASTER) = 0x38804;//Set bit [2] to 1 to enter more buffer mode
-			VPint(SPI_REG_MASTER) = reg_value | (1 << 2);
+//		VPint(SPI_REG_MASTER) = 0x38804;//Set bit [2] to 1 to enter more buffer mode
+		VPint(SPI_REG_MASTER) = reg_value | (1 << 2);
  //       	VPint(SPI_REG_MOREBUF) = 0x20000100;//Set bits [8:0] to 128 (data bit counts) and bits[29:24] to 32(comman bit counts)
         	/* write exact data size into flash */
-           	VPint(SPI_REG_MOREBUF) = 0x20000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 32(command bit counts)
+		if(four_byte_mode == 1){
+			VPint(SPI_REG_MOREBUF) = 0x28000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 40(command bit counts)
+		}else{
+           		VPint(SPI_REG_MOREBUF) = 0x20000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 32(command bit counts)
+		}	
         }
 #endif
 
@@ -408,7 +464,11 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 			spiflash_regwrite32(SPI_FLASH_DATA6, spi_data[5]);
 			spiflash_regwrite32(SPI_FLASH_DATA7, spi_data[6]);
 			spiflash_regwrite32(SPI_FLASH_DATA8, spi_data[7]);
-			opcode = (0x02 << 24) | ((__u32)to);
+			if(four_byte_mode == 1){
+				opcode = ((__u32)to);
+			}else{	
+				opcode = (0x02 << 24) | ((__u32)to);
+			}	
 		}
 		else
 #else
@@ -418,7 +478,15 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 
 		spiflash_regwrite32(SPI_FLASH_OPCODE, opcode);
 
-		reg = (reg & ~SPI_CTL_TX_RX_CNT_MASK) | (xact_len + 4) | SPI_CTL_START;
+		if(four_byte_mode == 1){
+#if defined(TC_SOC)
+			reg = ((0x02 << 24) | (reg & 0x00ffff00)) | (xact_len + 5) | SPI_CTL_START; 
+#else
+			reg = ((__u32)to & 0xff000000 ) | (reg & 0x00ffff00) | (xact_len + 5) | SPI_CTL_START;
+#endif
+		}else{
+			reg = (reg & ~SPI_CTL_TX_RX_CNT_MASK) | (xact_len + 4) | SPI_CTL_START;
+		}	
 		spiflash_regwrite32(SPI_FLASH_CTL, reg);
 		finished = FALSE;
 
@@ -559,6 +627,13 @@ static struct spi_flash_info flash_tables[] = {
 		EraseSize: SIZE_64KiB,
 	},
 	{
+		mfr_id: MANUFACTURER_MXIC,
+		dev_id: MX25L25635E,
+		name: "MX25L25635DE",
+		DeviceSize: SIZE_32MiB,
+		EraseSize: SIZE_64KiB,
+	},
+	{
 		mfr_id: MANUFACTURER_SPANSION,
 		dev_id: S25FL064A,
 		name: "S25FL064A",
@@ -665,6 +740,10 @@ struct spi_chip_info *spiflash_probe_tc3162(struct map_info *map)
 				byte_program_mode = 1;
 			}
 
+			if(flash_tables[i].DeviceSize >= SIZE_32MiB){
+				VPint(SPI_REG_BASE) |= ((1<<19)|(1<<20));
+				four_byte_mode = 1;	
+			}
 			chip_info = spiflash_tc3162_setup(map);
 			if (chip_info) {
 				chip_info->flash      = &flash_tables[i];
@@ -685,6 +764,52 @@ struct spi_chip_info *spiflash_probe_tc3162(struct map_info *map)
 #endif
 	return NULL;
 }
+
+#if defined(TCSUPPORT_VOIP)
+int mtd_spiflash_erase_sp(struct mtd_info *mtd, struct erase_info *instr)
+{
+	struct map_info *map = mtd->priv;
+	struct spi_chip_info *chip_info = (struct spi_chip_info *)map->fldrv_priv;
+	unsigned long adr, len;
+	int ret = 0;
+#if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
+	if(down_interruptible(&SPI_SEM))
+		return -ERESTARTSYS;
+
+	*((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM)) = reg0x28;
+#endif
+
+	if (instr->addr & (mtd->erasesize - 1)){
+#if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
+		up(&SPI_SEM);
+#endif
+		return -EINVAL;
+	}
+
+	if (instr->len & (mtd->erasesize -1)){
+#if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
+		up(&SPI_SEM);
+#endif
+		return -EINVAL;
+	}
+	if ((instr->len + instr->addr) > mtd->size){
+#if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
+		up(&SPI_SEM);
+#endif
+		return -EINVAL;
+	}
+
+	memset(&spiEraseParam,0,sizeof(spiEraseParam));
+	spiEraseParam.tmpMtd = mtd;
+	spiEraseParam.tmpInstr = instr;
+	init_timer(&eraseCheck_Timer);
+	eraseCheck_Timer.data = NULL;
+	eraseCheck_Timer.function = spiflash_wait_erase_ready;
+	eraseCheck_Timer.expires = jiffies + 1;
+	add_timer(&eraseCheck_Timer);
+	return 0;
+}
+#endif
 
 int mtd_spiflash_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
@@ -767,12 +892,17 @@ int mtd_spiflash_read(struct mtd_info *mtd, loff_t from, size_t len, size_t *ret
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	if(down_interruptible(&SPI_SEM))
 		return -ERESTARTSYS;
-
+#if defined(TCSUPPORT_VOIP)
+	atomic_set(&eraseAction, 1);
+#endif
 	*((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM)) = reg0x28;
 #endif
 	if (!chip_info->read){
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 		up(&SPI_SEM);
+#endif
+#if defined(TCSUPPORT_VOIP)
+	atomic_set(&eraseAction, 0);
 #endif
 		return -EOPNOTSUPP;
 	}
@@ -782,6 +912,9 @@ int mtd_spiflash_read(struct mtd_info *mtd, loff_t from, size_t len, size_t *ret
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 		up(&SPI_SEM);
 #endif
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		return ret;
 	}
 
@@ -790,6 +923,9 @@ int mtd_spiflash_read(struct mtd_info *mtd, loff_t from, size_t len, size_t *ret
 
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	up(&SPI_SEM);
+#endif
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
 #endif
 	return 0;
 }
@@ -803,11 +939,17 @@ int mtd_spiflash_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retl
 	if(down_interruptible(&SPI_SEM))
 		return -ERESTARTSYS;
 
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 1);
+#endif
 	*((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM)) = reg0x28;
 #endif	
 	if (!chip_info->write){
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 		up(&SPI_SEM);
+#endif
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
 #endif
 		return -EOPNOTSUPP;
 	}
@@ -816,6 +958,9 @@ int mtd_spiflash_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retl
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 		up(&SPI_SEM);
 #endif
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		return -EINTR;
 	}
 	ret = chip_info->write(map, (u32)buf, to, len);
@@ -823,6 +968,9 @@ int mtd_spiflash_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retl
 	if (ret){
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 		up(&SPI_SEM);
+#endif
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
 #endif
 		return ret;
 	}
@@ -833,9 +981,15 @@ int mtd_spiflash_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retl
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	up(&SPI_SEM);
 #endif
+#if defined(TCSUPPORT_VOIP)
+	atomic_set(&eraseAction, 0);
+#endif
 	return 0;
 }
 
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+int offset = 0;
+#endif
 
 static struct mtd_info *spiflash_probe(struct map_info *map)
 {
@@ -854,8 +1008,13 @@ static struct mtd_info *spiflash_probe(struct map_info *map)
 
 	mtd->priv = map;
 	mtd->type = MTD_NORFLASH;
-
+#if defined(TCSUPPORT_VOIP)
+	mtd->erase   = mtd_spiflash_erase_sp;
+#else
 	mtd->erase   = mtd_spiflash_erase;
+#endif
+
+
 	mtd->write   = mtd_spiflash_write;
 	mtd->read    = mtd_spiflash_read;
 	mtd->flags   = MTD_CAP_NORFLASH;
@@ -870,6 +1029,9 @@ static struct mtd_info *spiflash_probe(struct map_info *map)
 
 	printk(KERN_INFO "%s: Found SPIFLASH %dMiB %s\n",
 		map->name, chip_info->flash->DeviceSize/(1024*1024), chip_info->flash->name);
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+		offset = chip_info->flash->DeviceSize/2;
+#endif
 	return mtd;
 }
 
@@ -890,8 +1052,73 @@ static struct mtd_chip_driver spiflash_chipdrv = {
 	.module	 = THIS_MODULE
 };
 
+#if defined(TCSUPPORT_SUPPORT_FLASH)
+static int read_proc_support_flash(char *page, char **start, off_t off,
+	int count, int *eof, void *data)
+{
+	int len;
+	unsigned int flash_id;
+	int  index_flash;
+	char *buf_proc = NULL;
+	char buf_line[200];
+	char buf_name[100];
+	char *buf_replace = NULL;
+	int total_len=0;
+
+	
+	buf_proc = kmalloc(4*1024, GFP_KERNEL);
+	if (!buf_proc) 
+	{
+		printk(KERN_WARNING "Failed to allocate memory for /proc/tc3162/support_flash\n");
+		return 0;
+	}
+
+	memset(buf_proc,0,4*1024);
+
+	for(index_flash=0; index_flash < sizeof(flash_tables)/sizeof(struct spi_flash_info); index_flash++)
+	{
+		strcpy(buf_name,flash_tables[index_flash].name);//replace whitespace with '_'
+		while( (buf_replace=strstr(buf_name, " "))!=NULL)
+			*buf_replace='#';
+
+		if(flash_tables[index_flash].DeviceSize/0x100000 <4)
+			continue;
+
+		flash_id = (flash_tables[index_flash].mfr_id <<16) | ( flash_tables[index_flash].dev_id & 0xffff);
+
+		sprintf(buf_line,"%s %#x %d \n",buf_name , flash_id, 
+			flash_tables[index_flash].DeviceSize/0x100000);
+
+		total_len += strlen(buf_line);
+		if(total_len>4*1024)
+			break;
+		strcat(buf_proc,buf_line);
+	}
+
+	len = sprintf(page, "%s", buf_proc);
+
+	len -= off;
+	*start = page + off;
+
+	if (len > count)
+		len = count;
+	else
+		*eof = 1;
+
+	if (len < 0)
+		len = 0;
+	
+	kfree(buf_proc);
+	return len;
+}
+#endif
+
 static int __init spiflash_probe_init(void)
 {
+#if defined(TCSUPPORT_SUPPORT_FLASH)
+	create_proc_read_entry("tc3162/support_flash", 0, NULL, read_proc_support_flash, NULL);
+#endif
+
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	reg0x28 = *((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM));
 #endif
@@ -901,6 +1128,10 @@ static int __init spiflash_probe_init(void)
 
 static void __exit spiflash_probe_exit(void)
 {
+#if defined(TCSUPPORT_SUPPORT_FLASH)
+	remove_proc_entry("tc3162/support_flash",  NULL);
+#endif
+
 	unregister_mtd_chip_driver(&spiflash_chipdrv);
 }
 

@@ -160,11 +160,13 @@
  *		86DD	IPv6
  */
 
+#if !defined(TCSUPPORT_CT)
 #ifdef TCSUPPORT_BRIDGE_FASTPATH
 int (*hook_bridge_shortcut_process)(struct net_device *net_dev, struct sk_buff *skb);
 EXPORT_SYMBOL(hook_bridge_shortcut_process);
 void (*hook_dev_shortcut_learn)(struct sk_buff *skb, struct net_device *dev);
 EXPORT_SYMBOL(hook_dev_shortcut_learn);
+#endif
 #endif
 
 static DEFINE_SPINLOCK(ptype_lock);
@@ -179,6 +181,11 @@ static spinlock_t net_dma_event_lock;
 #ifdef CONFIG_TC_VOIP
 /*20091222 pork added during business travel*/
 extern unsigned int dbgEnable;
+#endif
+#ifdef CONFIG_QOS
+#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+int tc_qos_switch = 0;
+#endif
 #endif
 extern void tc3162wdog_kick(void);
 #ifdef TCSUPPORT_DOWNSTREAM_QOS
@@ -1163,7 +1170,11 @@ static void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		if ((ptype->dev == dev || !ptype->dev) &&
 		    (ptype->af_packet_priv == NULL ||
 		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
+#if defined(TCSUPPORT_HWNAT)		
+			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
+#else
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
+#endif
 			if (!skb2)
 				break;
 
@@ -1433,7 +1444,7 @@ static int dev_gso_segment(struct sk_buff *skb)
 	return 0;
 }
 
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 static int dev_gso_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	do {
@@ -1475,16 +1486,18 @@ __IMEM int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				goto gso;
 		}
 
+#if !defined(TCSUPPORT_CT)
 #ifdef TCSUPPORT_BRIDGE_FASTPATH
 		if(hook_dev_shortcut_learn){
 			hook_dev_shortcut_learn(skb, dev);
 		}
-#endif		
+#endif	
+#endif
 		return dev->hard_start_xmit(skb, dev);
 	}
 
 gso:
-#ifdef CONFIG_CPU_TC3162
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 	{
 		int rc;
 
@@ -1564,28 +1577,36 @@ static inline __be16 pppoe_proto(const struct sk_buff *skb)
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
  */
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 int (*portbind_sw_hook)(void);
 int (*portbind_check_hook)(char *inIf, char *outIf);
 EXPORT_SYMBOL(portbind_sw_hook);
 EXPORT_SYMBOL(portbind_check_hook);
 #endif
+#endif
 
-#ifdef TCSUPPORT_QOS
+
+#ifdef CONFIG_QOS
 u32 qos_queue_mask = 0;
 #endif
 
 #ifdef TCSUPPORT_VLAN_TAG
 int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
 int (*insert_vtag_hook)(struct sk_buff **pskb);
+#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 int (*check_vtag_hook)(void);
+#endif
 int (*get_vtag_hook)(struct net_device *dev, struct sk_buff *skb);
 EXPORT_SYMBOL(remove_vtag_hook);
 EXPORT_SYMBOL(insert_vtag_hook);
+#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 EXPORT_SYMBOL(check_vtag_hook);
+#endif
 EXPORT_SYMBOL(get_vtag_hook);
 #endif
 
+#if !defined(TCSUPPORT_CT) 
 __IMEM int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
@@ -1625,7 +1646,11 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 		}
 	}
 */
-	if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+	#if defined(TCSUPPORT_FTP_THROUGHPUT)
+		if ((portbind_sw_hook) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+	#else
+		if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+	#endif
 		if (portbind_check_hook) {
 			//only need check once. shnwind 20110407.
 			portbind_ret = portbind_check_hook(skb->orig_dev_name, skb->dev->name);
@@ -1646,104 +1671,114 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 #endif
 	
 #ifdef TCSUPPORT_VLAN_TAG
+	#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 	if (check_vtag_hook && (check_vtag_hook()) == 1)
+	#endif
 		if (insert_vtag_hook && (-1 == insert_vtag_hook(&skb)))
 			return rc;
 #endif
 
-#ifdef TCSUPPORT_QOS
-	queue_num = (skb->mark & QOS_FILTER_MARK) >> 4;
-	if (qos_queue_mask && (queue_num > 0 && queue_num < 7) && (qos_queue_mask & (1 << (queue_num - 1)))) {
-		//printk("%s:free skb for this skb is to 0 bindwidth queue.", __FUNCTION__);
-		goto out_kfree_skb;
-	}
-	
-#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
-	if ( skb->imq_flags & IMQ_F_ENQUEUE ) {
-		skb->imq_flags &= ~IMQ_F_ENQUEUE;	
-		/*start no queue marked packets to default queue*/
-		if ( !(skb->mark & QOS_FILTER_MARK) ) {
-			skb->mark |= QOS_PRIORITY_DEFAULT;
+#ifdef CONFIG_QOS
+#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+	if(1 == tc_qos_switch)
+	{
+#endif
+		queue_num = (skb->mark & QOS_FILTER_MARK) >> 4;
+		if (qos_queue_mask && (queue_num > 0 && queue_num < 7) && (qos_queue_mask & (1 << (queue_num - 1)))) {
+			//printk("%s:free skb for this skb is to 0 bindwidth queue.", __FUNCTION__);
+			goto out_kfree_skb;
 		}
-	}
 
-	/* set ppp & dhcp packet to highest prioty */
-	cp = skb->data;
-	cp += 12;
-	etherType = *(u16*)cp;
-	cp += 2;
-	if (etherType == 0x8863) {
-		skb->mark &= ~(0xF0);
-		skb->mark |= 0x10;
-	}
-	else if (etherType == 0x8864) {
-		/* skip pppoe head */
-		cp += 6; 					/* 6: PPPoE header 2: PPP protocol */
-		/* get ppp protocol */
-		pppProtocol = *(u16 *) cp;
-		/* check if LCP protocol */
-		if (pppProtocol == 0xc021 || 
-			pppProtocol == 0xc023 || 
-			pppProtocol == 0xc025 || 
-			pppProtocol == 0x8021 || 
-			pppProtocol == 0xc223) {
+		
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		if ( skb->imq_flags & IMQ_F_ENQUEUE ) {
+			skb->imq_flags &= ~IMQ_F_ENQUEUE;	
+			/*start no queue marked packets to default queue*/
+			if ( !(skb->mark & QOS_FILTER_MARK) ) {
+				skb->mark |= QOS_PRIORITY_DEFAULT;
+			}
+		}
+
+		/* set ppp & dhcp packet to highest prioty */
+		cp = skb->data;
+		cp += 12;
+		etherType = *(u16*)cp;
+		cp += 2;
+		if (etherType == 0x8863) {
 			skb->mark &= ~(0xF0);
 			skb->mark |= 0x10;
 		}
-	} 
-	else {
-		/* check dhcp packet, set it to first queue */
-		cp = skb->data;
-		cp += 23;
-		if (*cp == 0x11) { /* udp */
-			cp += 12;
-			if (*cp == 0x43 || *cp == 0x44) { /* udp port is 67 or 68 */
+		else if (etherType == 0x8864) {
+			/* skip pppoe head */
+			cp += 6; 					/* 6: PPPoE header 2: PPP protocol */
+			/* get ppp protocol */
+			pppProtocol = *(u16 *) cp;
+			/* check if LCP protocol */
+			if (pppProtocol == 0xc021 || 
+				pppProtocol == 0xc023 || 
+				pppProtocol == 0xc025 || 
+				pppProtocol == 0x8021 || 
+				pppProtocol == 0xc223) {
 				skb->mark &= ~(0xF0);
 				skb->mark |= 0x10;
 			}
-		}
-	}
-	
-	
-	if (skb->mark & QOS_RTP_MARK) {
-		rtp_match = 1;
-	}
-	else {
-		rtp_match = 0;
-	}
-	if (skb->mark & QOS_RULE_INDEX_MARK) {
-		rule_no = (skb->mark & QOS_RULE_INDEX_MARK) >> 12;
-		skb->mark &= ~QOS_RULE_INDEX_MARK;
-		if (0 == qostype_chk(DEV_XMIT_CHK_TYPE, rule_no, dev->name, rtp_match)) {
-			ret = get_tos(rule_no, &newtos);
-			if (0 == ret) {
-				if ( (skb->protocol == htons(ETH_P_IP)) || 
-					 (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IP)) ) {
-					ih = (struct iphdr *)(skb->network_header);
-					oldtos = ih->tos;
-					if ( skb_make_writable(&skb, sizeof(struct iphdr)) ) {
-						ih->tos = (unsigned char)newtos;
-						nf_csum_replace2(&ih->check, htons(oldtos), htons(ih->tos));
-					}
+		} 
+		else {
+			/* check dhcp packet, set it to first queue */
+			cp = skb->data;
+			cp += 23;
+			if (*cp == 0x11) { /* udp */
+				cp += 12;
+				if (*cp == 0x43 || *cp == 0x44) { /* udp port is 67 or 68 */
+					skb->mark &= ~(0xF0);
+					skb->mark |= 0x10;
 				}
-			#ifdef CONFIG_IPV6
-				else if ( (skb->protocol == htons(ETH_P_IPV6)) ||
-						  (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IPV6)) ) {
-					ih6 = (struct ipv6hdr *)(skb->network_header);
-					if ( skb_make_writable(&skb, sizeof(struct ipv6hdr)) ) {
-						ipv6_change_dsfield( ih6, 0xFF, (unsigned char)newtos );
-					}
-				}
-			#endif
 			}
 		}
-		else {
-			/* wan if not match */
-		    skb->mark &= ~QOS_FILTER_MARK;
-			skb->mark |= QOS_PRIORITY_DEFAULT;
-			/* clear 802.1p mark */
-			skb->mark &= ~QOS_DOT1P_MARK;
+		
+		
+		if (skb->mark & QOS_RTP_MARK) {
+			rtp_match = 1;
 		}
+		else {
+			rtp_match = 0;
+		}
+		if (skb->mark & QOS_RULE_INDEX_MARK) {
+			rule_no = (skb->mark & QOS_RULE_INDEX_MARK) >> 12;
+			skb->mark &= ~QOS_RULE_INDEX_MARK;
+			if (0 == qostype_chk(DEV_XMIT_CHK_TYPE, rule_no, dev->name, rtp_match)) {
+				ret = get_tos(rule_no, &newtos);
+				if (0 == ret) {
+					if ( (skb->protocol == htons(ETH_P_IP)) || 
+						 (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IP)) ) {
+						ih = (struct iphdr *)(skb->network_header);
+						oldtos = ih->tos;
+						if ( skb_make_writable(&skb, sizeof(struct iphdr)) ) {
+							ih->tos = (unsigned char)newtos;
+							nf_csum_replace2(&ih->check, htons(oldtos), htons(ih->tos));
+						}
+					}
+				#ifdef CONFIG_IPV6
+					else if ( (skb->protocol == htons(ETH_P_IPV6)) ||
+							  (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IPV6)) ) {
+						ih6 = (struct ipv6hdr *)(skb->network_header);
+						if ( skb_make_writable(&skb, sizeof(struct ipv6hdr)) ) {
+							ipv6_change_dsfield( ih6, 0xFF, (unsigned char)newtos );
+						}
+					}
+				#endif
+				}
+			}
+			else {
+				/* wan if not match */
+			    skb->mark &= ~QOS_FILTER_MARK;
+				skb->mark |= QOS_PRIORITY_DEFAULT;
+				/* clear 802.1p mark */
+				skb->mark &= ~QOS_DOT1P_MARK;
+			}
+		}
+#endif
+#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
 	}
 #endif
 #endif
@@ -1876,6 +1911,7 @@ out:
 	return rc;
 }
 
+#endif
 
 /*=======================================================================
 			Receiver routines
@@ -2361,6 +2397,7 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 		skb->iif = skb->dev->ifindex;
 
 	orig_dev = skb_bond(skb);
+#if !defined(TCSUPPORT_CT)
 #ifdef TCSUPPORT_BRIDGE_FASTPATH
 	if(hook_bridge_shortcut_process)
 	{
@@ -2369,16 +2406,28 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 		}	
 	}
 #endif
+#endif
 
 #ifdef TCSUPPORT_VLAN_TAG
+	#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 	if (check_vtag_hook && (check_vtag_hook() == 1))
+	#endif
 		if (get_vtag_hook)
-			get_vtag_hook(orig_dev, skb);
+			if (-1 == get_vtag_hook(orig_dev, skb)) {
+				kfree_skb(skb);
+				return NET_RX_DROP;
+			}
 #endif
 
 	if (!orig_dev)
 		return NET_RX_DROP;
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
+#if defined(TCSUPPORT_FTP_THROUGHPUT)
+	if (portbind_sw_hook) {
+#else
+	if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+#endif
 #ifdef CONFIG_SMUX
 	 /*we only check OSMUX interface and other interface*/
 	 //if((orig_dev->priv_flags & IFF_RSMUX) == 0)
@@ -2398,6 +2447,8 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 		skb->portbind_mark |= MASK_ORIGIN_DEV;
 		memcpy(skb->orig_dev_name, orig_dev->name, IFNAMSIZ);
 		//printk("netif_receive_skb: begin orig_dev name is [%s], skb device name is [%s]\n", skb->orig_dev_name, skb->dev->name);
+	}
+#endif
 	}
 #endif
 #endif
@@ -2457,7 +2508,14 @@ ncls:
        if((orig_dev->priv_flags & IFF_RSMUX) && 
 		smux_pkt_recv_hook) {
 		atomic_inc(&skb->users);
-              ret = smux_pkt_recv_hook(skb, skb->dev, orig_dev);
+              ret = smux_pkt_recv_hook(skb, skb->dev, orig_dev);		  
+#if (defined(TCSUPPORT_WAN_ETHER) || defined(TCSUPPORT_WAN_PTM)) && defined(TCSUPPORT_MULTISERVICE_ON_WAN)
+#ifdef TCSUPPORT_VLAN_TAG
+			  if (skb) {
+			  	skb->vlan_tag_flag |= VLAN_TAG_FROM_INDEV;
+			  }
+#endif			  
+#endif
         }
         else {
 #endif /* CONFIG_SMUX */
@@ -3797,6 +3855,7 @@ int register_netdevice(struct net_device *dev)
 	dev_hold(dev);
 	write_unlock_bh(&dev_base_lock);
 
+
 	/* Notify protocols, that a new device appeared. */
 	raw_notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
@@ -3902,15 +3961,12 @@ static void netdev_wait_allrefs(struct net_device *dev)
 			       dev->name, atomic_read(&dev->refcnt));
 #ifdef CONFIG_SMUX
 			/*When do smux interface unregister, it may be drop in endless loop. So add this clean refcnt action to avoid endless loop */
-			if(refcnt != 0 && dev->name[0]=='n') {//for nas interface, e.g. nas0,nas0_1
-				atomic_set(&dev->refcnt, 0);
-				printk("\nSet %s refcnt as 0 to avoid endless loop\n", dev->name);
-			}
-			if(refcnt != 0 && dev->name[0]=='e') {//for ether interface, e.g. eth0,eth0.1
-				atomic_set(&dev->refcnt, 0);
-				printk("\nSet %s refcnt as 0 to avoid endless loop\n", dev->name);
-			}
-			if(refcnt != 0 && dev->name[0]=='p') {//for ppp interface, e.g. ppp0
+			if(refcnt != 0 && (dev->name[0]=='n'
+							|| dev->name[0]=='e'
+							|| dev->name[0]=='p'
+							|| dev->name[0]=='r'))
+			{
+				//for network interface, e.g. nas0,nas0_1,eth0,eth0.1,ppp0,ra0
 				atomic_set(&dev->refcnt, 0);
 				printk("\nSet %s refcnt as 0 to avoid endless loop\n", dev->name);
 			}
@@ -4450,4 +4506,9 @@ EXPORT_SYMBOL(br_fdb_put_hook);
 EXPORT_SYMBOL(dev_load);
 #endif
 
+#ifdef CONFIG_QOS
+#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+EXPORT_SYMBOL(tc_qos_switch);
+#endif
+#endif
 EXPORT_PER_CPU_SYMBOL(softnet_data);

@@ -22,10 +22,20 @@
 #include <linux/imq.h>
 #endif
 #include "br_private.h"
+#if defined(TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
+
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 extern int (*portbind_sw_hook)(void);
 extern int (*portbind_check_hook)(char *inIf, char *outIf);
 #endif
+#endif
+
 
 /* Don't forward packets to originating port or forwarding diasabled */
 static inline int should_deliver(const struct net_bridge_port *p,
@@ -115,7 +125,7 @@ __IMEM void br_forward(const struct net_bridge_port *to, struct sk_buff *skb)
 
 	kfree_skb(skb);
 }
-
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 /* called under bridge lock */
 static void br_pb_flood(struct net_bridge *br, struct net_bridge_port *pIN, struct sk_buff *skb, int clone,
@@ -127,6 +137,15 @@ static void br_pb_flood(struct net_bridge *br, struct net_bridge_port *pIN, stru
 
 	struct net_device *indev = NULL;
 	struct net_device *outdev = NULL;
+
+#if defined(TCSUPPORT_HWNAT)
+	pktflow_free(skb);
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
+
 	if (clone) {
 		struct sk_buff *skb2;
 
@@ -194,6 +213,8 @@ static void br_pb_flood(struct net_bridge *br, struct net_bridge_port *pIN, stru
 	kfree_skb(skb);
 }
 #endif
+#endif
+
 /* called under bridge lock */
 static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 	void (*__packet_hook)(const struct net_bridge_port *p,
@@ -201,6 +222,14 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 {
 	struct net_bridge_port *p;
 	struct net_bridge_port *prev;
+
+#if defined(TCSUPPORT_HWNAT)
+	pktflow_free(skb);
+#endif
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
 
 	if (clone) {
 		struct sk_buff *skb2;
@@ -248,16 +277,26 @@ void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, int clone)
 	br_flood(br, skb, clone, __br_deliver);
 }
 
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 void br_flood_pb_forward(struct net_bridge *br, struct net_bridge_port *p, struct sk_buff *skb, int clone)
 {
+#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+	/*MARK sc_mac_learned flag, the flooding packets can't be learned into fastbridge table*/
+	skb->sc_mac_learned |=FB_FLOOD_PKT;
+#endif
 	br_pb_flood(br, p, skb, clone, __br_forward);
 }
+#endif
 #endif
 
 /* called under bridge lock */
 void br_flood_forward(struct net_bridge *br, struct sk_buff *skb, int clone)
 {
+#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+	/*MARK sc_mac_learned flag, the flooding packets can't be learned into fastbridge table*/
+	skb->sc_mac_learned |=FB_FLOOD_PKT;
+#endif
 	br_flood(br, skb, clone, __br_forward);
 }
 #ifdef CONFIG_MLD_SNOOPING

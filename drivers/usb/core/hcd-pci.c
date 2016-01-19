@@ -34,11 +34,16 @@
 #include "usb.h"
 #include "hcd.h"
 
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_MIPS_TC3262
-#include <asm-mips/tc3162/int_source.h>
+#if !defined(CONFIG_MIPS_RT63365)
+//IRQ for RT63365 USB is defined in host/ehci_ohci.c
+#include <asm-mips/tc3162/tc3182_int_source.h>
+#endif
 #else
 #ifdef CONFIG_MIPS_TC3162U
 #include <asm/tc3162/tc3162.h>
+#endif
 #endif
 #endif
 
@@ -82,11 +87,14 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 #ifdef CONFIG_MIPS_TC3262
        /*we do not use PCI interrupt so this value will be the interrupt 
            number for interrupt controller.*/
+#if !defined(CONFIG_MIPS_RT63365)
+//IRQ for RT63365 USB is defined in host/ehci_ohci.c
 	if(driver->flags & HCD_USB2){//shnwind
 		dev->irq = USB20_INT;
 	}else if(driver->flags & HCD_USB11){
 		dev->irq = USB11_INT;
 	}
+#endif
 #else
 #ifdef CONFIG_MIPS_TC3162U
        /*we do not use PCI interrupt so this value will be the interrupt 
@@ -150,6 +158,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	}
 #ifdef CONFIG_MIPS_TC3262
          /*shnwind some special PCI configure setting for USB20*/
+#if !defined(CONFIG_MIPS_RT63365)
 	if(driver->flags & HCD_USB2){
 		pci_write_config_dword(dev,0x40,0x000000e0);
 	 	pci_write_config_word(dev,0x0c,0xf808);
@@ -157,6 +166,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 		pci_write_config_word(dev,0x44,0xad54); //SET usb ok must set for sis phy, shnwind.
 	}
 
+#endif
 #else
 #ifdef CONFIG_MIPS_TC3162U
          /*shnwind some special PCI configure setting for USB20*/

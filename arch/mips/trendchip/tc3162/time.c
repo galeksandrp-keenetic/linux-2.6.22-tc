@@ -19,6 +19,27 @@
 #include <asm/time.h>
 #include <asm/tc3162/tc3162.h>
 
+irqreturn_t watchdog_timer_interrupt(int irq, void *dev_id)
+{
+	uint32 word;
+
+	word = VPint(CR_TIMER_CTL); 
+	word &= 0xffc0ffff;
+	word |= 0x00200000;
+	VPint(CR_TIMER_CTL)=word;
+
+	printk("watchdog timer interrupt\n");
+	dump_stack();
+	return IRQ_HANDLED;
+}
+
+static struct irqaction watchdog_timer_irqaction = {
+	.handler = watchdog_timer_interrupt,
+	.flags = IRQF_DISABLED ,
+	.name = "watchdog",
+};
+
+
 void
 timer_Configure(
 	uint8  timer_no, 
@@ -58,8 +79,11 @@ timer_WatchDogConfigure (
 {
     uint32 word;
     word = VPint(CR_TIMER_CTL);
-	word &= 0xfcffffff;
-    word |= ( tick_enable << 24)|(watchdog_enable<<25);
+#if !defined(TCSUPPORT_CT) 
+	word &= 0xfdffffdf;
+    word |= ( tick_enable << 5)|(watchdog_enable<<25);
+#endif
+
     VPint (CR_TIMER_CTL)=word;
 }
 
@@ -75,6 +99,14 @@ static void tc3162_timer_ack(void)
 
 void __init tc3162_time_init(void)
 {
+	if(isRT63260){
+		/* watchdog timer */
+		/* set count down 5 seconds to issue interrupt */
+		VPint(CR_WDOG_THSLD) = (5 * TIMERTICKS_1S * SYS_HCLK) * 1000 / 2;
+						    
+		setup_irq(TIMER5_INT, &watchdog_timer_irqaction);
+	}
+
 	//mips_timer_state = tc3162_timer_state;
 	mips_timer_ack = tc3162_timer_ack;
 

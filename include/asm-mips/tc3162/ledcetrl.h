@@ -18,6 +18,12 @@
  *************************************************************************/
 /*
 ** $Log: ledcetrl.h,v $
+** Revision 1.8  2011/06/02 11:35:51  lino
+** add RT65168 support
+**
+** Revision 1.7  2011/05/13 02:06:53  lyxue_sz
+** #10039: when customers modify configurations and save flash, power led green flash
+**
 ** Revision 1.6  2011/03/09 15:30:07  here
 ** [Ehancement] Add a new "LED_DSL_ALARM"  marco led define with 48th.
 **
@@ -144,14 +150,19 @@
 #define LED_VOIP_SLIC1_RESET (LED_BASE + 46)
 #define LED_VOIP_SLIC2_RESET (LED_BASE + 47)
 #define LED_DSL_ALARM (LED_BASE + 48)
+#define LED_VOIP_HOOK1_STATUS (LED_BASE + 49)
+#define LED_VOIP_HOOK2_STATUS (LED_BASE + 50)
 
 #define LED_WLAN_RADIO                 	(LED_BASE + 57) 
 #define GPIO_WLAN_WPS				(LED_BASE + 58)
 
 //add by brian for gpio additional request
 #define LED_PWR_FLASH				(LED_BASE + 59)
+
+
 /*20090811 pork added: fit for linos LED setting*/
 #define GPIO_SYS_RESET				(LED_BASE + 56)
+#define LED_LAN1_RESET				(LED_BASE + 63)
 
 /*__________________________________________________________________________
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

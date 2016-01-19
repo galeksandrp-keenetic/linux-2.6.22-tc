@@ -38,6 +38,11 @@ EXPORT_SYMBOL_GPL(br_igmpsnoop_set_quickleave_hook);
 int (*br_igmpsnoop_get_quickleave_hook)(struct net_bridge *br);
 EXPORT_SYMBOL_GPL(br_igmpsnoop_get_quickleave_hook);
 
+void (*br_igmpsnoop_set_routeportflag_hook)(struct net_bridge *br, unsigned long val);
+EXPORT_SYMBOL_GPL(br_igmpsnoop_set_routeportflag_hook);
+int (*br_igmpsnoop_get_routeportflag_hook)(struct net_bridge *br);
+EXPORT_SYMBOL_GPL(br_igmpsnoop_get_routeportflag_hook);
+
 void (*br_igmpsnoop_set_dbg_hook)(struct net_bridge *br, unsigned long val);
 EXPORT_SYMBOL_GPL(br_igmpsnoop_set_dbg_hook);
 int (*br_igmpsnoop_get_dbg_hook)(struct net_bridge *br);
@@ -55,6 +60,12 @@ void (*br_mldsnoop_show_hook)(void);
 EXPORT_SYMBOL(br_mldsnoop_enable_hook);
 EXPORT_SYMBOL(br_mldsnoop_set_age_hook);
 EXPORT_SYMBOL(br_mldsnoop_show_hook);
+#endif
+
+
+#if defined(TCSUPPORT_HWNAT)
+int port_reverse = 0;
+EXPORT_SYMBOL(port_reverse);
 #endif
 
 /* called with RTNL */
@@ -197,6 +208,8 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	typeof(br_igmpsnoop_get_ageing_time_hook) br_igmpsnoop_get_ageing_time_info;
 	typeof(br_igmpsnoop_set_quickleave_hook) br_igmpsnoop_set_quickleave_info;
 	typeof(br_igmpsnoop_get_quickleave_hook) br_igmpsnoop_get_quickleave_info;
+	typeof(br_igmpsnoop_set_routeportflag_hook) br_igmpsnoop_set_routeportflag_info;
+	typeof(br_igmpsnoop_get_routeportflag_hook) br_igmpsnoop_get_routeportflag_info;
 	typeof(br_igmpsnoop_set_dbg_hook) br_igmpsnoop_set_dbg_info;
 	typeof(br_igmpsnoop_get_dbg_hook) br_igmpsnoop_get_dbg_info;
 #endif
@@ -248,6 +261,9 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		br_igmpsnoop_get_quickleave_info = rcu_dereference(br_igmpsnoop_get_quickleave_hook);
 		if(br_igmpsnoop_get_quickleave_info)
 			b.igmpsnoop_quickleave = br_igmpsnoop_get_quickleave_info(br) ? 1 : 0;
+		br_igmpsnoop_get_routeportflag_info = rcu_dereference(br_igmpsnoop_get_routeportflag_hook);
+		if(br_igmpsnoop_get_routeportflag_info)
+			b.igmpsnoop_routeportflag = br_igmpsnoop_get_routeportflag_info(br) ? 1 : 0;
 		
 		br_igmpsnoop_get_dbg_info = rcu_dereference(br_igmpsnoop_get_dbg_hook);
 		if(br_igmpsnoop_get_dbg_info)
@@ -451,6 +467,15 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			br_igmpsnoop_set_quickleave_info(br, args[1]);
 		return 0;
 
+	case BRCTL_SET_IGMPSNOOPING_ROUTEPORTFLAG:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		
+		br_igmpsnoop_set_routeportflag_info = rcu_dereference(br_igmpsnoop_set_routeportflag_hook);
+		if(br_igmpsnoop_set_routeportflag_info)
+			br_igmpsnoop_set_routeportflag_info(br, args[1]);
+		return 0;
+		
 	case BRCTL_SET_IGMPSNOOPING_DBG:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;

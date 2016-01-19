@@ -8,6 +8,9 @@
 #include <linux/proc_fs.h>
 
 //#define PCIE_DEBUG	1
+extern uint32 pcie_config_addr;
+extern uint32 pcie_config_data;
+
 #define PCIE_CONFIG_ADDR		0xbfb81cf8
 #define PCIE_CONFIG_DATA		0xbfb81cfc
 #define AHB_BUS_TIMEOUT_ERR		(1<<25)
@@ -40,7 +43,7 @@ static struct resource tc3162_pcie_io_resource = {
 	.start  = 0x1FBD0000,
 	.end    = 0x1FBEFFFF,
 #endif
-#ifdef CONFIG_MIPS_TC3182
+#ifdef CONFIG_MIPS_TC3262
 	.start  = 0x1F600000,
 	.end    = 0x1F61FFFF,
 #endif
@@ -62,19 +65,77 @@ struct pci_controller tc3162_pcie_controller = {
 	.mem_resource	= &tc3162_pcie_mem_resource,
 };
 
-void pcieReset(void){
-	VPint(CR_AHB_PCIC) &= ~(1<<29);
-	mdelay(5);
-	VPint(CR_AHB_PCIC) &= ~(1<<30);
-	mdelay(5);
-	VPint(CR_AHB_PCIC) |= (1<<29);
-	mdelay(5);
-	VPint(CR_AHB_PCIC) |= (1<<30);
-	mdelay(5);
-	/*force link up, workaround the pcie hardware problems.*/
-	if(isTC3162U){
-		VPint(PCIE_CONFIG_ADDR) = 0x40;
-		VPint(PCIE_CONFIG_DATA) = 0x20;
+void setahbstat(int val){
+		ahb_status = val;
+}
+EXPORT_SYMBOL(setahbstat);
+
+void pcieReset(void){	
+	int i;
+	if(isRT63165){
+		return;		
+	}
+
+	if(isRT63365){
+		//disable interrupt
+		VPint(0xbfb8000c) &= ~(1<<20);
+		mdelay(5);
+		//PCI-E reset
+		if (VPint(CR_AHB_HWCONF)&(1<<31)) {		
+			//FPGA mode
+			VPint(0xbfb00834) &= ~(1<<26);
+			mdelay(1);
+			VPint(0xbfb00834) |= (1<<26);
+			mdelay(1);
+		}else{	
+			/* disabled PCIe port 1 */
+			VPint(0xbfb00088) &= ~(1<<22);
+			mdelay(1);
+			VPint(0xbfb00834) |= ((1<<26) | (1<<29));
+			mdelay(1);
+			VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
+			mdelay(1);
+		}		
+
+		VPint(0xbfb80000) |= (1<<1);
+		mdelay(1);
+		VPint(0xbfb80000) &= ~(1<<1);
+		mdelay(1);
+		//wait device link up
+		for(i=0 ; i<1000 ; i++){
+			mdelay(1);
+			if((VPint(0xbfb82050) & 0x1) != 0){
+				break;
+			}   
+		}
+		if(i == 1000){
+			printk("PCI-E RC can not link up\n");
+			return -1;
+		}
+		//config PCI-E RC
+		VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
+
+		//change class PCI-PCI Bridge
+		VPint(0xbfb82034) = 0x06040001;
+
+		//Enable CRC count .
+		VPint(KSEG1ADDR(pcie_config_addr)) = 0x118;
+		VPint(KSEG1ADDR(pcie_config_data)) |= (1<<8);
+
+	}else{
+		VPint(CR_AHB_PCIC) &= ~(1<<29);
+		mdelay(5);
+		VPint(CR_AHB_PCIC) &= ~(1<<30);
+		mdelay(5);
+		VPint(CR_AHB_PCIC) |= (1<<29);
+		mdelay(5);
+		VPint(CR_AHB_PCIC) |= (1<<30);
+		mdelay(5);
+		/*force link up, workaround the pcie hardware problems.*/
+		if(isTC3162U){
+			VPint(KSEG1ADDR(pcie_config_addr)) = 0x40;
+			VPint(KSEG1ADDR(pcie_config_data)) = 0x20;
+		}
 	}
 }
 
@@ -82,20 +143,32 @@ EXPORT_SYMBOL(pcieReset);
 
 int pcie_write_config_word(unsigned char type, unsigned char bus, unsigned char devnum, unsigned char regnum, unsigned long int value)
 {
-	VPint(PCIE_CONFIG_ADDR)=(type<<31|bus<<20 |devnum<<15|regnum);
-	VPint(PCIE_CONFIG_DATA)=value;
+	if(isRT63165 || isRT63365){
+		VPint(KSEG1ADDR(pcie_config_addr)) = (bus<<24 |devnum<<19|regnum);
+	}else{
+		VPint(KSEG1ADDR(pcie_config_addr))=(type<<31|bus<<20 |devnum<<15|regnum);
+	}	
+		VPint(KSEG1ADDR(pcie_config_data))=value;
 	return 0;
 }
 int pcie_write_config_byte(unsigned char type, unsigned char bus, unsigned char devnum, unsigned char regnum, unsigned char value)
 {
-	VPint(PCIE_CONFIG_ADDR)=(type<<31|bus<<20 |devnum<<15|regnum);
-	VPint(PCIE_CONFIG_DATA)=value;
+	if(isRT63165 || isRT63365){
+		VPint(KSEG1ADDR(pcie_config_addr)) = (bus<<24 |devnum<<19|regnum);
+	}else{	
+		VPint(KSEG1ADDR(pcie_config_addr))=(type<<31|bus<<20 |devnum<<15|regnum);
+	}	
+		VPint(KSEG1ADDR(pcie_config_data))=value;
 	return 0;
 }
 unsigned long int pcie_read_config_word(unsigned char type, unsigned char bus, unsigned char devnum, unsigned char regnum)
 {
-	VPint(PCIE_CONFIG_ADDR)=(type<<31|bus<<20|devnum<<15|regnum);
-	return VPint(PCIE_CONFIG_DATA);
+	if(isRT63165 || isRT63365){
+		VPint(KSEG1ADDR(pcie_config_addr))=(bus<<24 |devnum<<19|regnum);
+	}else{	
+		VPint(KSEG1ADDR(pcie_config_addr))=(type<<31|bus<<20|devnum<<15|regnum);
+	}
+	return VPint(KSEG1ADDR(pcie_config_data));
 }
 
 int pcieRegInitConfig(void)
@@ -106,6 +179,9 @@ int pcieRegInitConfig(void)
 	int slot;
 	int pci_device_exist;
 
+	if(isRT63165){
+		return 0;		
+	}
 
 	/* PCIe init module */
 	/* reset PCIe module */
@@ -141,36 +217,67 @@ int pcieRegInitConfig(void)
 	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x04, 0x00100007);
 
 	/* setup CACHE_LINE_SIZE register */
-	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x0c/*PCI_CACHE_LINE_SIZE*/, 0x00000008);//duoduo_20090701
+	if(isRT63365){
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x0c, 0x00010000);
+	}else{	
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x0c/*PCI_CACHE_LINE_SIZE*/, 0x00000008);//duoduo_20090701
+	}	
 	/* setup LATENCY_TIMER register */
 	/* pcie fixup end */
 	/*setup secondary bus number*/
 	/*setup subordinate bus number*/
 	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x18, 0x00010100);
 	/*setup I/O Base register*/
-	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x30, 0x0000FFFF);
+	if(isRT63365){
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x30, 0x0);
+	}else{	
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x30, 0x0000FFFF);
+	}
 	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x1C, 0x000000F0);
 	/*setup memory base register*/
-	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x20, 0x1F701F70);
+	if(isRT63365){
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x20, 0x20002000);
+	}else{	
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x20, 0x1F701F70);
+	}	
 	/*setup prefetchable memory base register */
 	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x24, 0x0000FFF0);
 	/*setup I/O Base upper 16 bits register*/
 	/*setup interrupt line register*/
 	/*setup bridge control*/
-	pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x3C, 0x0004010B);
+	if(isRT63365){
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x3C, 0x00040119);
+	}else{	
+		pcie_write_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x3C, 0x0004010B);
+	}	
+
 	/* pci register 0x10 config needed or not? Linos for L2H will configure it */
-	do
-	{
-		mdelay(30);
-		reg_val = pcie_read_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0xe0);
-		i++;
-	}
-	while((reg_val & 0x03f00000) != 0x00100000 && i <= 10);//check the if the dev has been link up
-	for(i = 0; i < 10; i++){
-		reg1_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x0);
-		mdelay(1);
-		reg2_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_1, 0x0);
-		mdelay(1);
+	if(isRT63365){
+		for(i = 0; i < 10; i++){
+			reg1_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x0);
+			mdelay(1);
+			//reg2_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_1, 0x0);
+			//mdelay(1);
+		}	
+		reg2_val = 0xffffffff;
+		//Enable Interrupt
+		VPint(0xbfb8000c) |= (1<<20);
+		//second band
+		//VPint(0xbfb8000c) |= (1<<21);
+	}else{	
+		do
+		{
+			mdelay(30);
+			reg_val = pcie_read_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0xe0);
+			i++;
+		}
+		while((reg_val & 0x03f00000) != 0x00100000 && i <= 10);//check the if the dev has been link up
+		for(i = 0; i < 10; i++){
+			reg1_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x0);
+			mdelay(1);
+			reg2_val = pcie_read_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_1, 0x0);
+			mdelay(1);
+		}
 	}
 	if( (reg1_val != 0xffffffff) &&
 			( (reg1_val == ((NIC3090_PCIe_DEVICE_ID <<16) |NIC_PCI_VENDOR_ID)) //duoduo_20090702
@@ -181,14 +288,20 @@ int pcieRegInitConfig(void)
 			  || (reg1_val == ((NIC539F_PCIe_DEVICE_ID <<16) |NIC_PCI_VENDOR_ID))
 			  || (reg1_val == ((NIC5392_PCIe_DEVICE_ID <<16) |NIC_PCI_VENDOR_ID))) ){//xyyou wait to do
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x04, 0x00100006);
-		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x10, PHYSADDR(PCI_DEVICE_MEM1)); 
+		if(isRT63365)
+			pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x10, 0x20000000);
+		else	
+			pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x10, PHYSADDR(PCI_DEVICE_MEM1)); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x14, 0); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x18, 0); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x1C, 0); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x20, 0); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x24, 0); 
 		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x30, 0); 
-		pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x3C, 0x0000010B); 
+		if(isRT63365)
+			pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x3C, 0x00000119);
+		else	
+			pcie_write_config_word(PCIE_TYPE_DEV, PCIE_BUS_DEV, PCIE_DEVNUM_0, 0x3C, 0x0000010B); 
 
 		slot = PCIE_DEVNUM_0;		
 		pci_device_exist++;
@@ -216,6 +329,9 @@ void
 ahbErrChk(void){
 	register uint32 status=0;
 	unsigned long flags;
+
+	if(isRT63365)
+		return;
 	status=VPint(CR_AHB_AACS);
 	if((status & AHB_BUS_TIMEOUT_ERR)||(status & AHB_BUS_ADDR_ERR)){	
 		printk("CR_AHB_AACS:0x%08lx\n", status);
@@ -252,6 +368,20 @@ void chkAhbErr(int force){
 		}
 		local_irq_restore(flags);
 	}
+
+	if(isRT63365 && pcie_soft_patch){
+		local_irq_save(flags);
+		/*check the pcie bus crc error counter*/
+		if((VPint(0xbfb82060)!=0x0) || (VPint(0xbfb82064)!=0x0) || (force==0x1) ){
+			printk("PCI-E L-crc %x E-crc %x!!\n",VPint(0xbfb82060),VPint(0xbfb82064));
+			/*Reset pcie and refill pcie-registers*/
+			pcieReset();
+			pcieRegInitConfig();
+			ahb_status = 1;
+		}
+		local_irq_restore(flags);
+	}
+
 }
 EXPORT_SYMBOL(chkAhbErr);
 static int ahb_status_read_proc(char *page, char **start, off_t off,
@@ -309,19 +439,121 @@ static int ahb_status_write_proc(struct file *file, const char *buffer,
 static __init int tc3162_pcie_init(void)
 {
 	struct proc_dir_entry *ahb_status_proc;
-	printk("tc3162_pcie_init\n");
-	/* no use now
-	pci_bios = VPint(CR_AHB_HWCONF) & (1<<8);
+	int i;
+	uint32 tmp;
+	
 
-	printk(KERN_INFO "tc3162: system has %sPCI BIOS\n",
-		pci_bios ? "" : "no ");
-	if (pci_bios == 0)
-		return -1; */
-#ifdef CONFIG_MIPS_TC3182
+	if(isRT63365){
+		printk("RT63365_pcie_init\n");
+
+		//change memory mapping affress.
+		tc3162_pcie_mem_resource.start = 0x20000000;
+		tc3162_pcie_mem_resource.end   = 0x2FFFFFFF;
+
+		//chane pcie addr and data window.
+		pcie_config_addr = 0x1fb80020;
+		pcie_config_data = 0x1fb80024;
+
+		//PCI-E reset
+		if (VPint(CR_AHB_HWCONF)&(1<<31)) {		
+			//FPGA mode
+			VPint(0xbfb00834) &= ~(1<<26);
+			mdelay(1);
+			VPint(0xbfb00834) |= (1<<26);
+			mdelay(1);
+		}else{	
+			/* disabled PCIe port 1 */
+			VPint(0xbfb00088) &= ~(1<<22);
+			mdelay(1);
+			VPint(0xbfb00834) |= ((1<<26)  | (1<<29));
+			mdelay(1);
+			VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
+			mdelay(1);
+			
+			//mhbErrChkdelay(1);
+		}		
+
+		VPint(0xbfb80000) |= (1<<1);
+		mdelay(1);
+		VPint(0xbfb80000) &= ~(1<<1);
+		mdelay(1);
+
+		if (VPint(CR_AHB_HWCONF)&(1<<31)) {
+			//FPGA mode
+			tmp = VPint(0xbfbc0028);
+			VPint(0xbfbc0028) = 0x60068880;
+			VPint(0xbfbc0004) = 0x08000002;
+			VPint(0xbfbc0008) = 0x00000700;
+			VPint(0xbfbc0000) = 0x00160106;
+			VPint(0xbfbc0028) = tmp;
+		}
+
+		//wait device link up
+		for(i=0 ; i<1000 ; i++){
+			mdelay(1);
+			if((VPint(0xbfb82050) & 0x1) != 0){
+				break;
+			}   
+		}
+		if(i == 1000){
+			printk("PCI-E RC can not link up\n");
+			return -1;
+		}
+
+		//config PCI-E RC
+		VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
+
+		//change class PCI-PCI Bridge
+		VPint(0xbfb82034) = 0x06040001;
+
+		//set pci-e burst size
+		//VPint(0xbfb82060) = 0x3; // need check
+
+		//Enable CRC count .
+		VPint(KSEG1ADDR(pcie_config_addr)) = 0x118;
+		VPint(KSEG1ADDR(pcie_config_data)) |= (1<<8);
+
+	}
+	else if(isRT63165){
+		
+		printk("RT63165_pcie_init\n");
+		VPint(CR_AHB_PCIC) |= (1<<29);
+		mdelay(1);
+		VPint(CR_AHB_PCIC) |= (1<<30);
+		mdelay(1);
+		//wait device link up
+		for(i=0 ; i<1000 ; i++){
+			mdelay(1);
+			if((VPint(0xbfb81050) & 0x1) != 0){
+				break;
+			}	
+		}
+		if(i == 1000){
+			printk("PCI-E RC can not link up\n");
+			return -1;
+		}
+		VPint(0xbfb81cf8) = 0x0;
+		if((VPint(0xbfb81cfc) & 0xffff) == 0xffff){
+			printk("No PCI-E device found\n");
+			return -1;
+		}
+
+		//config PCI-E RC
+		VPint(0xbfb81010) = 0xffff0001;//not support BAR0
+		//check has device or not 
+		VPint(0xbfb81034) = 0x06040001;//change class PCI-PCI Bridge
+		//set pci-e burst size
+		//VPint(0xbfb81060) = 0x3;
+		//Enable CRC count .
+		VPint(KSEG1ADDR(pcie_config_addr)) = 0x118;
+		VPint(KSEG1ADDR(pcie_config_data)) |= (1<<8);
+	}else{
+	printk("tc3162_pcie_init\n");
+#ifdef CONFIG_MIPS_TC3262
 	VPint(0xbfb000b8) = 0x00000001;
 #endif 
 
-#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3182)
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
 	/*pcie relate clock setting*/
 	uint32 tmp = VPint(CR_AHB_SSR);
 	//tmp &= ~(1<<0 | 1<<2 | 1<<3 | 1<<4);
@@ -342,7 +574,7 @@ static __init int tc3162_pcie_init(void)
 	mdelay(5);
 
 #ifdef CONFIG_MIPS_TC3162U
-	/*work arround for pcie link up*/
+		/*force pcie link up*/
 	VPint(PCIE_CONFIG_ADDR) = 0x40;
 	VPint(PCIE_CONFIG_DATA) = 0x20;
 #endif	
@@ -350,6 +582,7 @@ static __init int tc3162_pcie_init(void)
 	/*
 	VPint(CR_AHB_PCIC) |= (1<<24) | (1<<25);
 	*/
+	}
 
 	/* Set I/O resource limits.  */
 	ioport_resource.end = 0x1fffffff;

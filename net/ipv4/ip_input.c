@@ -146,6 +146,10 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
+
 extern unsigned int dbgEnable;
 /*
  *	SNMP management statistics
@@ -270,6 +274,11 @@ int ip_local_deliver(struct sk_buff *skb)
 		if (!skb)
 			return 0;
 	}
+
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
 		       ip_local_deliver_finish);

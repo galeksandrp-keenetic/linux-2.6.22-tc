@@ -1550,6 +1550,9 @@ static __sum16 tcp_v4_checksum_init(struct sk_buff *skb)
 int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct sock *rsk;
+#if defined(TCSUPPORT_REDIRECT_WITH_PORTMASK) || defined(TCSUPPORT_CD_NEW_GUI) || defined(TCSUPPORT_FW_UPGRADE_16M) || defined(TCSUPPORT_ACCOUNT_ACL) || defined(TCSUPPORT_CT_FW_UPGRADE_16M)
+	sk->sk_mark = skb->mark;
+#endif
 	
 #ifdef CONFIG_TCP_MD5SIG
 	/*

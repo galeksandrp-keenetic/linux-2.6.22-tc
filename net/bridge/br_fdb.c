@@ -24,10 +24,15 @@
 #include <asm/atomic.h>
 #include <asm/unaligned.h>
 #include "br_private.h"
+#if defined(TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
 
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 extern int (*portbind_sw_hook)(void);
 extern int (*portbind_check_hook)(char *inIf, char *outIf);
+#endif
 #endif
 __DMEM static struct kmem_cache *br_fdb_cache __read_mostly;
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
@@ -78,6 +83,11 @@ static inline int br_mac_hash(const unsigned char *mac)
 
 static inline void fdb_delete(struct net_bridge_fdb_entry *f)
 {
+#if defined(TCSUPPORT_HWNAT)
+  	if (pktflow_fdb_delete_hook) 
+		pktflow_fdb_delete_hook(f);
+#endif
+
 	hlist_del_rcu(&f->hlist);
 	br_fdb_put(f);
 }
@@ -212,6 +222,7 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	}
 	spin_unlock_bh(&br->hash_lock);
 }
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 /* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
 __IMEM struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, struct net_bridge_port *p,
@@ -258,6 +269,7 @@ __IMEM struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, struc
 
 	return NULL;
 }
+#endif
 #endif
 
 /* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
@@ -428,8 +440,13 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 #ifdef CONFIG_MIPS_TC3262
 __IMEM
 #endif
+#if defined(TCSUPPORT_HWNAT)
+void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
+		   const unsigned char *addr, struct sk_buff *skb)
+#else
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   const unsigned char *addr)
+#endif
 {
 	struct hlist_head *head = &br->hash[br_mac_hash(addr)];
 	struct net_bridge_fdb_entry *fdb;
@@ -450,6 +467,9 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 			/* fastpath: update of existing entry */
 			fdb->dst = source;
 			fdb->ageing_timer = jiffies;
+#if defined(TCSUPPORT_HWNAT)
+			pktflow_fdb(skb, fdb);
+#endif
 		}
 	} else {
 		spin_lock(&br->hash_lock);

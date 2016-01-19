@@ -73,6 +73,16 @@ enum ip_conntrack_status {
 	/* Connection has fixed timeout. */
 	IPS_FIXED_TIMEOUT_BIT = 10,
 	IPS_FIXED_TIMEOUT = (1 << IPS_FIXED_TIMEOUT_BIT),
+
+#if defined(TCSUPPORT_HWNAT)
+	/* Connection for pktflow tracing */
+   	IPS_PKTFLOW_BIT = 11,
+   	IPS_PKTFLOW = (1 << IPS_PKTFLOW_BIT),
+
+	/* Connection for pktflow traced */
+   	IPS_PKTFLOWED_BIT = 12,
+   	IPS_PKTFLOWED = (1 << IPS_PKTFLOWED_BIT),
+#endif
 };
 
 /* Connection tracking event bits */
@@ -129,6 +139,16 @@ enum ip_conntrack_events
 	/* Mark is set */
 	IPCT_MARK_BIT = 12,
 	IPCT_MARK = (1 << IPCT_MARK_BIT),
+
+#if defined(TCSUPPORT_HWNAT)
+	/* Conntrack for pktflow tracing */
+   	IPCT_PKTFLOW_BIT = 13,
+   	IPCT_PKTFLOW = (1 << IPCT_PKTFLOW_BIT),
+
+	/* Conntrack for pktflow traced */
+   	IPCT_PKTFLOWED_BIT = 14,
+   	IPCT_PKTFLOWED = (1 << IPCT_PKTFLOWED_BIT),
+#endif
 };
 
 enum ip_conntrack_expect_events {

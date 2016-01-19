@@ -64,6 +64,7 @@
 #include <linux/imq.h>
 #include <net/pkt_sched.h>
 
+#if !defined(TCSUPPORT_CT) 
 struct imq_private {
 	struct net_device_stats stats;
 	struct tasklet_struct   imq_tasklet;
@@ -71,7 +72,7 @@ struct imq_private {
 	struct sk_buff_head     rq;
 	struct sk_buff_head     tq;
 };
-
+#endif
 extern int qdisc_restart1(struct net_device *dev);
 
 static nf_hookfn imq_nf_hook;
@@ -153,7 +154,9 @@ static void imq_skb_destructor(struct sk_buff *skb)
 	}
 }
 
+#if !defined(TCSUPPORT_CT) 
 static int imq_dev_xmit2(struct sk_buff *skb, struct net_device *dev)
+#endif
 {
 	struct net_device_stats *stats = (struct net_device_stats*) dev->priv;
 
@@ -218,6 +221,7 @@ static int imq_dev_xmit2(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
+#if !defined(TCSUPPORT_CT) 
 static void ri_tasklet(unsigned long dev)
 {
 
@@ -307,7 +311,7 @@ static int imq_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	return ret;
 }
-
+#endif
 //static int imq_nf_queue(struct sk_buff *skb, struct nf_info *info, unsigned queue_num, void *data)
 int imq_nf_queue(struct sk_buff *skb, struct nf_info *info, void *data)
 {
@@ -443,6 +447,7 @@ static void __exit imq_unhook(void)
 	nf_unregister_queue_handler(PF_INET);
 }
 
+#if !defined(TCSUPPORT_CT) 
 static int __init imq_dev_init(struct net_device *dev)
 {
 	struct imq_private *dp = netdev_priv(dev);
@@ -475,7 +480,7 @@ static void imq_dev_uninit(struct net_device *dev)
 
 	kfree(dev->priv);
 }
-
+#endif
 static int __init imq_init_devs(void)
 {
 	struct net_device *dev;

@@ -21,6 +21,12 @@
 
 static struct class *mtd_class;
 
+#if defined(TCSUPPORT_VOIP)
+/*#11542: For voice afftected by Flash action issue*/
+atomic_t eraseAction;
+extern int mtd_spiflash_erase_sp(struct mtd_info *mtd, struct erase_info *instr);
+#endif
+
 static void mtd_notify_add(struct mtd_info* mtd)
 {
 	if (!mtd)
@@ -429,9 +435,15 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	case MEMERASE:
 	{
 		struct erase_info *erase;
-
-		if(!(file->f_mode & 2))
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 1);
+#endif
+		if(!(file->f_mode & 2)){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EPERM;
+		}
 
 		erase=kzalloc(sizeof(struct erase_info),GFP_KERNEL);
 		if (!erase)
@@ -445,6 +457,9 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			if (copy_from_user(&erase->addr, argp,
 				    sizeof(struct erase_info_user))) {
 				kfree(erase);
+#if defined(TCSUPPORT_VOIP)
+				atomic_set(&eraseAction, 0);
+#endif
 				return -EFAULT;
 			}
 			erase->mtd = mtd;
@@ -474,6 +489,9 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			}
 			kfree(erase);
 		}
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		break;
 	}
 
@@ -481,15 +499,29 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	{
 		struct mtd_oob_buf buf;
 		struct mtd_oob_ops ops;
-
-		if(!(file->f_mode & 2))
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 1);
+#endif
+		if(!(file->f_mode & 2)){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EPERM;
+		}
 
-		if (copy_from_user(&buf, argp, sizeof(struct mtd_oob_buf)))
+		if (copy_from_user(&buf, argp, sizeof(struct mtd_oob_buf))){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EFAULT;
+		}
 
-		if (buf.length > 4096)
+		if (buf.length > 4096){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EINVAL;
+		}
 
 		if (!mtd->write_oob)
 			ret = -EOPNOTSUPP;
@@ -497,22 +529,37 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			ret = access_ok(VERIFY_READ, buf.ptr,
 					buf.length) ? 0 : EFAULT;
 
-		if (ret)
+		if (ret){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return ret;
+		}
 
 		ops.ooblen = buf.length;
 		ops.ooboffs = buf.start & (mtd->oobsize - 1);
 		ops.datbuf = NULL;
 		ops.mode = MTD_OOB_PLACE;
 
-		if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs))
+		if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs)){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EINVAL;
+		}
 
 		ops.oobbuf = kmalloc(buf.length, GFP_KERNEL);
-		if (!ops.oobbuf)
+		if (!ops.oobbuf){
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -ENOMEM;
+		}
 
 		if (copy_from_user(ops.oobbuf, buf.ptr, buf.length)) {
+#if defined(TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			kfree(ops.oobbuf);
 			return -EFAULT;
 		}
@@ -525,6 +572,9 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			ret = -EFAULT;
 
 		kfree(ops.oobbuf);
+#if defined(TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		break;
 
 	}
@@ -777,7 +827,9 @@ static int __init init_mtdchar(void)
 		       MTD_CHAR_MAJOR);
 		return -EAGAIN;
 	}
-
+#if defined(TCSUPPORT_VOIP)
+	atomic_set(&eraseAction, 0);
+#endif
 	mtd_class = class_create(THIS_MODULE, "mtd");
 
 	if (IS_ERR(mtd_class)) {
@@ -800,7 +852,9 @@ static void __exit cleanup_mtdchar(void)
 module_init(init_mtdchar);
 module_exit(cleanup_mtdchar);
 
-
+#if defined(TCSUPPORT_VOIP)
+EXPORT_SYMBOL(eraseAction);
+#endif
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
 MODULE_DESCRIPTION("Direct character-device access to MTD devices");

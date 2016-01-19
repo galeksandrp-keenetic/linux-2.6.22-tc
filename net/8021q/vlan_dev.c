@@ -40,7 +40,9 @@
 #ifdef TCSUPPORT_VLAN_TAG
 extern int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
 extern int (*insert_vtag_hook)(struct sk_buff **pskb);
+#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 extern int (*check_vtag_hook)(void);
+#endif
 #endif
 
 /*
@@ -165,10 +167,12 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		rcu_read_unlock();
 
 #ifdef TCSUPPORT_VLAN_TAG
+#if !defined(TCSUPPORT_FTP_THROUGHPUT)
 		if (check_vtag_hook && (check_vtag_hook() == 1)) {
 			if (remove_vtag_hook) {
 				 if (remove_vtag_hook(skb, orig_dev) == -1) {
-					//kfree_skb(skb);
+				 	/* must free skb !! */
+					kfree_skb(skb);
 					return -1;
 				 }
 				 else {
@@ -203,6 +207,39 @@ Normal_Handle:
 			}
 		}
 #else
+			if (remove_vtag_hook) {
+				 if (remove_vtag_hook(skb, orig_dev) == -1) {
+					/* must free skb !! */
+					kfree_skb(skb);
+					return -1;
+				 }
+				 else {
+				 	netif_rx(skb);
+					return 0;
+				 }
+			}
+			else {
+				if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n'))) {
+					proto = vhdr->h_vlan_encapsulated_proto;
+					skb->protocol = proto;
+					/* Take off the VLAN header (4 bytes currently) */
+					skb_pull_rcsum(skb, VLAN_HLEN);
+					skb->dev = orig_dev;
+					
+					netif_rx(skb);
+					return 0;
+				}
+				else {
+#ifdef VLAN_DEBUG
+					printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
+						__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
+#endif
+					kfree_skb(skb);
+					return -1;
+				}
+			}	
+#endif
+#else
 #if 0
 #ifdef VLAN_DEBUG
 		printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
@@ -211,7 +248,9 @@ Normal_Handle:
 		kfree_skb(skb);
 		return -1;
 #else
+#if !defined(TCSUPPORT_CT) 
 		if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n')))
+#endif
 		{
 			proto = vhdr->h_vlan_encapsulated_proto;
 			skb->protocol = proto;
@@ -234,6 +273,7 @@ Normal_Handle:
 #endif
 #endif
 	}
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 	if (skb->dev->name[0] == 'e') {
 	//	skb->mark |= MASK_ORIGIN_DEV;
@@ -242,6 +282,8 @@ Normal_Handle:
 		//printk("vlan_skb_recv: begin orig_dev name is [%s], orig_dev name is [%s]\n", skb->orig_dev_name, orig_dev->name);
 	}
 #endif
+#endif
+
 
 	skb->dev->last_rx = jiffies;
 
@@ -599,8 +641,10 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * OTHER THINGS LIKE FDDI/TokenRing/802.3 SNAPs...
 	 */
 
+#if !defined(TCSUPPORT_CT) 
 	/* if interface is ethernet interface, let it insert more than one vlan header */
 	if ((veth->h_vlan_proto != htons(ETH_P_8021Q)) || (skb->dev->name[0] == 'e')) {
+#endif
 		int orig_headroom = skb_headroom(skb);
 		unsigned short veth_TCI;
 

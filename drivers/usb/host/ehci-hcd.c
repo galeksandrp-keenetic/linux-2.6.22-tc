@@ -52,13 +52,14 @@ static struct usb_hcd   *save_hcd = NULL;
 #define POLLING_MODE_DETECT_INTV  1
 #endif
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 struct ehci_hcd  *save_ehci = NULL;
 void  special_ehci_reset(void);
 int reset_count=0;
 char has_reclaim=0;
 #define VPint           *(volatile unsigned long int *)
 #endif
-
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -130,7 +131,11 @@ static const char	hcd_name [] = "ehci_hcd";
 #define EHCI_IAA_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
 #define EHCI_IO_JIFFIES		(HZ/10)		/* io watchdog > irq_thresh */
 #define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
+#ifndef CONFIG_MIPS_RT63365
 #define EHCI_SHRINK_JIFFIES	(HZ/200)	/* async qh unlink delay */
+#else
+#define EHCI_SHRINK_FRAMES	5
+#endif
 
 /* Initial IRQ latency:  faster than hw default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -292,8 +297,10 @@ static void ehci_watchdog (unsigned long param)
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
 	unsigned long		flags;
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 	unsigned long       cmd;
 	int pstatus, port_enable, i;
+#endif
 #endif	
 
 #if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
@@ -314,6 +321,7 @@ static void ehci_watchdog (unsigned long param)
 			ehci->reclaim_ready = 1;
 		}
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 		else{
 			i = HCS_N_PORTS (ehci->hcs_params);
 			port_enable = 0;
@@ -331,7 +339,8 @@ static void ehci_watchdog (unsigned long param)
 				has_reclaim = 1;
 			}
 		}
-#endif		
+#endif
+#endif
 	}
 
  	/* stop async processing after it's idled a bit */
@@ -434,6 +443,7 @@ static void ehci_work (struct ehci_hcd *ehci)
 }
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 int ehci_light_reset (struct ehci_hcd *ehci)
 {
 	u32	command, hcc_params;
@@ -464,6 +474,7 @@ int ehci_light_reset (struct ehci_hcd *ehci)
 	
 	return 0;
 }
+#endif	 
 #endif
 #if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
 void ehci_poll(unsigned long data)
@@ -484,7 +495,9 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	ehci_dbg (ehci, "stop\n");
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
     save_ehci = NULL;	
+#endif
 #endif
 #if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
 	save_hcd  = NULL;
@@ -703,7 +716,9 @@ static int ehci_run (struct usb_hcd *hcd)
 	create_debug_files(ehci);
 	create_companion_file(ehci);
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
     save_ehci = ehci;
+#endif
 #endif
 #if defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G)
 	save_hcd  = hcd;
@@ -761,15 +776,19 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 	if (status & STS_IAA) {
 		COUNT (ehci->stats.reclaim);
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)		
+#if !defined(CONFIG_MIPS_RT63365)
 		if(has_reclaim == 0){
+#endif
 #endif		
 		ehci->reclaim_ready = 1;
 		bh = 1;
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 		}else{
 			has_reclaim = 0;
 		}
-#endif			
+#endif
+#endif
 	}
 
 	/* remote wakeup [4.3.1] */
@@ -1064,6 +1083,11 @@ MODULE_LICENSE ("GPL");
 #define	PLATFORM_DRIVER		ehci_hcd_au1xxx_driver
 #endif
 
+#if defined (CONFIG_MIPS_RT63365)
+#include "ehci-rt3xxx.c"
+#define PLATFORM_DRIVER     rt3xxx_ehci_driver
+#endif
+
 #ifdef CONFIG_PPC_PS3
 #include "ehci-ps3.c"
 #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_sb_driver
@@ -1076,6 +1100,7 @@ MODULE_LICENSE ("GPL");
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
 
+#if !defined(CONFIG_MIPS_RT63365)
 void  special_ehci_reset(void){
 	struct ehci_hcd     *ehci;
 	u32 flags;
@@ -1095,6 +1120,7 @@ void  special_ehci_reset(void){
 
 }
 
+#endif
 #endif
 static int __init ehci_hcd_init(void)
 {

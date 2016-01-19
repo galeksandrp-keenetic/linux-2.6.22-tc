@@ -18,9 +18,11 @@
 #include <linux/etherdevice.h>
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 extern int (*portbind_sw_hook)(void);
 extern int (*portbind_check_hook)(char *inIf, char *outIf);
+#endif
 #endif
 
 /* Bridge group multicast address 802.1d (pg 51). */
@@ -31,7 +33,7 @@ int (*br_mc_forward_hook)(struct net_bridge *br, struct sk_buff *skb, int clone)
 EXPORT_SYMBOL_GPL(br_mc_forward_hook);
 #endif
 #ifdef CONFIG_MLD_SNOOPING
-int (*br_mldsnooping_forward_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest);
+int (*br_mldsnooping_forward_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
 EXPORT_SYMBOL(br_mldsnooping_forward_hook);
 #endif
 
@@ -52,6 +54,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 		netif_receive_skb);
 }
 
+#if !defined(TCSUPPORT_CT) 
 /* note: already called with rcu_read_lock (preempt_disabled) */
 __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 {
@@ -75,7 +78,11 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br = p->br;
+#if defined(TCSUPPORT_HWNAT)
+	br_fdb_update(br, p, eth_hdr(skb)->h_source, skb);
+#else
 	br_fdb_update(br, p, eth_hdr(skb)->h_source);
+#endif
 
 	if (p->state == BR_STATE_LEARNING)
 		goto drop;
@@ -104,8 +111,10 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 		#ifdef CONFIG_MLD_SNOOPING
 			case ETH_P_IPV6: /*MLD Snooping*/
 				br_mldsnooping_forward = rcu_dereference(br_mldsnooping_forward_hook);	
-				if(br_mldsnooping_forward)			
-					ret = br_mldsnooping_forward(skb, br, dest);		
+				if(br_mldsnooping_forward)
+				{
+					ret = br_mldsnooping_forward(skb, br, dest,!passedup);	
+				}			
 				break;
 		#endif
 			default:
@@ -115,7 +124,11 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 		
 		if(!ret){
 		#ifdef CONFIG_PORT_BINDING
+		#if defined(TCSUPPORT_FTP_THROUGHPUT)
+			if (portbind_sw_hook) {
+		#else
 			if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+		#endif
 				br_flood_pb_forward(br, p, skb, !passedup);
 			}
 			else {
@@ -127,7 +140,11 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 		}
 #else
 	#ifdef CONFIG_PORT_BINDING
-		if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+		#if defined(TCSUPPORT_FTP_THROUGHPUT)
+			if (portbind_sw_hook) {
+		#else
+			if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+		#endif
 			br_flood_pb_forward(br, p, skb, !passedup);
 		}
 		else {
@@ -144,7 +161,11 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 	}
 
 #ifdef CONFIG_PORT_BINDING
-	if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+	#if defined(TCSUPPORT_FTP_THROUGHPUT)
+		if (portbind_sw_hook) {
+	#else
+		if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+	#endif
 		//printk("In port is %s\n", p->dev->name);
 		dst = __br_fdb_pb_get(br, p, dest);
 	}
@@ -168,7 +189,11 @@ __IMEM int br_handle_frame_finish(struct sk_buff *skb)
 	}
 
 #ifdef CONFIG_PORT_BINDING
-	if (portbind_sw_hook &&(portbind_sw_hook() == 1)) {
+	#if defined(TCSUPPORT_FTP_THROUGHPUT)
+		if (portbind_sw_hook) {
+	#else
+		if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+	#endif
 		br_flood_pb_forward(br, p, skb, 0);
 	}
 	else {
@@ -185,13 +210,18 @@ drop:
 	goto out;
 }
 
+#endif
 /* note: already called with rcu_read_lock (preempt_disabled) */
 static int br_handle_local_finish(struct sk_buff *skb)
 {
 	struct net_bridge_port *p = rcu_dereference(skb->dev->br_port);
 
 	if (p && p->state != BR_STATE_DISABLED)
+#if defined(TCSUPPORT_HWNAT)
+		br_fdb_update(p->br, p, eth_hdr(skb)->h_source, skb);
+#else
 		br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
+#endif
 
 	return 0;	 /* process further */
 }

@@ -232,11 +232,14 @@ static int __init nf_conntrack_irc_init(void)
 		return -EINVAL;
 	}
 
+#if !defined(TCSUPPORT_CT) 
 #if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
-    irc_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
+    	irc_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
 #else
 	irc_buffer = kmalloc(65536, GFP_KERNEL);
-#endif	
+#endif
+#endif
+	
 	if (!irc_buffer)
 		return -ENOMEM;
 

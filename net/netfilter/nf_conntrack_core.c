@@ -29,6 +29,9 @@
 #include <linux/netdevice.h>
 #include <linux/socket.h>
 #include <linux/mm.h>
+#if defined(TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
 
 #if defined(TCSUPPORT_NAT_SESSION_RESERVE)
 #include <linux/in.h>
@@ -40,6 +43,10 @@
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_core.h>
+
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
 
 #define NF_CONNTRACK_VERSION	"0.5.0"
 
@@ -362,6 +369,14 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	struct nf_conn *ct = (struct nf_conn *)nfct;
 	struct nf_conntrack_l4proto *l4proto;
 	typeof(nf_conntrack_destroyed) destroyed;
+
+#if defined(TCSUPPORT_HWNAT)
+	clear_bit(IPS_PKTFLOW_BIT, &ct->status);   
+   	if ((ct->pktflow_key[IP_CT_DIR_ORIGINAL] != 0) || (ct->pktflow_key[IP_CT_DIR_REPLY] != 0)) {
+    	if (pktflow_nfct_close_hook) 
+        	pktflow_nfct_close_hook(ct);
+	}
+#endif
 
 	DEBUGP("destroy_conntrack(%p)\n", ct);
 	NF_CT_ASSERT(atomic_read(&nfct->use) == 0);
@@ -777,6 +792,11 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 	memset(conntrack, 0, nf_ct_cache[features].size);
 	conntrack->features = features;
 	atomic_set(&conntrack->ct_general.use, 1);
+
+#if defined(TCSUPPORT_HWNAT)
+   	set_bit(IPS_PKTFLOW_BIT, &conntrack->status);  
+#endif
+
 	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple = *orig;
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = *repl;
 	/* Don't set timer yet: wait for confirmation */
@@ -955,6 +975,37 @@ resolve_normal_ct(struct sk_buff *skb,
 	}
 	skb->nfct = &ct->ct_general;
 	skb->nfctinfo = *ctinfo;
+
+#if defined(TCSUPPORT_HWNAT)
+{
+	struct nf_conn_help *help = nfct_help(ct);
+
+	if (help && help->helper) {
+		if (strcmp(help->helper->name, "FULLCONE-NAT") != 0)
+			clear_bit(IPS_PKTFLOW_BIT, &ct->status);
+	}
+
+	if (test_bit(IPS_PKTFLOW_BIT, &ct->status)) {
+		pktflow_nfct(skb, ct);                     
+	} else {
+		pktflow_free(skb);                         
+	}
+}
+#endif
+
+#ifdef TCSUPPORT_RA_HWNAT
+{
+	struct nf_conn_help *help = nfct_help(ct);
+
+	if (help && help->helper) {
+		if (strcmp(help->helper->name, "FULLCONE-NAT") != 0) {
+			if (ra_sw_nat_hook_free)
+				ra_sw_nat_hook_free(skb);
+		}
+	}
+}
+#endif
+
 	return ct;
 }
 
@@ -1443,6 +1494,10 @@ int __init nf_conntrack_init(void)
 	atomic_set(&nf_conntrack_untracked.ct_general.use, 1);
 	/*  - and look it like as a confirmed connection */
 	set_bit(IPS_CONFIRMED_BIT, &nf_conntrack_untracked.status);
+
+#if defined(TCSUPPORT_HWNAT)
+	pktflow_refresh_fn = (pktflow_refresh_t) __nf_ct_refresh_acct;
+#endif
 
 	return ret;
 

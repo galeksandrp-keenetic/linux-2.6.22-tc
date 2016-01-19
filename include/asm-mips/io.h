@@ -293,6 +293,79 @@ static inline void iounmap(const volatile void __iomem *addr)
 #undef __IS_KSEG1
 }
 
+#if defined(WIFI_MODULE) && defined(CONFIG_MIPS_TC3262)
+extern void ahbErrChk(void);
+#define __BUILD_MEMORY_SINGLE(pfx, bwlq, type, irq)			\
+									\
+static inline void pfx##write##bwlq(type val,				\
+				    volatile void __iomem *mem)		\
+{									\
+	volatile type *__mem;						\
+	type __val;							\
+	ahbErrChk();								\
+	__mem = (void *)__swizzle_addr_##bwlq((unsigned long)(mem));	\
+									\
+	__val = pfx##ioswab##bwlq(__mem, val);				\
+									\
+	if (sizeof(type) != sizeof(u64) || sizeof(u64) == sizeof(long))	\
+		*__mem = __val;						\
+	else if (cpu_has_64bits) {					\
+		unsigned long __flags;					\
+		type __tmp;						\
+									\
+		if (irq)						\
+			local_irq_save(__flags);			\
+		__asm__ __volatile__(					\
+			".set	mips3"		"\t\t# __writeq""\n\t"	\
+			"dsll32	%L0, %L0, 0"			"\n\t"	\
+			"dsrl32	%L0, %L0, 0"			"\n\t"	\
+			"dsll32	%M0, %M0, 0"			"\n\t"	\
+			"or	%L0, %L0, %M0"			"\n\t"	\
+			"sd	%L0, %2"			"\n\t"	\
+			".set	mips0"				"\n"	\
+			: "=r" (__tmp)					\
+			: "0" (__val), "m" (*__mem));			\
+		if (irq)						\
+			local_irq_restore(__flags);			\
+	} else								\
+		BUG();							\
+	ahbErrChk();	\
+}									\
+									\
+static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
+{									\
+	volatile type *__mem;						\
+	type __val;							\
+	ahbErrChk();							\
+	__mem = (void *)__swizzle_addr_##bwlq((unsigned long)(mem));	\
+									\
+	if (sizeof(type) != sizeof(u64) || sizeof(u64) == sizeof(long))	\
+		__val = *__mem;						\
+	else if (cpu_has_64bits) {					\
+		unsigned long __flags;					\
+									\
+		if (irq)						\
+			local_irq_save(__flags);			\
+		__asm__ __volatile__(					\
+			".set	mips3"		"\t\t# __readq"	"\n\t"	\
+			"ld	%L0, %1"			"\n\t"	\
+			"dsra32	%M0, %L0, 0"			"\n\t"	\
+			"sll	%L0, %L0, 0"			"\n\t"	\
+			".set	mips0"				"\n"	\
+			: "=r" (__val)					\
+			: "m" (*__mem));				\
+		if (irq)						\
+			local_irq_restore(__flags);			\
+	} else {							\
+		__val = 0;						\
+		BUG();							\
+	}								\
+									\
+	return pfx##ioswab##bwlq(__mem, __val);				\
+}
+
+#else
+
 #define __BUILD_MEMORY_SINGLE(pfx, bwlq, type, irq)			\
 									\
 static inline void pfx##write##bwlq(type val,				\
@@ -304,7 +377,7 @@ static inline void pfx##write##bwlq(type val,				\
 	__mem = (void *)__swizzle_addr_##bwlq((unsigned long)(mem));	\
 									\
 	__val = pfx##ioswab##bwlq(__mem, val);				\
-									\
+										\
 	if (sizeof(type) != sizeof(u64) || sizeof(u64) == sizeof(long))	\
 		*__mem = __val;						\
 	else if (cpu_has_64bits) {					\
@@ -360,7 +433,7 @@ static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
 									\
 	return pfx##ioswab##bwlq(__mem, __val);				\
 }
-
+#endif
 #define __BUILD_IOPORT_SINGLE(pfx, bwlq, type, p, slow)			\
 									\
 static inline void pfx##out##bwlq##p(type val, unsigned long port)	\

@@ -78,6 +78,9 @@
 
 #define SPI_STATUS_WIP			STM_STATUS_WIP
 
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+extern int offset;
+#endif
 
 
 #endif

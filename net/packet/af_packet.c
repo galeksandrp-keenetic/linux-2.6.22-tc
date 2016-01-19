@@ -499,6 +499,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 		}
 	}
 
+	
 	snaplen = skb->len;
 
 	res = run_filter(skb, sk, snaplen);
@@ -512,7 +513,11 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 		goto drop_n_acct;
 
 	if (skb_shared(skb)) {
+#if defined(TCSUPPORT_HWNAT)		
+		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
+#else
 		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
+#endif
 		if (nskb == NULL)
 			goto drop_n_acct;
 
@@ -630,7 +635,11 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 		    atomic_read(&sk->sk_rmem_alloc) + skb->truesize <
 		    (unsigned)sk->sk_rcvbuf) {
 			if (skb_shared(skb)) {
+#if defined(TCSUPPORT_HWNAT)		
+				copy_skb = skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
+#else
 				copy_skb = skb_clone(skb, GFP_ATOMIC);
+#endif
 			} else {
 				copy_skb = skb_get(skb);
 				skb_head = skb->data;
@@ -1556,7 +1565,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 				amount = skb->len;
 			spin_unlock_bh(&sk->sk_receive_queue.lock);
 			return put_user(amount, (int __user *)arg);
-		}
+		} 
 		case SIOCGSTAMP:
 			return sock_get_timestamp(sk, (struct timeval __user *)arg);
 		case SIOCGSTAMPNS:

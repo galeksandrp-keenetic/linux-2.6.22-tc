@@ -146,6 +146,15 @@ static void ipip6_tunnel_link(struct ip_tunnel *t)
 	write_unlock_bh(&ipip6_lock);
 }
 
+#if 0
+static voild ipip6_tunnel_clone_6rd(struct net_device *dev, struct sit_net *sitn)
+{
+#ifdef CONFIG_IPV6_SIT_6RD
+	struct ip_tunnel *t = netdev_priv(dev);
+#endif	
+}
+#endif
+
 static struct ip_tunnel * ipip6_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 {
 	__be32 remote = parms->iph.daddr;
@@ -415,6 +424,33 @@ static inline __be32 try_6to4(struct in6_addr *v6dst)
 	return dst;
 }
 
+#ifdef CONFIG_IPV6_SIT_6RD
+/* Returns the enbedded IPv4 address if the IPv6 address comes from 6rd rule */
+static inline __be32 try_6rd(struct in6_addr *v6dst, struct ip_tunnel *tunnel)
+{
+	__be32 dst = 0;
+
+	/* isolate addr according to mask */
+	if (ipv6_prefix_equal(v6dst, &tunnel->ip6rd.prefix, tunnel->ip6rd.prefixlen)){
+		unsigned pbw0, pbi0;
+		int pbi1;
+		u32 d;
+
+		pbw0 = tunnel->ip6rd.prefixlen >> 5;
+		pbi0 = tunnel->ip6rd.prefixlen & 0x1f;
+
+		d = (ntohl(v6dst->s6_addr32[pbw0]) << pbi0) >> tunnel->ip6rd.relay_prefixlen;
+
+		pbi1 = pbi0 - tunnel->ip6rd.relay_prefixlen;
+		if (pbi1 > 0)
+			d |= ntohl(v6dst->s6_addr32[pbw0 + 1]) >> (32 - pbi1);
+		
+		dst = tunnel->ip6rd.relay_prefix | htonl(d);
+	}
+	return dst;
+}
+#endif
+
 /*
  *	This function assumes it is being called from dev_queue_xmit()
  *	and that skb is filled properly by that function.
@@ -443,9 +479,14 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (skb->protocol != htons(ETH_P_IPV6))
 		goto tx_error;
-
+	
 	if (!dst)
+#ifdef CONFIG_IPV6_SIT_6RD	
+		dst = try_6rd(&iph6->daddr, tunnel);
+#else
 		dst = try_6to4(&iph6->daddr);
+#endif
+
 
 	if (!dst) {
 		struct neighbour *neigh = NULL;
@@ -597,9 +638,15 @@ ipip6_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	int err = 0;
 	struct ip_tunnel_parm p;
 	struct ip_tunnel *t;
+#ifdef CONFIG_IPV6_SIT_6RD
+	struct ip_tunnel_6rd ip6rd;
+#endif
 
 	switch (cmd) {
 	case SIOCGETTUNNEL:
+#ifdef CONFIG_IPV6_SIT_6RD
+	case SIOCGET6RD:
+#endif 
 		t = NULL;
 		if (dev == ipip6_fb_tunnel_dev) {
 			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p))) {
@@ -610,9 +657,24 @@ ipip6_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		if (t == NULL)
 			t = netdev_priv(dev);
-		memcpy(&p, &t->parms, sizeof(p));
-		if (copy_to_user(ifr->ifr_ifru.ifru_data, &p, sizeof(p)))
-			err = -EFAULT;
+
+		err = -EFAULT;
+		if(cmd = SIOCGETTUNNEL){
+			memcpy(&p, &t->parms, sizeof(p));
+			if (copy_to_user(ifr->ifr_ifru.ifru_data, &p, sizeof(p)))
+			//err = -EFAULT;
+			goto done;
+#ifdef CONFIG_IPV6_SIT_6RD
+		}else{
+			ipv6_addr_copy(&ip6rd.prefix, &t->ip6rd.prefix);
+			ip6rd.relay_prefix = t->ip6rd.relay_prefix;
+			ip6rd.prefixlen = t->ip6rd.relay_prefixlen;
+			ip6rd.relay_prefixlen = t->ip6rd.relay_prefixlen;
+			if(copy_to_user(ifr->ifr_ifru.ifru_data, &ip6rd, sizeof(ip6rd)))
+				goto done;
+#endif
+		}
+		err = 0;
 		break;
 
 	case SIOCADDTUNNEL:
@@ -689,6 +751,50 @@ ipip6_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		unregister_netdevice(dev);
 		err = 0;
 		break;
+
+#ifdef CONFIG_IPV6_SIT_6RD
+	case SIOCADD6RD:
+	case SIOCCHG6RD:
+	case SIOCDEL6RD:
+		err = -EPERM;
+		//printk("Lyric debug in sit.c enter ADD/CHG/DEL 6rd tunnel.\n");
+		if(!capable(CAP_NET_ADMIN))
+			goto done;
+		err = -EFAULT;
+		if(copy_from_user(&ip6rd, ifr->ifr_ifru.ifru_data, sizeof(ip6rd)))
+			goto done;
+
+		t = netdev_priv(dev);
+
+		if(cmd != SIOCDEL6RD){
+			struct in6_addr prefix;
+			__be32 relay_prefix;
+
+			err = -EINVAL;
+			if(ip6rd.relay_prefixlen > 32 || 
+			   ip6rd.prefixlen + (32 - ip6rd.relay_prefixlen) > 64)
+			   	goto done;
+
+			ipv6_addr_prefix(&prefix, &ip6rd.prefix, ip6rd.prefixlen);
+			if(!ipv6_addr_equal(&prefix, &ip6rd.prefix))
+				goto done;
+			if(ip6rd.relay_prefixlen)
+				relay_prefix = ip6rd.relay_prefix & htonl(0xffffffffUL << (32-ip6rd.relay_prefixlen));
+			else
+				relay_prefix = 0;
+			if(relay_prefix != ip6rd.relay_prefix)
+				goto done;
+
+			ipv6_addr_copy(&t->ip6rd.prefix, &prefix);
+			t->ip6rd.relay_prefix = relay_prefix;
+			t->ip6rd.prefixlen = ip6rd.prefixlen;
+			t->ip6rd.relay_prefixlen = ip6rd.relay_prefixlen;
+		}else
+			//ipip6_tunnel_clone_6rd(dev, sitn);
+			memset(&t->ip6rd, 0, sizeof(ip6rd));
+		err = 0 ;
+		break;
+#endif
 
 	default:
 		err = -EINVAL;

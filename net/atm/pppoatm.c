@@ -229,14 +229,14 @@ static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 			if ((skb = n) == NULL)
 				return DROP_PACKET;
 		} 
-#ifndef CONFIG_CPU_TC3162
+#if !defined(CONFIG_CPU_TC3162) && !defined(CONFIG_MIPS_TC3262)
 		else if (!atm_may_send(pvcc->atmvcc, skb->truesize))
 			goto nospace;
 #endif
 		memcpy(skb_push(skb, LLC_LEN), pppllc, LLC_LEN);
 		break;
 	case e_vc:
-#ifndef CONFIG_CPU_TC3162
+#if !defined(CONFIG_CPU_TC3162) && !defined(CONFIG_MIPS_TC3262)
 		if (!atm_may_send(pvcc->atmvcc, skb->truesize))
 			goto nospace;
 #endif

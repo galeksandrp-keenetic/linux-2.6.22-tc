@@ -24,4 +24,9 @@ typedef	struct {
 	char *argc_errmsg;	
 } cmds_t;
 
+extern int cmd_reg_add(char *cmd_name, cmds_t *cmds_p);
+extern int cmd_register(cmds_t *cmds_p);
+extern int cmd_unregister(char *name);
+extern int subcmd(const cmds_t tab[], int argc, char *argv[], void *p);
+
 #endif /* _CMDPARSE_ */

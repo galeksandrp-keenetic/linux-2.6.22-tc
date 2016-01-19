@@ -18,6 +18,15 @@
  *************************************************************************/
 /*
 ** $Log: tc3162.h,v $
+** Revision 1.11  2011/07/07 07:54:12  shnwind
+** RT63260 & RT63260 auto_bench support
+**
+** Revision 1.10  2011/06/17 01:21:36  shnwind
+** rt65168 pwctlcmd support
+**
+** Revision 1.9  2011/06/02 11:35:51  lino
+** add RT65168 support
+**
 ** Revision 1.8  2011/03/15 04:51:16  lino
 ** remove set_vi_handler needed in drivers and timer function to use handle_percpu_irq instead of handle_level_irq
 **
@@ -93,7 +102,7 @@
 #ifndef _TC3162_H_
 #define _TC3162_H_
 
-#ifdef CONFIG_MIPS_TC3182 
+#ifdef CONFIG_MIPS_TC3262 
 #include "./tc3182_int_source.h"
 #else
 #include "./int_source.h" /*shnwind add*/
@@ -162,22 +171,38 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #define isTC3162L5P5E3 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0xb)?1:0)
 #define isTC3162L5P5 (isTC3162L5P5E2 || isTC3162L5P5E3)
 #define isTC3162U ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x10)?1:0)
+#define isRT63260 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x20)?1:0)
 
+#define isTC3169 	(((VPint(0xbfb00064)&0xffff0000))==0x00000000)
 #define isTC3182 	(((VPint(0xbfb00064)&0xffff0000))==0x00010000)
-#define isTC3262 	(((VPint(0xbfb00064)&0xffff0000))==0x00000000)
+#define isRT65168 	(((VPint(0xbfb00064)&0xffff0000))==0x00020000)
+#define isRT63165 	(((VPint(0xbfb00064)&0xffff0000))==0x00030000)
+#define isRT63365 	(((VPint(0xbfb00064)&0xffff0000))==0x00040000)
 
 #ifdef TC3162L2
-#define	SYS_HCLK       	(isTC3162U ? (3*(((VPint(0xbfb000b0)>>16)&0x1ff)+1)/(((VPint(0xbfb000b0)>>25)&0x1f)+1)) : 133)
+#define RT63260_SYS_HCLK ((12*(((VPint(0xbfb000b0))&0x1ff)+1)/(((VPint(0xbfb000b0)>>9)&0x1f)+1))/5)
+#define TC3162U_SYS_HCLK (3*(((VPint(0xbfb000b0)>>16)&0x1ff)+1)/(((VPint(0xbfb000b0)>>25)&0x1f)+1))
+#define SYS_HCLK        (isRT63260 ? RT63260_SYS_HCLK : (isTC3162U ? TC3162U_SYS_HCLK : 133))
 #endif
 
 #ifdef CONFIG_MIPS_TC3262
-// FPGA
-//#define	SYS_HCLK		12.5	
-// ASIC
-#define	SYS_HCLK		(isTC3182 ? 102.4 : (3*((VPint(0xbfb00058)>>16)+1)/(((VPint(0xbfb00058)&0x1f)+1)<<1)))
+/* RT63165 ASIC */
+/* FPGA is 25Mhz, ASIC LQFP128 is 166.67Mhz, others are 200Mhz */
+#define	RT63165_SYS_HCLK       	(VPint(0xbfb0008c)&(1<<31) ? 25 : (VPint(0xbfb0008c)&(1<<9) ? (200) : (16667/100)))
+
+/* RT63365 ASIC */
+/* FPGA is 25/32Mhz 
+ * ASIC RT6856/RT63368: DDR(0): 233.33, DDR(1): 175, SDR: 140
+ *      RT6855/RT63365: DDR(0): 166.67, DDR(1): 125, SDR: 140 */
+#define	RT63365_SYS_HCLK       	(VPint(0xbfb0008c)&(1<<31) ? (25) : (VPint(0xbfb0008c)&(1<<9) ? (VPint(0xbfb0008c)&(1<<25) ? (VPint(0xbfb0008c)&(1<<26) ? (175) : (23333/100)) : (140)) : (VPint(0xbfb0008c)&(1<<25) ? (VPint(0xbfb0008c)&(1<<26) ? (125) : (16667/100)) : (140))))
+
+#define	SYS_HCLK		(isRT63365 ? RT63365_SYS_HCLK : (isRT63165 ? RT63165_SYS_HCLK : (isRT65168 ? (1024/10) : (isTC3182 ? (1024/10) : (3*((VPint(0xbfb00058)>>16)+1)/(((VPint(0xbfb00058)&0x1f)+1)<<1))))))
 #endif
 
 #define	SAR_CLK	(SYS_HCLK)/(4.0)		//more accurate if 4.0 not 4
+
+/* define CPU timer clock, FPGA is 50Mhz, ASIC is 250Mhz */
+#define	CPUTMR_CLK		(VPint(0xbfb0008c)&(1<<31) ? 50	: 250)
 
 #define DSPRAM_BASE		0x9c000000
 
@@ -194,7 +219,8 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #define tc_outw(offset,val)    	(*(volatile unsigned short *)(offset) = val)
 #define tc_outl(offset,val)    	(*(volatile unsigned long *)(offset) = val)
 
-#define IS_SPIFLASH			((VPint(CR_AHB_SSR) & (1<<20)) || (VPint(CR_AHB_HWCONF) & (1<<4)))
+#define IS_SPIFLASH				((VPint(CR_AHB_SSR) & (1<<20)) || !(VPint(CR_AHB_HWCONF) & 0x1))
+#define IS_NANDFLASH			(VPint(CR_AHB_HWCONF) & 0x1)
 #define NF_CONNTRACK_BUF_SIZE 4096
 /*****************************
  * DMC Module Registers *
@@ -205,6 +231,19 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #define CR_DMC_STC      	(0x01 | CR_DMC_BASE)
 #define CR_DMC_SAMT      	(0x02 | CR_DMC_BASE)
 #define CR_DMC_SCR      	(0x03 | CR_DMC_BASE)
+
+/* RT63165 specific */
+/* DDR self refresh control register */
+#define CR_DMC_DDR_SR    	(0x18 | CR_DMC_BASE)
+/* DDR self refresh target count */
+#define CR_DMC_DDR_SR_CNT  	(0x1c | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG0    	(0x40 | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG1    	(0x44 | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG2    	(0x48 | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG3    	(0x4c | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG4    	(0x50 | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG8    	(0x60 | CR_DMC_BASE)
+#define CR_DMC_DDR_CFG9    	(0x64 | CR_DMC_BASE)
 
 #define CR_DMC_CTL0      	(0x70 | CR_DMC_BASE)
 #define CR_DMC_CTL1      	(0x74 | CR_DMC_BASE)
@@ -585,6 +624,9 @@ interrupt_priority
 #define CR_TIMER4_VLR       (CR_TIMER_BASE + 0x28)
 #define CR_TIMER5_LDV       (CR_TIMER_BASE + 0x2C)
 #define CR_TIMER5_VLR       (CR_TIMER_BASE + 0x30)
+/* new watchdog design */
+#define CR_WDOG_THSLD       (CR_TIMER_BASE + 0x34)
+#define CR_WDOG_RLD         (CR_TIMER_BASE + 0x38)
 
 #define TIMER_ENABLE         1
 #define TIMER_DISABLE        0
@@ -608,6 +650,15 @@ interrupt_priority
 #define timerLdvSet(timer_no,val) *(volatile uint32 *)(CR_TIMER0_LDV+timer_no*0x08) = (val)
 #define timerVlrGet(timer_no,val) (val)=*(volatile uint32 *)(CR_TIMER0_VLR+timer_no*0x08)
 
+/**************************
+ * Timer Module Registers *
+ **************************/
+#define CR_CPUTMR_BASE 		0xBFBF0400
+#define CR_CPUTMR_CTL    	(CR_CPUTMR_BASE + 0x00)
+#define CR_CPUTMR_CMR0    	(CR_CPUTMR_BASE + 0x04)
+#define CR_CPUTMR_CNT0    	(CR_CPUTMR_BASE + 0x08)
+#define CR_CPUTMR_CMR1    	(CR_CPUTMR_BASE + 0x0c)
+#define CR_CPUTMR_CNT1    	(CR_CPUTMR_BASE + 0x10)
 
 /*************************
  * GPIO Module Registers *
@@ -653,6 +704,12 @@ interrupt_priority
 #define CR_AHB_SMB3       	(CR_AHB_BASE + 0x2C)
 #define CR_AHB_SMB4       	(CR_AHB_BASE + 0x30)
 #define CR_AHB_SMB5       	(CR_AHB_BASE + 0x34)
+
+/* RT63165 */
+#define CR_ERR_ADDR    		(CR_AHB_BASE + 0x3c)
+#define CR_PRATIR      		(CR_AHB_BASE + 0x58)
+#define CR_MON_TMR     		(CR_AHB_BASE + 0x60)
+
 #define CR_AHB_PMCR       	(CR_AHB_BASE + 0x80)
 #define CR_AHB_DMTCR       	(CR_AHB_BASE + 0x84)
 #define CR_AHB_PCIC	       	(CR_AHB_BASE + 0x88)
@@ -663,9 +720,17 @@ interrupt_priority
 #define CR_DMEM       	(CR_AHB_BASE + 0xA0)
 #endif
 #define CR_AHB_ABMR       	(CR_AHB_BASE + 0xB8)
+#define CR_CKGEN_CONF		(CR_AHB_BASE + 0xC0)
 #define CR_PSMCR       		(CR_AHB_BASE + 0xCC)
 #define CR_PSMDR       		(CR_AHB_BASE + 0xD0)
 #define CR_PSMMR       		(CR_AHB_BASE + 0xD0)
+
+/* RT63165 */
+#define CR_SRAM       		(CR_AHB_BASE + 0xF4)
+
+/* RT63365 */
+#define CR_CLK_CFG     		(CR_AHB_BASE + 0x82c)
+#define CR_RSTCTRL2    		(CR_AHB_BASE + 0x834)
 
 /*************************************************
  * SRAM/FLASH/ROM Controller Operation Registers *

@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/ptrace.h>
 #include <linux/stddef.h>
+#include <linux/module.h>
 
 #include <asm/cpu.h>
 #include <asm/fpu.h>
@@ -24,6 +25,44 @@
 
 extern int __imem, __dmem;
 #endif
+
+static char *sram_allocp = NULL;
+static int sram_size = 0;
+static int sram_free = 0;
+
+int is_sram_addr(void *p)
+{
+	if ((CKSEG1ADDR(p) & 0xffffc000) == (CKSEG1ADDR(DSPRAM_BASE) & 0xffffc000))
+		return 1;
+	else 
+		return 0;
+}
+EXPORT_SYMBOL(is_sram_addr);
+
+void *alloc_sram(int n)
+{
+	if (sram_allocp == NULL)
+		return NULL;
+
+	if (sram_free >= n) {
+		sram_free -= n;
+		sram_allocp += n;
+		printk("alloc_sram p=%p free=%04x\n", sram_allocp, sram_free);
+		return sram_allocp - n;
+	} else 
+		return NULL;
+}
+EXPORT_SYMBOL(alloc_sram);
+
+void free_sram(void *p, int n)
+{
+	if (sram_allocp == (p+n)) {
+		sram_free += n;
+		sram_allocp -= n;
+	}
+	printk("free_sram p=%p free=%04x\n", sram_allocp, sram_free);
+}
+EXPORT_SYMBOL(free_sram);
 
 #define MIPS34K_Index_Store_Data_I	0x0c
 
@@ -227,6 +266,12 @@ static __cpuinit void probe_spram(char *type,
 			if (v != ~TDAT)
 				printk(KERN_ERR "vp=%p wrote=%08x got=%08x\n",
 				       vp+1, ~TDAT, v);
+#ifdef CONFIG_MIPS_TC3262
+			if (enabled) {
+				sram_allocp = (char *) vp;
+				sram_size = sram_free = size;
+			}
+#endif
 		}
 
 		pr_info("%s%d: PA=%08x,Size=%08x%s\n",
@@ -283,14 +328,25 @@ __cpuinit void spram_config(void)
 			probe_spram("ISPRAM", CPHYSADDR(&__imem),
 				    &ispram_load_tag, &ispram_store_tag);
 			ispram_fill();
-			VPint(CR_DMC_ISPCFGR) = (CPHYSADDR(&__imem) & 0xfffff000) | (1<<8) | (0x7);
+			if (!isRT63165 && !isRT63365)
+				VPint(CR_DMC_ISPCFGR) = (CPHYSADDR(&__imem) & 0xfffff000) | (1<<8) | (0x7);
 		}
 #endif
 #ifdef CONFIG_TC3162_DMEM
-		if (config0 & (1<<23)) {
-			probe_spram("DSPRAM", CPHYSADDR(DSPRAM_BASE),
-				    &dspram_load_tag, &dspram_store_tag);
-			VPint(CR_DMC_DSPCFGR) = (CPHYSADDR(DSPRAM_BASE) & 0xfffff000) | (1<<8) | (0x7);
+		if (isRT63165 || isRT63365) {
+			VPint(CR_SRAM) = (CPHYSADDR(DSPRAM_BASE) & 0xffffc000) | (1<<0);
+			printk("Enable SRAM=%08lx\n", VPint(CR_SRAM));
+
+			sram_allocp = (char *) CKSEG1ADDR(DSPRAM_BASE);
+			sram_size = sram_free = 0x8000;
+		} else {
+			if (!isTC3182 && !isRT65168) {
+				if (config0 & (1<<23)) {
+					probe_spram("DSPRAM", CPHYSADDR(DSPRAM_BASE),
+							&dspram_load_tag, &dspram_store_tag);
+					VPint(CR_DMC_DSPCFGR) = (CPHYSADDR(DSPRAM_BASE) & 0xfffff000) | (1<<8) | (0x7);
+				}
+			}
 		}
 #endif
 #endif

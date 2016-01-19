@@ -18,8 +18,11 @@
 #define EBT_IP6_PROTO 0x08
 #define EBT_IP6_SPORT 0x10
 #define EBT_IP6_DPORT 0x20
+
+#if !defined(TCSUPPORT_CZ_GENERAL) 
 #define EBT_IP6_MASK (EBT_IP6_SOURCE | EBT_IP6_DEST | EBT_IP6_TCLASS |\
 		      EBT_IP6_PROTO | EBT_IP6_SPORT | EBT_IP6_DPORT)
+#endif
 #define EBT_IP6_MATCH "ip6"
 
 /* the same values are used for the invflags */

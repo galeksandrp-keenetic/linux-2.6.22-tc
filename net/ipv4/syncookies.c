@@ -23,7 +23,7 @@
 
 extern int sysctl_tcp_syncookies;
 
-static __u32 syncookie_secret[2][16-3+SHA_DIGEST_WORDS];
+__u32 syncookie_secret[2][16-3+SHA_DIGEST_WORDS];
 
 static __init int init_syncookies(void)
 {

@@ -48,6 +48,10 @@
 #define SKB_MAX_HEAD(X)		(SKB_MAX_ORDER((X), 0))
 #define SKB_MAX_ALLOC		(SKB_MAX_ORDER(0, 2))
 
+#if defined(TCSUPPORT_HWNAT)
+struct pktflow_t;
+#endif
+
 /* A. Checksumming of received packets by device.
  *
  *	NONE: device failed to checksum this packet.
@@ -285,6 +289,12 @@ struct sk_buff {
 	int				(*skb_recycling_callback)(struct sk_buff *skb);
 	int				skb_recycling_ind;
 #endif
+#if defined(TCSUPPORT_HWNAT)
+	struct pktflow_t	*pktflow_p;
+#endif
+#if defined(TCSUPPORT_RA_HWNAT)
+	char				foe[8];
+#endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct nf_conntrack	*nfct;
 	struct sk_buff		*nfct_reasm;
@@ -308,12 +318,14 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 #define MASK_ORIGIN_DEV   		0x1 	/* flag for port bind set origin dev name */
 #define MASK_OUT_DEV   			0x2 	/* flag for port bind set origin dev name */
 #define	IFNAMSIZ				16
 	__u32		portbind_mark;
 	char		orig_dev_name[IFNAMSIZ];
+#endif
 #endif
 #ifdef	TCSUPPORT_VLAN_TAG
 	__u16		vlan_tags[2];
@@ -323,6 +335,7 @@ struct sk_buff {
 #define		VLAN_TAG_FROM_INDEV		(1<<3)	
 #define		VLAN_TAG_INSERT_FLAG	(1<<4)
 #define		VLAN_TAG_CHECK_FLAG		(1<<5)
+#define		VLAN_TAG_FROM_WAN		(1<<6)
 	__u32	vlan_tag_flag;
 #endif
 #if 1//def CONFIG_QOS
@@ -335,12 +348,24 @@ struct sk_buff {
 #define QOS_RTP_MARK				0x04
 #define LANIF_MASK					0xf0000000
 #define WANIF_MASK					0x7f0000
+#define MULTICAST_MASK 		0xf0000
 #define SKBUF_COPYTOLAN				(1 << 26)
 #define SKBUF_TCCONSOLE				(1 << 27)
 /* the last bit is used as route policy mask */
 #define ROUTE_POLICY_MASK			(1 << 24)
 //#define QOS_WANIF_MARK			0xff000
 //#define QOS_DSCP_MARK  			0x3f00000
+#endif
+#if !defined(TCSUPPORT_CT)
+#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#define FB_WAN_ENABLE 	(1<<0)
+#define FB_FLOOD_PKT 	(1<<1)
+	__u8	fb_flags;
+	__u8    sc_mac_learned;
+#endif
+#endif
+#if defined(CONFIG_MIPS_RT63365) && defined(TCSUPPORT_WAN_ETHER)
+	__u8    wan_port_flag;
 #endif
 	__u32			mark;  /*The first 4 bits are used to identify LAN interfaces. 0x10000000~0x90000000:LAN1~LAN4,ra0~ra3,usb0*/
 
@@ -354,11 +379,6 @@ struct sk_buff {
 				*data;
 	unsigned int		truesize;
 	atomic_t		users;
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
-#define FB_WAN_ENABLE 	(1<<0)
-	__u8	fb_flags;
-	__u8    sc_mac_learned;
-#endif
 };
 
 #ifdef __KERNEL__
@@ -1216,11 +1236,20 @@ static inline int skb_network_offset(const struct sk_buff *skb)
  * headroom, you should not reduce this.
  */
 #ifndef NET_SKB_PAD
+#if !defined(TCSUPPORT_CT) 
+/* Temporary set NET_SKB_PAD as 16 for RT65168 */
+#if defined(CONFIG_MIPS_RT65168)
+//#define NET_SKB_PAD	16
+#define NET_SKB_PAD	32 //for pppoa vc crash issue,change from 16 to 32
+#else
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 #define NET_SKB_PAD	32
 #else
 #define NET_SKB_PAD	16
 #endif
+#endif
+#endif
+
 #endif
 
 extern int ___pskb_trim(struct sk_buff *skb, unsigned int len);
@@ -1733,9 +1762,11 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 	dst->nf_bridge  = src->nf_bridge;
 	nf_bridge_get(src->nf_bridge);
 #endif
+#if !defined(TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 	dst->portbind_mark = src->portbind_mark;
 	memcpy(dst->orig_dev_name, src->orig_dev_name, IFNAMSIZ);
+#endif
 #endif
 #ifdef TCSUPPORT_VLAN_TAG
 	dst->vlan_tags[0] = src->vlan_tags[0];
@@ -1808,6 +1839,7 @@ static inline struct sk_buff *skbmgr_dev_alloc_skb4k(void)
 		skb_reserve(skb, NET_SKB_PAD);
 	return skb;
 }
+
 
 #if defined(CONFIG_MIPS_TC3262)
 

@@ -56,3 +56,8 @@ obj-$(CONFIG_RFKILL)		+= rfkill/
 ifeq ($(CONFIG_NET),y)
 obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
 endif
+
+ifeq ($(TCSUPPORT_RA_HWNAT),1)
+obj-y 						+= nat/foe_hook/
+endif
+

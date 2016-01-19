@@ -19,3 +19,6 @@ obj-$(CONFIG_NET_PKTGEN) += pktgen.o
 obj-$(CONFIG_NETPOLL) += netpoll.o
 obj-$(CONFIG_NET_DMA) += user_dma.o
 obj-$(CONFIG_FIB_RULES) += fib_rules.o
+ifeq ($(TCSUPPORT_HWNAT),1)
+obj-y += pktflow.o
+endif

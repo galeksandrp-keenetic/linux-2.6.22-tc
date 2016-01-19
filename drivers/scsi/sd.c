@@ -62,7 +62,7 @@
 
 #include "scsi_logging.h"
 
-#ifdef CONFIG_USB_AUTOMOUNT
+#ifdef USB_AUTOMOUNT
 #include <linux/proc_fs.h>
 struct mutex signal_mutex;
 struct task_struct *mount_task_p;
@@ -105,7 +105,7 @@ static const char *sd_cache_types[] = {
 	"write through", "none", "write back",
 	"write back, no read (daft)"
 };
-#ifdef CONFIG_USB_AUTOMOUNT
+#ifdef USB_AUTOMOUNT
 /*---------------------------------------------------------------------
  ** function mame: automount_pid_write_proc
  *
@@ -1733,7 +1733,7 @@ static int sd_probe(struct device *dev)
 	dev_set_drvdata(dev, sdkp);
 	add_disk(gd);
     
-#ifdef CONFIG_USB_AUTOMOUNT   
+#ifdef USB_AUTOMOUNT   
     if(mount_task_p != NULL)
     {
         mutex_lock(&signal_mutex);
@@ -1779,7 +1779,7 @@ static int sd_remove(struct device *dev)
 	class_device_put(&sdkp->cdev);
 	mutex_unlock(&sd_ref_mutex);
 
-#ifdef CONFIG_USB_AUTOMOUNT    
+#ifdef USB_AUTOMOUNT
     if(mount_task_p != NULL)
     {
         mutex_lock(&signal_mutex);
@@ -1918,7 +1918,7 @@ done:
 static int __init init_sd(void)
 {
 	int majors = 0, i, err;
-#ifdef CONFIG_USB_AUTOMOUNT
+#ifdef USB_AUTOMOUNT
     struct proc_dir_entry *automount_proc;
 
 /* 1. mount_task_p: a pointer which will (later) point to the task_struct 

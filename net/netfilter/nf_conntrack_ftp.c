@@ -576,11 +576,14 @@ static int __init nf_conntrack_ftp_init(void)
 {
 	int i, j = -1, ret = 0;
 	char *tmpname;
+#if !defined(TCSUPPORT_CT) 
 #if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
 	ftp_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
 #else
 	ftp_buffer = kmalloc(65536, GFP_KERNEL);
-#endif	
+#endif
+#endif
+	
 	if (!ftp_buffer)
 		return -ENOMEM;
 

@@ -500,6 +500,9 @@ static int udp_push_pending_frames(struct sock *sk)
 		uh->check = CSUM_MANGLED_0;
 
 send:
+#ifdef TCSUPPORT_QOS
+	skb->mark = sk->sk_mark; /*It's for marking rtp packets*/
+#endif
 	err = ip_push_pending_frames(sk);
 out:
 	up->len = 0;
@@ -530,7 +533,6 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	/*
 	 *	Check the flags.
 	 */
-
 	if (msg->msg_flags&MSG_OOB)	/* Mirror BSD error message compatibility */
 		return -EOPNOTSUPP;
 
@@ -874,6 +876,11 @@ try_again:
 		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
 		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
+	
+#ifdef TCSUPPORT_FW_UPGRADE_16M
+	sk->sk_mark = skb->mark;
+	//printk("sk mark = %x\n", sk->sk_mark);
+#endif
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 

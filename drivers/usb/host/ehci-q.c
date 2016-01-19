@@ -1068,8 +1068,14 @@ static void scan_async (struct ehci_hcd *ehci)
 	struct ehci_qh		*qh;
 	enum ehci_timer_action	action = TIMER_IO_WATCHDOG;
 
+//fix usb reset prblem for Synopsys USB PHY
+#ifdef CONFIG_MIPS_RT63365
+    ehci->stamp = ehci_readl(ehci, &ehci->regs->frame_index);
+#else
 	if (!++(ehci->stamp))
 		ehci->stamp++;
+#endif 
+       
 	timer_action_done (ehci, TIMER_ASYNC_SHRINK);
 rescan:
 	qh = ehci->async->qh_next.qh;
@@ -1100,6 +1106,18 @@ rescan:
 			 * doesn't stay idle for long.
 			 * (plus, avoids some kind of re-activation race.)
 			 */
+#ifdef CONFIG_MIPS_RT63365
+			//fix usb reset prblem for Synopsys USB PHY
+			if (list_empty(&qh->qtd_list)
+					&& qh->qh_state == QH_STATE_LINKED) {
+				if (!ehci->reclaim
+					&& ((ehci->stamp - qh->stamp) & 0x1fff)
+					>= (EHCI_SHRINK_FRAMES * 8))
+					start_unlink_async(ehci, qh);
+				else
+					action = TIMER_ASYNC_SHRINK;
+			}
+#else			 		 
 			if (list_empty (&qh->qtd_list)) {
 				if (qh->stamp == ehci->stamp)
 					action = TIMER_ASYNC_SHRINK;
@@ -1107,7 +1125,7 @@ rescan:
 					    && qh->qh_state == QH_STATE_LINKED)
 					start_unlink_async (ehci, qh);
 			}
-
+#endif
 			qh = qh->qh_next.qh;
 		} while (qh);
 	}

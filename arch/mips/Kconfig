@@ -152,14 +152,31 @@ config MIPS_TC3262
 	select TC3162_DMEM
 	help
 	  This enables support for TrendChip's TC3262 based board.  
-	  board.
 
 config MIPS_TC3182
 	bool "TrendChip's TC3182 Board"
 	depends on MIPS_TC3262
 	help
 	  This enables support for TrendChip's TC3182 based board.  
-	  board.
+
+config MIPS_RT63165
+	bool "Ralink's RT63165 Board"
+	depends on MIPS_TC3262
+	help
+	  This enables support for Ralink's RT63165 based board.  
+
+config MIPS_RT63365
+	bool "Ralink's RT63365 Board"
+	depends on MIPS_TC3262
+	help
+	  This enables support for Ralink's RT63365 based board.  
+
+config MIPS_RT65168
+	bool "Ralink's RT65168 Board"
+	depends on MIPS_TC3262
+	select RALINK_VDSL
+	help
+	  This enables support for Ralink's RT65168 based board.  
 
 config MIPS_EV64120
 	bool "Galileo EV64120 Evaluation board (EXPERIMENTAL)"
@@ -981,6 +998,10 @@ config MIPS_PATENTFREE
 	depends on SYS_HAS_CPU_TC3162
 
 config TC3162_ADSL
+	bool 
+	depends on SYS_HAS_CPU_TC3162
+
+config RALINK_VDSL
 	bool 
 	depends on SYS_HAS_CPU_TC3162
 

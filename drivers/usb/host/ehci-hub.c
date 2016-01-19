@@ -28,7 +28,9 @@
 
 /*-------------------------------------------------------------------------*/
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 extern int ehci_light_reset (struct ehci_hcd *ehci);
+#endif
 #endif
 
 #ifdef	CONFIG_PM
@@ -457,8 +459,10 @@ static int ehci_hub_control (
 	int		retval = 0;
 	unsigned	selector;
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 	char reset_flag = 0;
 	unsigned long cmd_tmp;
+#endif
 #endif
 
 	/*
@@ -720,12 +724,14 @@ static int ehci_hub_control (
 			} else {
 				ehci_vdbg (ehci, "port %d reset\n", wIndex + 1);
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 				reset_flag = 1;
 				cmd_tmp = ehci_readl(ehci,&ehci->regs->command);
 				cmd_tmp &= ~CMD_RUN;
 				ehci_writel(ehci, cmd_tmp, &ehci->regs->command);
 				mdelay(2);
-#endif			
+#endif
+#endif
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;
 
@@ -738,12 +744,14 @@ static int ehci_hub_control (
 			}
 			ehci_writel(ehci, temp, status_reg);
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 			if( reset_flag == 1){
 				cmd_tmp = ehci_readl(ehci,&ehci->regs->command);
 				cmd_tmp |= CMD_RUN;
 				ehci_writel(ehci, cmd_tmp, &ehci->regs->command);
 			}
-#endif		
+#endif
+#endif
 			break;
 
 		/* For downstream facing ports (these):  one hub port is put
@@ -762,11 +770,13 @@ static int ehci_hub_control (
 			break;
 
 #if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
 		case USB_HOST_LIGHT_RESET:
 			//printk("SET port feature, Light reset\n");
 			ehci_light_reset (ehci);
 			break;
-#endif			
+#endif
+#endif
 		default:
 			goto error;
 		}

@@ -2437,3 +2437,5 @@
 
 #define PCI_VENDOR_ID_SIS 			0x1039
 #define PCI_DEVICE_ID_SIS			0x000a
+#define PCI_VENDOR_ID_RT			0x1814
+#define PCI_DEVICE_ID_RT			0x0801

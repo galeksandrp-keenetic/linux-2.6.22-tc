@@ -45,17 +45,40 @@ struct vm_area_struct;
 #define __GFP_NOMEMALLOC ((__force gfp_t)0x10000u) /* Don't use emergency reserves */
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
-#if !defined(TCSUPPORT_MEMORY_CONTROL) 
+
+#if defined(TCSUPPORT_HWNAT)
+#define __GFP_SKIP_PKTFLOW	((__force gfp_t)0x400000u)
+#define GFP_SKIP_PKTFLOW	__GFP_SKIP_PKTFLOW
+#else
+#define __GFP_SKIP_PKTFLOW	((__force gfp_t)0x0u)
+#define GFP_SKIP_PKTFLOW	__GFP_SKIP_PKTFLOW
+#endif
+
+#if !defined(TCSUPPORT_CT) 
+#if defined(TCSUPPORT_MEMORY_CONTROL)
+#define __GFP_TCMC	((__force gfp_t)0x80000u)/* Memory control flag,used by skbmgr_alloc_skb2k,jlliu */
+#define __GFP_TC_CRITICAL	((__force gfp_t)0x100000u)/* Memory critical flag,used by skbmgr_alloc_skb2k_tc_critical */
+#define __GFP_BITS_SHIFT 21	/* Room for 21 __GFP_FOO bits */
+#else
 #define __GFP_BITS_SHIFT 20	/* Room for 20 __GFP_FOO bits */
 #endif
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
-#if !defined(TCSUPPORT_MEMORY_CONTROL) 
+#if defined(TCSUPPORT_MEMORY_CONTROL)
 /* if you forget to add the bitmask here kernel will crash, period */
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
 			__GFP_NOFAIL|__GFP_NORETRY|__GFP_COMP| \
-			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE)
+			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_TCMC|__GFP_TC_CRITICAL| \
+			__GFP_SKIP_PKTFLOW)
+#else
+/* if you forget to add the bitmask here kernel will crash, period */
+#define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
+			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
+			__GFP_NOFAIL|__GFP_NORETRY|__GFP_COMP| \
+			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_SKIP_PKTFLOW)
+#endif
+
 #endif
 
 /* This equals 0, but use constants in case they ever change */

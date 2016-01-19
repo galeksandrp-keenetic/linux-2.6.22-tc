@@ -1803,11 +1803,14 @@ static int __init nf_conntrack_h323_init(void)
 {
 	int ret;
 
+#if !defined(TCSUPPORT_CT) 
 #if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
     h323_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
 #else
 	h323_buffer = kmalloc(65536, GFP_KERNEL);
-#endif	
+#endif
+#endif
+	
 	if (!h323_buffer)
 		return -ENOMEM;
 	ret = nf_conntrack_helper_register(&nf_conntrack_helper_q931[0]);

@@ -477,11 +477,14 @@ init(void)
                 printk("nf_conntrack_rtsp: setup_timeout must be a positive integer\n");
                 return -EBUSY;
         }
+#if !defined(TCSUPPORT_CT) 
 #if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
 		rtsp_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
 #else
         rtsp_buffer = kmalloc(65536, GFP_KERNEL);
-#endif		
+#endif
+#endif
+		
         if (!rtsp_buffer) 
                 return -ENOMEM;
 

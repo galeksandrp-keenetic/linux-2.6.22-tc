@@ -44,22 +44,7 @@
 #include "usb.h"
 #include "hcd.h"
 #include "hub.h"
-#ifdef CONFIG_MIPS_TC3262
-#include <asm-mips/tc3162/int_source.h>
-static void tc3162ser_irq_dispath_USB20(void);
-static void tc3162ser_irq_dispath_USB11(void);
- 
-static void 
-tc3162ser_irq_dispath_USB20(void)
-{
-		do_IRQ(USB20_INT);			
-}
-static void
-tc3162ser_irq_dispath_USB11(void)
-{
-	        do_IRQ(USB11_INT);
-}
-#endif
+
 
 
 /*-------------------------------------------------------------------------*/
@@ -1633,15 +1618,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	if (hcd->driver->irq) {
 		snprintf(hcd->irq_descr, sizeof(hcd->irq_descr), "%s:usb%d",
 				hcd->driver->description, hcd->self.busnum);
-	#ifdef CONFIG_MIPS_TC3262
-		if(cpu_has_vint){
-			if(hcd->driver->flags & HCD_USB2){
-				set_vi_handler(irqnum,tc3162ser_irq_dispath_USB20);
-			}else if(hcd->driver->flags & HCD_USB11){
-				set_vi_handler(irqnum,tc3162ser_irq_dispath_USB11);
-			}
-		}
-	#endif
 #if !(defined(CONFIG_MIPS_TC3162U) && defined(TC_SUPPORT_3G))
 		/*USB host change to polling mode.
 		            shnwind 20101129.*/

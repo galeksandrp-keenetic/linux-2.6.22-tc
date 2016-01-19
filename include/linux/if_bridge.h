@@ -51,6 +51,7 @@
 #define BRCTL_GET_MC_FDB_ENTRIES 21
 #define BRCTL_SET_IGMPSNOOPING_QUICKLEAVE 22
 #define BRCTL_SET_IGMPSNOOPING_DBG 23
+#define BRCTL_SET_IGMPSNOOPING_ROUTEPORTFLAG 27
 #endif
 #ifdef CONFIG_MLD_SNOOPING
 /*MLD Snooping*/
@@ -89,6 +90,7 @@ struct __bridge_info
 #ifdef CONFIG_IGMP_SNOOPING
 	__u8 igmpsnoop_enabled;
 	__u8 igmpsnoop_quickleave;
+	__u8 igmpsnoop_routeportflag;
 	__u8 igmpsnoop_dbg;
 	__u32 igmpsnoop_ageing_time;
 #endif

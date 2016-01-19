@@ -4,7 +4,7 @@
 #include <asm/tc3162/tc3162.h>
 
 static char irq_tab_tc3162[] __initdata = {
-#ifndef CONFIG_MIPS_TC3182
+#ifndef CONFIG_MIPS_TC3262
     [1] = PCI_A_INT,
     [2] = PCI_B_INT,
 #endif

@@ -45,6 +45,9 @@
 #include <net/addrconf.h>
 #include <net/xfrm.h>
 
+#ifdef TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
 
 
 inline int ip6_rcv_finish( struct sk_buff *skb)
@@ -240,8 +243,15 @@ discard:
 
 int ip6_input(struct sk_buff *skb)
 {
+#ifdef TCSUPPORT_RA_HWNAT
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
+
 	return NF_HOOK(PF_INET6,NF_IP6_LOCAL_IN, skb, skb->dev, NULL, ip6_input_finish);
 }
+
+
 
 int ip6_mc_input(struct sk_buff *skb)
 {

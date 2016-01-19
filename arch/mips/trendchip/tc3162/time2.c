@@ -36,12 +36,18 @@
 #include <asm/time.h>
 
 #include <asm/tc3162/tc3162.h>
+#include <asm/tc3162/TCIfSetQuery_os.h>
 
 unsigned long cpu_khz;
 
 static int mips_cpu_timer_irq;
 extern int cp0_perfcount_irq;
 extern void smtc_timer_broadcast(int);
+#ifdef CONFIG_PCI
+extern int pcieRegInitConfig(void);
+extern void pcieReset(void);
+extern void setahbstat(int val);
+#endif
 
 static void delay1ms(int ms)
 {
@@ -89,7 +95,9 @@ timerSet(
 {   
     uint32 word;
 
-    word = (timerTime * SYS_HCLK) * 1000 / 2; 
+	/* when SYS_HCLK is large, it will cause overflow. The calculation will be wrong */
+    /* word = (timerTime * SYS_HCLK) * 1000 / 2; */
+    word = (timerTime * SYS_HCLK) * 500; 
     timerLdvSet(timer_no,word);
     timerCtlSet(timer_no,enable,mode,halt);
 }
@@ -102,10 +110,196 @@ timer_WatchDogConfigure (
 {
     uint32 word;
     word = VPint(CR_TIMER_CTL);
-	word &= 0xfcffffff;
-    word |= ( tick_enable << 24)|(watchdog_enable<<25);
+#if !defined(TCSUPPORT_CT) 
+	word &= 0xfdffffdf;
+    word |= ( tick_enable << 5)|(watchdog_enable<<25);
+#endif
     VPint (CR_TIMER_CTL)=word;
 }
+
+/************************************************************************
+*                      C P U  T I M E R  
+*************************************************************************
+*/
+
+/* how many counter cycles in a jiffy */
+static unsigned long cycles_per_jiffy __read_mostly;
+
+/* expirelo is the count value for next CPU timer interrupt */
+static unsigned int expirelo;
+
+static void cputmr_timer_ack(void)
+{
+	unsigned int count;
+
+	/* Ack this timer interrupt and set the next one.  */
+	expirelo += cycles_per_jiffy;
+	VPint(CR_CPUTMR_CMR0) = expirelo;
+
+	/* Check to see if we have missed any timer interrupts.  */
+	while (((count = VPint(CR_CPUTMR_CNT0)) - expirelo) < 0x7fffffff) {
+		/* missed_timer_count++; */
+		expirelo = count + cycles_per_jiffy;
+		VPint(CR_CPUTMR_CMR0) = expirelo;
+	}
+}
+
+static cycle_t cputmr_hpt_read(void)
+{
+	return VPint(CR_CPUTMR_CNT0);
+}
+
+static void __init cputmr_hpt_timer_init(void)
+{
+	VPint(CR_CPUTMR_CNT0) = 0x0;
+	VPint(CR_CPUTMR_CNT1) = 0x0;
+
+	expirelo = VPint(CR_CPUTMR_CNT0) + cycles_per_jiffy;
+	VPint(CR_CPUTMR_CMR0) = expirelo;
+
+	VPint(CR_CPUTMR_CMR1) = expirelo;
+
+	VPint(CR_CPUTMR_CTL) |= (1<<1)|(1<<0);
+}
+
+irqreturn_t cputmr_timer_interrupt(int irq, void *dev_id)
+{
+	int cpu = smp_processor_id();
+
+#ifdef CONFIG_MIPS_MT_SMTC
+	/*
+	 *  In an SMTC system, one Count/Compare set exists per VPE.
+	 *  Which TC within a VPE gets the interrupt is essentially
+	 *  random - we only know that it shouldn't be one with
+	 *  IXMT set. Whichever TC gets the interrupt needs to
+	 *  send special interprocessor interrupts to the other
+	 *  TCs to make sure that they schedule, etc.
+	 *
+	 *  That code is specific to the SMTC kernel, not to
+	 *  the a particular platform, so it's invoked from
+	 *  the general MIPS timer_interrupt routine.
+	 */
+
+	/*
+	 * There are things we only want to do once per tick
+	 * in an "MP" system.   One TC of each VPE will take
+	 * the actual timer interrupt.  The others will get
+	 * timer broadcast IPIs. We use whoever it is that takes
+	 * the tick on VPE 0 to run the full timer_interrupt().
+	 */
+	if (cpu_data[cpu].vpe_id == 0) {
+		timer_interrupt(irq, NULL);
+	} else {
+		VPint(CR_CPUTMR_CMR1) = (VPint(CR_CPUTMR_CNT1) +
+						 (mips_hpt_frequency/HZ));
+		local_timer_interrupt(irq, dev_id);
+	}
+	smtc_timer_broadcast(cpu_data[cpu].vpe_id);
+#else /* CONFIG_MIPS_MT_SMTC */
+	if (cpu == 0) {
+		/*
+		 * CPU 0 handles the global timer interrupt job and process
+		 * accounting resets count/compare registers to trigger next
+		 * timer int.
+		 */
+		timer_interrupt(irq, NULL);
+	} else {
+		/* Everyone else needs to reset the timer int here as
+		   ll_local_timer_interrupt doesn't */
+		/*
+		 * FIXME: need to cope with counter underflow.
+		 * More support needs to be added to kernel/time for
+		 * counter/timer interrupts on multiple CPU's
+		 */
+		VPint(CR_CPUTMR_CMR1) = (VPint(CR_CPUTMR_CNT1) + (mips_hpt_frequency/HZ));
+
+		/*
+		 * Other CPUs should do profiling and process accounting
+		 */
+		local_timer_interrupt(irq, dev_id);
+	}
+#endif /* CONFIG_MIPS_MT_SMTC */
+
+	return IRQ_HANDLED;
+}
+
+/************************************************************************
+*                   W A T C H D O G   T I M E R  
+*************************************************************************
+*/
+
+irqreturn_t watchdog_timer_interrupt(int irq, void *dev_id)
+{
+	uint32 word;
+
+	word = VPint(CR_TIMER_CTL); 
+	word &= 0xffc0ffff;
+	word |= 0x00200000;
+	VPint(CR_TIMER_CTL)=word;
+
+	printk("watchdog timer interrupt\n");
+
+#ifdef CONFIG_TC3162_ADSL
+    /* stop adsl */
+	if (adsl_dev_ops)
+	    adsl_dev_ops->set(ADSL_SET_DMT_CLOSE, NULL, NULL); 
+#endif
+
+	dump_stack();
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction watchdog_timer_irqaction = {
+	.handler = watchdog_timer_interrupt,
+	.flags = IRQF_DISABLED ,
+	.name = "watchdog",
+};
+
+static void watchdog_timer_dispatch(void)
+{
+	do_IRQ(TIMER5_INT);
+}
+
+/************************************************************************
+*                   B U S  T I M E O U T  I N T E R R U P T  
+*************************************************************************
+*/
+
+irqreturn_t bus_timeout_interrupt(int irq, void *dev_id)
+{
+	uint32 reg;
+
+	/* read to clear interrupt */
+	reg = VPint(CR_PRATIR);
+
+	printk("bus timeout interrupt ERR ADDR=%08lx\n", VPint(CR_ERR_ADDR));
+	dump_stack();	
+
+#ifdef CONFIG_PCI
+	pcieReset();
+	pcieRegInitConfig();
+	setahbstat(1);
+#endif
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction bus_timeout_irqaction = {
+	.handler = bus_timeout_interrupt,
+	.flags = IRQF_DISABLED ,
+	.name = "bus timeout",
+};
+
+static void bus_timeout_dispatch(void)
+{
+	do_IRQ(BUS_TOUT_INT);
+}
+
+/************************************************************************
+*                        T I M E R
+*************************************************************************
+*/
 
 static void mips_timer_dispatch(void)
 {
@@ -124,7 +318,7 @@ extern int null_perf_irq(void);
 
 extern int (*perf_irq)(void);
 
-#if	defined(CONFIG_PCI) && defined(CONFIG_MIPS_TC3182)
+#if	defined(CONFIG_PCI) && defined(CONFIG_MIPS_TC3262)
 extern void ahbErrChk(void);
 #endif
 
@@ -132,7 +326,7 @@ irqreturn_t mips_timer_interrupt(int irq, void *dev_id)
 {
 	int cpu = smp_processor_id();
 
-#if	defined(CONFIG_PCI) && defined(CONFIG_MIPS_TC3182)
+#if	defined(CONFIG_PCI) && defined(CONFIG_MIPS_TC3262)
 	ahbErrChk();
 #endif
 
@@ -236,8 +430,44 @@ void __init tc3162_time_init(void)
 
 	est_freq = estimate_cpu_frequency ();
 
+	if (isRT63165 || isRT63365) {
+		/* enable CPU external timer */
+		clocksource_mips.read = cputmr_hpt_read;
+		mips_hpt_frequency = CPUTMR_CLK * 1000000;
+
+		mips_timer_ack = cputmr_timer_ack;
+		/* Calculate cache parameters.  */
+		cycles_per_jiffy =
+			(mips_hpt_frequency + HZ / 2) / HZ;
+
+		cputmr_hpt_timer_init();
+
+		/* watchdog timer */
+		/* set count down 3 seconds to issue interrupt */
+   		VPint(CR_WDOG_THSLD) = (3 * TIMERTICKS_1S * SYS_HCLK) * 1000 / 2; 
+
+		if (cpu_has_vint)
+			set_vi_handler(TIMER5_INT, watchdog_timer_dispatch);
+#ifdef CONFIG_MIPS_MT_SMTC
+		setup_irq_smtc(TIMER5_INT, &watchdog_timer_irqaction, 0x0);
+#else
+		setup_irq(TIMER5_INT, &watchdog_timer_irqaction);
+#endif
+
+		/* setup bus timeout interrupt */
+   		//VPint(CR_MON_TMR) |= ((1<<30) | (0xff));
+
+		if (cpu_has_vint)
+			set_vi_handler(BUS_TOUT_INT, bus_timeout_dispatch);
+#ifdef CONFIG_MIPS_MT_SMTC
+		setup_irq_smtc(BUS_TOUT_INT, &bus_timeout_irqaction, 0x0);
+#else
+		setup_irq(BUS_TOUT_INT, &bus_timeout_irqaction);
+#endif
+	} 
+
 	printk("CPU frequency %d.%02d MHz\n", est_freq/1000000,
-	       (est_freq%1000000)*100/1000000);
+		   (est_freq%1000000)*100/1000000);
 
     cpu_khz = est_freq / 1000;
 }
@@ -279,7 +509,10 @@ void __init plat_timer_setup(struct irqaction *irq)
 	mips_cpu_timer_irq = SI_TIMER_INT;
 
 	/* we are using the cpu counter for timer interrupts */
-	irq->handler = mips_timer_interrupt;	/* we use our own handler */
+	if (isRT63165 || isRT63365) 
+		irq->handler = cputmr_timer_interrupt;	/* we use our own handler */
+	else
+		irq->handler = mips_timer_interrupt;	/* we use our own handler */
 #ifdef CONFIG_MIPS_MT_SMTC
 	setup_irq_smtc(mips_cpu_timer_irq, irq, 0x100 << cp0_compare_irq);
 #else

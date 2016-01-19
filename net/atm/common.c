@@ -657,7 +657,7 @@ static int check_tp(struct atm_trafprm *tp)
 {
 	/* @@@ Should be merged with adjust_tp */
 	if (!tp->traffic_class || tp->traffic_class == ATM_ANYCLASS) return 0;
-#ifndef CONFIG_CPU_TC3162
+#if !defined(CONFIG_CPU_TC3162) && !defined(CONFIG_MIPS_TC3262)
 	if (tp->traffic_class != ATM_UBR && !tp->min_pcr && !tp->pcr &&
 	    !tp->max_pcr) return -EINVAL;
 #endif
