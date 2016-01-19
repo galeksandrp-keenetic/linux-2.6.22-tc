@@ -2,6 +2,7 @@
  * USB Network driver infrastructure
  * Copyright (C) 2000-2005 by David Brownell
  * Copyright (C) 2003-2005 David Hollis <dhollis@davehollis.com>
+ * Copyright (C) 2011 by McMCC (NDM Systems)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +44,9 @@
 #include <linux/usb.h>
 
 #include "usbnet.h"
-
+#ifdef CONFIG_DEVFS_FS
+#include <linux/devfs_fs_kernel.h>
+#endif
 #define DRIVER_VERSION		"22-Aug-2005"
 
 
@@ -203,6 +206,7 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 {
 	int	status;
 
+	skb->dev = dev->net;
 	skb->protocol = eth_type_trans (skb, dev->net);
 	dev->stats.rx_packets++;
 	dev->stats.rx_bytes += skb->len;
@@ -558,7 +562,7 @@ static int usbnet_stop (struct net_device *net)
 	netif_stop_queue (net);
 
 	if (netif_msg_ifdown (dev))
-		devinfo (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
+		devinfo (dev, "stop stats: rx/tx %llu/%llu, errs %ld/%ld",
 			dev->stats.rx_packets, dev->stats.tx_packets,
 			dev->stats.rx_errors, dev->stats.tx_errors
 			);
@@ -588,6 +592,7 @@ static int usbnet_stop (struct net_device *net)
 	dev->flags = 0;
 	del_timer_sync (&dev->delay);
 	tasklet_kill (&dev->bh);
+	usb_autopm_put_interface(dev->intf);
 
 	return 0;
 }
@@ -603,6 +608,16 @@ static int usbnet_open (struct net_device *net)
 	struct usbnet		*dev = netdev_priv(net);
 	int			retval = 0;
 	struct driver_info	*info = dev->driver_info;
+
+	if ((retval = usb_autopm_get_interface(dev->intf)) < 0) {
+		if (netif_msg_ifup (dev))
+			devinfo (dev,
+				"resumption fail (%d) usbnet usb-%s-%s, %s",
+				retval,
+				dev->udev->bus->bus_name, dev->udev->devpath,
+			info->description);
+		goto done_nopm;
+	}
 
 	// put into "known safe" state
 	if (info->reset && (retval = info->reset (dev)) < 0) {
@@ -657,7 +672,10 @@ static int usbnet_open (struct net_device *net)
 
 	// delay posting reads until we're fully open
 	tasklet_schedule (&dev->bh);
+	return retval;
 done:
+	usb_autopm_put_interface(dev->intf);
+done_nopm:
 	return retval;
 }
 
@@ -1067,9 +1085,20 @@ static void usbnet_bh (unsigned long param)
  * USB Device Driver support
  *
  *-------------------------------------------------------------------------*/
+#ifdef CONFIG_DEVFS_FS
+/* Structs fake usb class driver for mdev, McMCC, 21092010 */
+static const struct file_operations fake_fops = {
+    .owner =    THIS_MODULE,
+};
+
+static struct usb_class_driver fake_usb_class = {
+    .name =        "usbeth%d",
+	.fops =         &fake_fops,
+	.minor_base =   0,
+};
+#endif
 
 // precondition: never called in_interrupt
-
 void usbnet_disconnect (struct usb_interface *intf)
 {
 	struct usbnet		*dev;
@@ -1080,7 +1109,10 @@ void usbnet_disconnect (struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	if (!dev)
 		return;
-
+#ifdef CONFIG_DEVFS_FS
+	/* Deregister dev for mdev, McMCC, 21092010 */
+	usb_deregister_dev(intf, &fake_usb_class);
+#endif
 	xdev = interface_to_usbdev (intf);
 
 	if (netif_msg_probe (dev))
@@ -1090,6 +1122,10 @@ void usbnet_disconnect (struct usb_interface *intf)
 			dev->driver_info->description);
 
 	net = dev->net;
+#ifdef CONFIG_DEVFS_FS
+	/* Remove dev from devfs, McMCC, 21092010 */
+	devfs_remove("usb%s", net->name);
+#endif
 	unregister_netdev (net);
 
 	/* we don't hold rtnl here ... */
@@ -1103,11 +1139,9 @@ void usbnet_disconnect (struct usb_interface *intf)
 }
 EXPORT_SYMBOL_GPL(usbnet_disconnect);
 
-
 /*-------------------------------------------------------------------------*/
 
 // precondition: never called in_interrupt
-
 int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
@@ -1141,6 +1175,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	dev = netdev_priv(net);
 	dev->udev = xdev;
+	dev->intf = udev;
 	dev->driver_info = info;
 	dev->driver_name = name;
 	dev->msg_enable = netif_msg_init (msg_level, NETIF_MSG_DRV
@@ -1193,7 +1228,28 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		// can rename the link if it knows better.
 		if ((dev->driver_info->flags & FLAG_ETHER) != 0
 				&& (net->dev_addr [0] & 0x02) == 0)
-			strcpy (net->name, "eth%d");
+        {
+            /* Check wimax devices, McMCC, 21092010 */
+            //printk("usbnet: VID = 0x%04x, PID = 0x%04x\n", xdev->descriptor.idVendor, xdev->descriptor.idProduct);
+            if(((xdev->descriptor.idProduct == 0x7112) && (xdev->descriptor.idVendor == 0x0e8d)) || /* ZyXEL on MTK */
+               ((xdev->descriptor.idProduct == 0x7708) && (xdev->descriptor.idVendor == 0x1076)) || /* Yota Key */
+               (((xdev->descriptor.idProduct == 0x8002) || (xdev->descriptor.idProduct == 0x8003)) && (xdev->descriptor.idVendor == 0x1076)) || /* Yota One */ 
+               ((xdev->descriptor.idProduct == 0xa4a2) && (xdev->descriptor.idVendor == 0x0525)))   /* Yota Key */
+            {
+                strcpy (net->name, "wimax%d");
+#ifdef CONFIG_DEVFS_FS
+                fake_usb_class.name = "usbwimax%d";
+#endif
+            } else {
+                strcpy (net->name, "eth%d");
+#ifdef CONFIG_DEVFS_FS
+                fake_usb_class.name = "usbeth%d";
+#endif
+            }
+        }
+		/* WLAN devices should always be named "wlan%d" */
+		if ((dev->driver_info->flags & FLAG_WLAN) != 0)
+			strcpy(net->name, "wlan%d");
 
 		/* maybe the remote can't receive an Ethernet MTU */
 		if (net->mtu > (dev->hard_mtu - net->hard_header_len))
@@ -1211,7 +1267,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 			status = 0;
 
 	}
-	if (status == 0 && dev->status)
+	if (status >= 0 && dev->status)
 		status = init_status (dev, udev);
 	if (status < 0)
 		goto out3;
@@ -1239,7 +1295,11 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	// start as if the link is up
 	netif_device_attach (net);
-
+#ifdef CONFIG_DEVFS_FS
+	/* Register dev as class for mdev, McMCC, 21092010 */	
+	usb_register_dev(udev, &fake_usb_class);
+	devfs_mk_cdev(MKDEV(USB_MAJOR, udev->minor), S_IFCHR | S_IRUGO | S_IWUGO, "usb%s", net->name);
+#endif	
 	return 0;
 
 out3:
@@ -1265,12 +1325,18 @@ int usbnet_suspend (struct usb_interface *intf, pm_message_t message)
 	struct usbnet		*dev = usb_get_intfdata(intf);
 
 	if (!dev->suspend_count++) {
-		/* accelerate emptying of the rx and queues, to avoid
+		/*
+		 * accelerate emptying of the rx and queues, to avoid
 		 * having everything error out.
 		 */
 		netif_device_detach (dev->net);
 		(void) unlink_urbs (dev, &dev->rxq);
 		(void) unlink_urbs (dev, &dev->txq);
+		/*
+		 * reattach so runtime management can use and
+		 * wake the device
+		 */
+		netif_device_attach (dev->net);
 	}
 	return 0;
 }
@@ -1280,10 +1346,9 @@ int usbnet_resume (struct usb_interface *intf)
 {
 	struct usbnet		*dev = usb_get_intfdata(intf);
 
-	if (!--dev->suspend_count) {
-		netif_device_attach (dev->net);
+	if (!--dev->suspend_count)
 		tasklet_schedule (&dev->bh);
-	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usbnet_resume);

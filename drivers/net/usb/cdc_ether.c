@@ -2,6 +2,7 @@
  * CDC Ethernet based networking peripherals
  * Copyright (C) 2003-2005 by David Brownell
  * Copyright (C) 2006 by Ole Andre Vadla Ravnas (ActiveSync)
+ * Copyright (C) 2011 by McMCC (NDM Systems)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,10 +52,18 @@ static int is_activesync(struct usb_interface_descriptor *desc)
 		&& desc->bInterfaceProtocol == 1;
 }
 
+static int is_wireless_rndis(struct usb_interface_descriptor *desc)
+{
+    return (desc->bInterfaceClass == USB_CLASS_WIRELESS_CONTROLLER &&
+        desc->bInterfaceSubClass == 1 &&
+        desc->bInterfaceProtocol == 3);
+}
+
 #else
 
 #define is_rndis(desc)		0
 #define is_activesync(desc)	0
+#define is_wireless_rndis(desc) 0
 
 #endif
 
@@ -111,7 +120,8 @@ int usbnet_generic_cdc_bind(struct usbnet *dev, struct usb_interface *intf)
 	 * of cdc-acm, it'll fail RNDIS requests cleanly.
 	 */
 	rndis = is_rndis(&intf->cur_altsetting->desc)
-		|| is_activesync(&intf->cur_altsetting->desc);
+		|| is_activesync(&intf->cur_altsetting->desc)
+		|| is_wireless_rndis(&intf->cur_altsetting->desc);
 
 	memset(info, 0, sizeof *info);
 	info->control = intf;
@@ -228,15 +238,16 @@ next_desc:
 		buf += buf [0];
 	}
 
-	/* Microsoft ActiveSync based RNDIS devices lack the CDC descriptors,
-	 * so we'll hard-wire the interfaces and not check for descriptors.
+	/* Microsoft ActiveSync based and some regular RNDIS devices lack the
+	 * CDC descriptors, so we'll hard-wire the interfaces and not check
+	 * for descriptors.
 	 */
-	if (is_activesync(&intf->cur_altsetting->desc) && !info->u) {
+	if (rndis && !info->u) {
 		info->control = usb_ifnum_to_if(dev->udev, 0);
 		info->data = usb_ifnum_to_if(dev->udev, 1);
 		if (!info->control || !info->data) {
 			dev_dbg(&intf->dev,
-				"activesync: master #0/%p slave #1/%p\n",
+				"rndis: master #0/%p slave #1/%p\n",
 				info->control,
 				info->data);
 			goto bad_desc;

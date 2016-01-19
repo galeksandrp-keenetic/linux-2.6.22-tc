@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2000-2005 by David Brownell <dbrownell@users.sourceforge.net>
  * Copyright (C) 2003-2005 David Hollis <dhollis@davehollis.com>
+ * Copyright (C) 2011 by McMCC (NDM Systems)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,8 +29,10 @@
 struct usbnet {
 	/* housekeeping */
 	struct usb_device	*udev;
+	struct usb_interface	*intf;
 	struct driver_info	*driver_info;
 	const char		*driver_name;
+	void			*driver_priv;
 	wait_queue_head_t	*wait;
 	struct mutex		phy_mutex;
 	unsigned char		suspend_count;
@@ -86,6 +89,7 @@ struct driver_info {
 #define FLAG_ETHER	0x0020		/* maybe use "eth%d" names */
 
 #define FLAG_FRAMING_AX 0x0040          /* AX88772/178 packets */
+#define FLAG_WLAN  0x0080      /* use "wlan%d" names */
 
 	/* init device ... can sleep, or cause probe() failure */
 	int	(*bind)(struct usbnet *, struct usb_interface *);
@@ -111,6 +115,15 @@ struct driver_info {
 	/* fixup tx packet (add framing) */
 	struct sk_buff	*(*tx_fixup)(struct usbnet *dev,
 				struct sk_buff *skb, gfp_t flags);
+
+	/* early initialization code, can sleep. This is for minidrivers
+	 * having 'subminidrivers' that need to do extra initialization
+	 * right after minidriver have initialized hardware. */
+	int	(*early_init)(struct usbnet *dev);
+
+	/* called by minidriver when link state changes, state: 0=disconnect,
+	 * 1=connect */
+	void	(*link_change)(struct usbnet *dev, int state);
 
 	/* for new devices, use the descriptor-reading code instead */
 	int		in;		/* rx endpoint */
