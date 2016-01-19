@@ -1694,9 +1694,9 @@ void devfs_remove(const char *fmt, ...)
 		devfs_handle_t de = _devfs_find_entry(NULL, buf, 0);
 
 		if (!de) {
-			printk(KERN_ERR "%s: %s not found, cannot remove\n",
+			/* printk(KERN_ERR "%s: %s not found, cannot remove\n",
 			       __FUNCTION__, buf);
-			dump_stack();
+			dump_stack(); */
 			return;
 		}
 
