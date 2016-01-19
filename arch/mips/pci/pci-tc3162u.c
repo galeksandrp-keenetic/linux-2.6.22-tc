@@ -71,11 +71,11 @@ void setahbstat(int val){
 }
 EXPORT_SYMBOL(setahbstat);
 
-int pcieReset(void){	
+void pcieReset(void){	
 	int i;
 	
 	if(isRT63165){
-		return -1;		
+		return;
 	}
 
 	if(isRT63365){
@@ -127,7 +127,7 @@ int pcieReset(void){
 		}
 		if(i == 1000){
 			printk("PCI-E RC can not link up\n");
-			return -1;
+			return;
 		}
 		if(dual_band_support){		
 			if((VPint(0xbfb82050) & 0x1) != 0){
@@ -180,8 +180,6 @@ int pcieReset(void){
 			VPint(KSEG1ADDR(pcie_config_data)) = 0x20;
 		}
 	}
-	
-	return 0;
 }
 
 EXPORT_SYMBOL(pcieReset);
@@ -222,7 +220,7 @@ int pcieRegInitConfig(void)
 	unsigned int reg_val = 0;
 	int i = 0;
 	int slot;
-	int pci_device_exist;
+	int pci_device_exist = 0;
 
 	if(isRT63165){
 		return 0;		
@@ -306,12 +304,12 @@ int pcieRegInitConfig(void)
 		}	
 		reg2_val = 0xffffffff;
 		//Enable Interrupt
-		if(VPint(0xbfb82050) == 1){
+		if((VPint(0xbfb82050) & 0x1) == 1){
 			VPint(0xbfb8000c) |= (1<<20);
 		}	
 		//second band
 		if(dual_band_support){
-			if(VPint(0xbfb83050) == 1){
+			if((VPint(0xbfb83050) & 0x1) == 1){
 				VPint(0xbfb8000c) |= (1<<21);
 			}	
 		}	
@@ -390,8 +388,7 @@ ahbErrChk(void){
 		printk("CR_AHB_ABEA:0x%08lx\n", VPint(CR_AHB_ABEA));
 		local_irq_save(flags);
 		ahb_status=1;
-		if(pcieReset() != 0)
-			return;
+		pcieReset();
 		pcieRegInitConfig();
 		local_irq_restore(flags);
 	}
@@ -414,8 +411,7 @@ void chkAhbErr(int force){
 		val= pcie_read_config_word(PCIE_TYPE_RC, PCIE_BUS_RC, PCIE_DEVNUM_0, 0x54);
 		if((val!=0x0) || (force==0x1) ){
 			/*Reset pcie and refill pcie-registers*/
-			if(pcieReset() != 0)
-				return;
+			pcieReset();
 			pcieRegInitConfig();
 			ahb_status = 1;
 		}
@@ -425,11 +421,10 @@ void chkAhbErr(int force){
 	if(isRT63365 && pcie_soft_patch){
 		local_irq_save(flags);
 		/*check the pcie bus crc error counter*/
-		if((VPint(0xbfb82060)!=0x0) || (VPint(0xbfb82064)!=0x0) || (force==0x1) ){
-			printk("PCI-E L-crc %x E-crc %x!!\n",VPint(0xbfb82060),VPint(0xbfb82064));
+		if((VPint(0xbfb82060) != 0x0) || (VPint(0xbfb82064) != 0x0) || (force == 0x1) ){
+			printk("PCI-E L-crc 0x%08x E-crc 0x%08x!!\n",VPint(0xbfb82060),VPint(0xbfb82064));
 			/*Reset pcie and refill pcie-registers*/
-			if(pcieReset() != 0)
-				return;
+			pcieReset();
 			pcieRegInitConfig();
 			ahb_status = 1;
 		}
@@ -479,8 +474,7 @@ static int ahb_status_write_proc(struct file *file, const char *buffer,
 	if(val==0x2){
 		/*Reset pcie and refill pcie-registers*/
 		local_irq_save(flags);
-		if(pcieReset() != 0)
-			return -1;
+		pcieReset();
 		pcieRegInitConfig();
 		local_irq_restore(flags);
 	}

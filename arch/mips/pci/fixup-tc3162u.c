@@ -49,12 +49,12 @@ static void tc3162_pcie_fixup_ra63165(struct pci_dev *dev)
 		
 	//pci-e interrupt enable_dma
 	if(isRT63365){
-		if(VPint(0xbfb82050) == 1){
+		if((VPint(0xbfb82050) & 0x1) == 1){
 		VPint(0xbfb8000c) |= (1<<20); 
 		}
 		//second band
 		if(dual_band_support){
-		if(VPint(0xbfb83050) == 1){
+		if((VPint(0xbfb83050) & 0x1) == 1){
 			VPint(0xbfb8000c) |= (1<<21);
 			}
 		}
