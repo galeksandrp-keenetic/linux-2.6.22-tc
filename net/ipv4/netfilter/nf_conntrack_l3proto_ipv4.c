@@ -24,6 +24,11 @@
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
+
+
 #if 0
 #define DEBUGP printk
 #else
@@ -75,8 +80,7 @@ static int ipv4_print_conntrack(struct seq_file *s,
 
 /* Returns new sk_buff, or NULL */
 static 
-struct sk_buff *
-nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
+struct sk_buff * nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
 {
 	skb_orphan(skb);
 
@@ -153,6 +157,14 @@ static unsigned int ipv4_conntrack_help(unsigned int hooknum,
 	helper = rcu_dereference(help->helper);
 	if (!helper)
 		return NF_ACCEPT;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	ct->fast_ext = 1;
+#endif
+ 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	FOE_ALG_SKIP(*pskb);
+#endif
 
 	return helper->help(pskb, skb_network_offset(*pskb) + ip_hdrlen(*pskb),
 			    ct, ctinfo);

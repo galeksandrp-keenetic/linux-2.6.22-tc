@@ -23,6 +23,12 @@
 
 #include "nf_internals.h"
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+int (*fast_nat_hit_hook_func)(struct sk_buff *skb) = NULL;
+extern int ipv4_fastnat_conntrack;
+EXPORT_SYMBOL(fast_nat_hit_hook_func);
+#endif
+
 static DEFINE_MUTEX(afinfo_mutex);
 
 struct nf_afinfo *nf_afinfo[NPROTO] __read_mostly;
@@ -125,14 +131,13 @@ unsigned int nf_iterate(struct list_head *head,
 			int (*okfn)(struct sk_buff *),
 			int hook_thresh)
 {
-	unsigned int verdict, fnat;
+	unsigned int verdict;
 
 	/*
 	 * The caller must not block between calls to this
 	 * function because of risk of continuing from deleted element.
 	 */
 	 
-	fnat = 0;
 	list_for_each_continue_rcu(*i, head) {
 		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
 
@@ -155,11 +160,12 @@ unsigned int nf_iterate(struct list_head *head,
 		   reference here, since function can't sleep. --RR */
 		verdict = elem->hook(hook, skb, indev, outdev, okfn);
 
-		if (verdict != NF_ACCEPT 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)		
-			&& verdict != NF_FAST_NAT
+		if (verdict == NF_FAST_NAT)
+			return NF_FAST_NAT;
 #endif
-			) {
+
+		if (verdict != NF_ACCEPT) {
 
 #ifdef CONFIG_NETFILTER_DEBUG
 			if (unlikely((verdict & NF_VERDICT_MASK)
@@ -173,16 +179,9 @@ unsigned int nf_iterate(struct list_head *head,
 				return verdict;
 			*i = (*i)->prev;
 		}
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)		
-		else if( verdict == NF_FAST_NAT ) fnat = 1;
-	}
-
-	return fnat ? NF_FAST_NAT : NF_ACCEPT;
-#else 
 	}
 	
 	return NF_ACCEPT;
-#endif
 }
 
 
@@ -197,6 +196,9 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff **pskb,
 {
 	struct list_head *elem;
 	unsigned int verdict;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	int (*fast_nat_hit_hook)(struct sk_buff *skb);
+#endif
 	int ret = 0;
 
 	/* We may already have this, but read-locks nest anyway */
@@ -219,9 +221,14 @@ next_hook:
 			goto next_hook;
 	}
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	else if( verdict == NF_FAST_NAT ) {
-		ret = 0xDEAD; /* hack for okfn */
-		goto unlock;
+	else if (verdict == NF_FAST_NAT) {
+		if( (fast_nat_hit_hook = rcu_dereference(fast_nat_hit_hook_func)) ) {
+			ret = fast_nat_hit_hook(*pskb);
+		}
+		else {
+			kfree_skb(*pskb);
+			ret = -EPERM;
+		}
 	}
 #endif	
 unlock:

@@ -47,7 +47,7 @@
 #define DEBUG
 */
 
-#define PPTP_DRIVER_VERSION "0.8.3.37"
+#define PPTP_DRIVER_VERSION "0.8.3.39"
 
 MODULE_DESCRIPTION("Point-to-Point Tunneling Protocol for Linux");
 MODULE_AUTHOR("Kozlov D. (xeb@mail.ru)");
@@ -60,38 +60,12 @@ static int log_packets=10;
 #define PPP_LCP_ECHREQ 0x09
 #define PPP_LCP_ECHREP 0x0A
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-MODULE_PARM(log_level,"i");
-MODULE_PARM(log_packets,"i");
-#else
 module_param(log_level,int,0);
 module_param(log_packets,int,0);
-#endif
 MODULE_PARM_DESC(log_level,"Logging level (default=0)");
 
 #define SC_RCV_BITS	(SC_RCV_B7_1|SC_RCV_B7_0|SC_RCV_ODDP|SC_RCV_EVNP)
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define INIT_TIMER(_timer,_routine,_data) \
-do { \
-	(_timer)->function=_routine; \
-	(_timer)->data=_data; \
-	init_timer(_timer); \
-} while (0);
-
-static inline void *kzalloc(size_t size,int gfp) {
-	void *p;
-	if( (p = kmalloc(size,gfp)) ) memset(p,0,size);
-	return p;
-}
-#endif
-
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define SK_STATE(sk) (sk)->state
-#else
 #define SK_STATE(sk) (sk)->sk_state
-#endif
 
 static spinlock_t lock_chan;
 
@@ -153,7 +127,6 @@ struct pptp_gre_header {
   u_int32_t ack;		/* seq number of highest packet recieved by */
   				/*  sender in this session */
 };
-#define PPTP_HEADER_OVERHEAD (2+sizeof(struct pptp_gre_header))
 
 static inline struct pppox_sock *find_call(__u32 call_id, __u32 s_addr, __u32 d_addr) {
     PCALLID_LIST p_call;
@@ -255,18 +228,6 @@ static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 	if (SK_STATE(sk_pppox(po)) & PPPOX_DEAD)
 	    goto tx_error;
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	{
-		struct rt_key key = {
-			.dst=opt->dst_addr.sin_addr.s_addr,
-			.src=opt->src_addr.sin_addr.s_addr,
-			.tos=RT_TOS(0),
-		};
-		if ((err=ip_route_output_key(&rt, &key))) {
-			goto tx_error;
-		}
-	}
-	#else
 	{
 		struct flowi fl = { .oif = 0,
 				    .nl_u = { .ip4_u =
@@ -274,23 +235,14 @@ static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 						.saddr = opt->src_addr.sin_addr.s_addr,
 						.tos = RT_TOS(0) } },
 				    .proto = IPPROTO_GRE };
-		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 		if ((err=ip_route_output_key(&rt, &fl))) {
-		#else
-		if ((err=ip_route_output_key(&init_net,&rt, &fl))) {
-		#endif
 			goto tx_error;
 		}
 	}
-	#endif
+
 	tdev = rt->u.dst.dev;
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	max_headroom = ((tdev->hard_header_len+15)&~15) + sizeof(*iph)+sizeof(*hdr)+2;
-	#else
 	max_headroom = LL_RESERVED_SPACE(tdev) + sizeof(*iph)+sizeof(*hdr)+2;
-	#endif
-
 
 	if (skb_headroom(skb) < max_headroom || skb_cloned(skb) || skb_shared(skb)) {
 		struct sk_buff *new_skb = skb_realloc_headroom(skb, max_headroom);
@@ -330,8 +282,8 @@ static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 	if (opt->ack_sent == seq_recv) header_len-=sizeof(hdr->ack);
 
 	// Push down and install GRE header
-	skb_push(skb,header_len);
-	hdr=(struct pptp_gre_header *)(skb->data);
+	hdr = (struct pptp_gre_header *)skb_push(skb, header_len);
+	skb_reset_transport_header(skb);
 
 	hdr->flags       = PPTP_GRE_FLAG_K;
 	hdr->ver         = PPTP_GRE_VER;
@@ -360,44 +312,24 @@ static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 		printk("\n");
 	#endif
 
-	/*
-	 *	Push down and install the IP header.
-	 */
-
-	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-	skb->transport_header = skb->network_header;
-	skb_push(skb, sizeof(*iph));
-	skb_reset_network_header(skb);
-	#else
-	skb->h.raw = skb->nh.raw;
-	skb->nh.raw = skb_push(skb, sizeof(*iph));
-	#endif
 	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	IPCB(skb)->flags &= ~(IPSKB_XFRM_TUNNEL_SIZE | IPSKB_XFRM_TRANSFORMED |
 			      IPSKB_REROUTED);
 	#endif
 
-	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-	iph 			=	ip_hdr(skb);
-	#else
-	iph 			=	skb->nh.iph;
-	#endif
+	iph = (struct iphdr*)skb_push(skb, sizeof(*iph));
+	skb_reset_network_header(skb);
+
 	iph->version		=	4;
 	iph->ihl		=	sizeof(struct iphdr) >> 2;
-        if (ip_dont_fragment(sk, &rt->u.dst))
-                iph->frag_off   =       htons(IP_DF);
-        else
-                iph->frag_off   =       0;
+	if (ip_dont_fragment(sk, &rt->u.dst)) iph->frag_off = htons(IP_DF);
+	else iph->frag_off  = 0;
 	iph->protocol		=	IPPROTO_GRE;
 	iph->tos		=	0;
 	iph->daddr		=	rt->rt_dst;
 	iph->saddr		=	rt->rt_src;
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	iph->ttl = sk->protinfo.af_inet.ttl;
-	#else
 	iph->ttl = dst_metric(&rt->u.dst, RTAX_HOPLIMIT);
-	#endif
 	iph->tot_len = htons(skb->len);
 
 	dst_release(skb->dst);
@@ -406,34 +338,20 @@ static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 	nf_reset(skb);
 
 	skb->ip_summed = CHECKSUM_NONE;
-	ip_select_ident(iph, &rt->u.dst, NULL);
+	ip_select_ident_more(iph, &rt->u.dst, sk, (skb_shinfo(skb)->gso_segs ?: 1) - 1);
+
 	ip_send_check(iph);
 
-#if 0
-
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
- 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, ip_send);
-	#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
- 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, dst_output);
- 	#else
- 	ip_local_out(skb);
- 	#endif
-
-#else
-
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if( IS_SPACE_AVAILABLED(skb) &&
-		((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
-		(FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
-		(FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))) {
-			FOE_ALG(skb)=1;
-	}
+	FOE_ALG_SKIP(skb);
 #endif
-
 	dst_output(skb);
-#endif
+
+	return 1;
 
 tx_error:
+	printk("pptp: tx error\n");
+	if( skb ) kfree_skb(skb);
 	return 1;
 }
 
@@ -581,6 +499,7 @@ ppp_lcp_echo_reply:
 			ppp_stat_add(&po->chan, skb);
 			netif_rx(skb);
 		} else {
+			//skb_set_owner_r(skb, sk);
 			skb_set_network_header(skb, skb->head - skb->data);
 		ppp_input(&po->chan,skb);
 		}
@@ -604,12 +523,7 @@ int gre_input(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, 12))
 		goto drop;
 
-	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
 	iph = ip_hdr(skb);
-	#else
-	iph = skb->nh.iph;
-	#endif
-
 	header = (struct pptp_gre_header *)((char *)iph + iph->ihl * 4);
 
 	if (    /* version should be 1 */
@@ -640,9 +554,13 @@ int gre_input(struct sk_buff *skb)
 	if( (po = find_call(htons(header->call_id), iph->saddr, (__u32)-1)) ) {
 		dst_release(skb->dst);
 		skb->dst = NULL;
-		skb_pull(skb, iph->ihl * 4);
+		skb_pull(skb, (int)((char*)header - (char*)skb->data));
 		nf_reset(skb);
 		
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		FOE_ALG_SKIP(skb);
+#endif
+
 		pptp_rcv_core(sk_pppox(po), skb);
 		return 1;
 	}
@@ -670,7 +588,6 @@ static int pptp_bind(struct socket *sock,struct sockaddr *uservaddr,int sockaddr
 
 	opt->src_addr=sp->sa_addr.pptp;
 	if( add_call(po) == (__u32)-1 ) {
-	    release_sock(sk);
 		error=-EBUSY;
 	}
 	#ifdef DEBUG
@@ -724,54 +641,32 @@ static int pptp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	po->chan.private=sk;
 	po->chan.ops=&pptp_chan_ops;
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	{
-		struct rt_key key = {
-			.dst=opt->dst_addr.sin_addr.s_addr,
-			.src=opt->src_addr.sin_addr.s_addr,
-			.tos=RT_TOS(0),
-		};
-		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
-		if (ip_route_output_key(&rt, &key)) {
-		#else
-		if (ip_route_output_key(&init_net, &rt, &key)) {
-		#endif
-			error = -EHOSTUNREACH;
-			goto end;
-		}
-	}
-	#else
 	{
 		struct flowi fl = {
-				    .nl_u = { .ip4_u =
-					      { .daddr = opt->dst_addr.sin_addr.s_addr,
-						.saddr = opt->src_addr.sin_addr.s_addr,
-						.tos = RT_CONN_FLAGS(sk) } },
-				    .proto = IPPROTO_GRE };
-		#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)
+			.nl_u = { 
+				.ip4_u = { 
+					.daddr = sp->sa_addr.pptp.sin_addr.s_addr,
+					.tos = RT_CONN_FLAGS(sk) 
+				} 
+			},
+			.proto = IPPROTO_GRE 
+		};
+
 		security_sk_classify_flow(sk, &fl);
-		#endif
-		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 		if (ip_route_output_key(&rt, &fl)){
-		#else
-		if (ip_route_output_key(&init_net, &rt, &fl)){
-		#endif
 			error = -EHOSTUNREACH;
 			goto end;
 		}
 		sk_setup_caps(sk, &rt->u.dst);
 	}
-	#endif
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	po->chan.mtu=PPP_MTU;
-	#else
-	po->chan.mtu=dst_mtu(&rt->u.dst);
-	if (!po->chan.mtu) po->chan.mtu=PPP_MTU;
-	#endif
-	ip_rt_put(rt);
-	po->chan.mtu-=PPTP_HEADER_OVERHEAD;
 
-	po->chan.hdrlen=2+sizeof(struct pptp_gre_header);
+	po->chan.mtu = dst_mtu(&rt->u.dst);
+	ip_rt_put(rt);
+
+	if( !po->chan.mtu ) 	po->chan.mtu = PPP_MTU;
+	po->chan.mtu -= (sizeof(struct iphdr) + sizeof(struct pptp_gre_header) + 2);
+	po->chan.hdrlen = LL_MAX_HEADER + sizeof(struct iphdr) + sizeof(struct pptp_gre_header) + 2;
+
 	error = ppp_register_channel(&po->chan);
 	if (error){
 		printk(KERN_ERR "PPTP: failed to register PPP channel (%d)\n",error);
@@ -815,11 +710,7 @@ static int pptp_release(struct socket *sock)
 
 	lock_sock(sk);
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	if (sk->dead)
-	#else
 	if (sock_flag(sk, SOCK_DEAD))
-	#endif
 	{
 	    release_sock(sk);
 	    return -EBADF;
@@ -848,19 +739,15 @@ static int pptp_release(struct socket *sock)
 }
 
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 static struct proto pptp_sk_proto = {
 	.name	  = "PPTP",
 	.owner	  = THIS_MODULE,
 	.obj_size = sizeof(struct pppox_sock),
 };
-#endif
 
 static struct proto_ops pptp_ops = {
     .family		= AF_PPPOX,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
     .owner		= THIS_MODULE,
-#endif
     .release		= pptp_release,
     .bind		=  pptp_bind,
     .connect		= pptp_connect,
@@ -875,66 +762,10 @@ static struct proto_ops pptp_ops = {
     .sendmsg		= sock_no_sendmsg,
     .recvmsg		= sock_no_recvmsg,
     .mmap		= sock_no_mmap,
-    #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
     .ioctl		= pppox_ioctl,
-    #endif
 };
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static void pptp_sock_destruct(struct sock *sk)
-{
-	skb_queue_purge(&sk->receive_queue);
-	if (!(SK_STATE(sk) & PPPOX_DEAD)) {
-		delete_call(pppox_sk(sk));
-		pppox_unbind_sock(sk);
-	}
-	if (sk->protinfo.destruct_hook)
-		kfree(sk->protinfo.destruct_hook);
-
-	MOD_DEC_USE_COUNT;
-}
-
-static int pptp_create(struct socket *sock)
-{
-	int error = -ENOMEM;
-	struct sock *sk;
-	struct pppox_sock *po;
-	struct pptp_opt *opt;
-
-	MOD_INC_USE_COUNT;
-
-	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, 1);
-	if (!sk)
-		goto out;
-
-	sock_init_data(sock, sk);
-
-	sock->state = SS_UNCONNECTED;
-	sock->ops   = &pptp_ops;
-
-	sk->sk_backlog_rcv = pppoe_rcv_core;
-	sk->state	   = PPPOX_NONE;
-	sk->type	   = SOCK_STREAM;
-	sk->family	   = PF_PPPOX;
-	sk->protocol	   = PX_PROTO_PPTP;
-
-	sk->protinfo.pppox=kzalloc(sizeof(struct pppox_sock),GFP_KERNEL);
-	sk->destruct=pptp_sock_destruct;
-	sk->protinfo.destruct_hook=sk->protinfo.pppox;
-
-	po = pppox_sk(sk);
-	po->sk=sk;
-	opt=&po->proto.pptp;
-
-	opt->seq_sent=0; opt->seq_recv=0;
-	opt->ack_recv=0; opt->ack_sent=0;
-
-	error = 0;
-out:
-	return error;
-}
-#else
 static void pptp_sock_destruct(struct sock *sk)
 {
     if (!(SK_STATE(sk) & PPPOX_DEAD)){
@@ -943,23 +774,21 @@ static void pptp_sock_destruct(struct sock *sk)
     }
     skb_queue_purge(&sk->sk_receive_queue);
 }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+
+/* no packet's here, interface  */
+static int pptp_recv_none(struct sock *sk, struct sk_buff *skb) {
+	kfree_skb(skb);
+	return NET_RX_DROP;
+}
+
 static int pptp_create(struct socket *sock)
-#else
-static int pptp_create(struct net *net, struct socket *sock)
-#endif
 {
 	int error = -ENOMEM;
 	struct sock *sk;
 	struct pppox_sock *po;
 	struct pptp_opt *opt;
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, &pptp_sk_proto, 1);
-	#else
-	sk = sk_alloc(net,PF_PPPOX, GFP_KERNEL, &pptp_sk_proto);
-	#endif
-	if (!sk)
+	if( !(sk = sk_alloc(PF_PPPOX, GFP_KERNEL, &pptp_sk_proto, 1)) )
 		goto out;
 
 	sock_init_data(sock, sk);
@@ -967,7 +796,7 @@ static int pptp_create(struct net *net, struct socket *sock)
 	sock->state = SS_UNCONNECTED;
 	sock->ops   = &pptp_ops;
 
-	sk->sk_backlog_rcv = pptp_rcv_core;
+	sk->sk_backlog_rcv = pptp_recv_none;
 	sk->sk_state	   = PPPOX_NONE;
 	sk->sk_type	   = SOCK_STREAM;
 	sk->sk_family	   = PF_PPPOX;
@@ -975,9 +804,6 @@ static int pptp_create(struct net *net, struct socket *sock)
 	sk->sk_destruct	   = pptp_sock_destruct;
 
 	po = pppox_sk(sk);
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	po->sk=sk;
-	#endif
 	opt=&po->proto.pptp;
 
 	opt->seq_sent=0; opt->seq_recv=0;
@@ -987,7 +813,6 @@ static int pptp_create(struct net *net, struct socket *sock)
 out:
 	return error;
 }
-#endif
 
 
 static int pptp_ppp_ioctl(struct ppp_channel *chan, unsigned int cmd,
@@ -1024,9 +849,7 @@ static int pptp_ppp_ioctl(struct ppp_channel *chan, unsigned int cmd,
 
 static struct pppox_proto pppox_pptp_proto = {
     .create	= pptp_create,
-	  #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15)
     .owner	= THIS_MODULE,
-    #endif
 };
 
 static int pptp_init_module(void)
@@ -1036,13 +859,11 @@ static int pptp_init_module(void)
 
 	spin_lock_init(&lock_chan);
 
-	#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 	err = proto_register(&pptp_sk_proto, 0);
 	if (err){
 		printk(KERN_INFO "PPTP: can't register sk_proto\n");
-		goto out_inet_del_protocol;
+		goto out;
 	}
-	#endif
 
  	err = register_pppox_proto(PX_PROTO_PPTP, &pppox_pptp_proto);
 	if (err){
@@ -1052,16 +873,9 @@ static int pptp_init_module(void)
 	
 out:
 	return err;
+
 out_unregister_sk_proto:
-
-	#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 	proto_unregister(&pptp_sk_proto);
-	#endif
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
-out_inet_del_protocol:
-#endif
-
 	goto out;
 }
 

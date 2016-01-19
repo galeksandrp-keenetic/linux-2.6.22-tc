@@ -65,7 +65,7 @@ struct sockaddr_pppox {
        union{ 
                struct pppoe_addr       pppoe; 
 	       struct pptp_addr        pptp; 
-       }sa_addr; 
+       } sa_addr; 
 }__attribute__ ((packed)); 
 
 /* The use of the above union isn't viable because the size of this

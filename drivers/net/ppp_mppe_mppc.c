@@ -609,6 +609,7 @@ mppc_compress(struct ppp_mppe_state *state, unsigned char *ibuf,
 	    continue;
 	}
 	if (r - q >= 64) {
+	    if( *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
@@ -623,8 +624,7 @@ mppc_compress(struct ppp_mppe_state *state, unsigned char *ibuf,
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
 	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
-	    *p++ != *s++ || *p++ != *s++ || *p++ != *s++ || *p++ != *s++ ||
-	    *p++ != *s++;
+	    *p++ != *s++ ) {};
 	    if (s - q == 64) {
 		p--; s--;
 		while((*p++ == *s++) && (s < r) && (p < q));

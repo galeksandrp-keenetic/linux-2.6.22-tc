@@ -33,6 +33,10 @@
 #define DEBUGP(format, args...)
 #endif
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+extern int ipv4_fastnat_conntrack;
+#endif
+
 /* Protects conntrack->proto.tcp */
 static DEFINE_RWLOCK(tcp_lock);
 
@@ -792,6 +796,11 @@ static int tcp_error(struct sk_buff *skb,
 		return -NF_ACCEPT;
 	}
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (ipv4_fastnat_conntrack)
+		return NF_ACCEPT;
+#endif
+
 	/* Checksum invalid? Ignore.
 	 * We skip checking packets on the outgoing path
 	 * because the checksum is assumed to be correct.
@@ -1428,7 +1437,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp6 =
 	.print_conntrack 	= tcp_print_conntrack,
 	.packet 		= tcp_packet,
 	.new 			= tcp_new,
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	.error			= NULL,
+#else
 	.error			= tcp_error,
+#endif
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
 	.to_nfattr		= tcp_to_nfattr,
 	.from_nfattr		= nfattr_to_tcp,

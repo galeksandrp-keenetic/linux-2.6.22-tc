@@ -76,12 +76,8 @@ target(struct sk_buff **pskb,
 			(*pskb)->mark = mark ^ diff;
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		if (	(*pskb)->mark &&
-				IS_SPACE_AVAILABLED(*pskb) &&
-          	((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
-           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
-           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE)))
-          		FOE_ALG(*pskb) = 1;
+//			if( (*pskb)->mark )
+//				FOE_ALG_SKIP(*pskb);
 #endif
 			break;
 		}

@@ -23,6 +23,10 @@
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_ecache.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+extern int ipv4_fastnat_conntrack;
+#endif
+
 static unsigned int nf_ct_udp_timeout __read_mostly = 30*HZ;
 static unsigned int nf_ct_udp_timeout_stream __read_mostly = 180*HZ;
 
@@ -120,6 +124,11 @@ static int udp_error(struct sk_buff *skb, unsigned int dataoff,
 				"nf_ct_udp: truncated/malformed packet ");
 		return -NF_ACCEPT;
 	}
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (ipv4_fastnat_conntrack)
+		return NF_ACCEPT;
+#endif
 
 	/* Packet with no checksum */
 	if (!hdr->check)
@@ -233,7 +242,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_udp6 =
 	.print_conntrack	= udp_print_conntrack,
 	.packet			= udp_packet,
 	.new			= udp_new,
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	.error			= NULL,
+#else
 	.error			= udp_error,
+#endif
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
 	.tuple_to_nfattr	= nf_ct_port_tuple_to_nfattr,
 	.nfattr_to_tuple	= nf_ct_port_nfattr_to_tuple,

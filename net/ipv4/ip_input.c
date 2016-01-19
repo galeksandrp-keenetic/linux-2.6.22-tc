@@ -158,8 +158,7 @@ __DMEM DEFINE_SNMP_STAT(struct ipstats_mib, ip_statistics) __read_mostly;
 #endif
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-int (*fast_nat_hit_hook_func)(struct sk_buff *skb) = NULL;
-EXPORT_SYMBOL(fast_nat_hit_hook_func);
+extern int ipv4_fastnat_conntrack;
 #endif
 
 
@@ -270,8 +269,23 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 /*
  * 	Deliver IP Packets to the higher protocol layers.
  */
+
+#if defined (CONFIG_PPPOL2TP)
+extern int l2tp_input(struct sk_buff *skb);
+#endif
+
+#if defined (CONFIG_PPTP)
+extern int gre_input(struct sk_buff *skb);
+#endif
+
+
 int ip_local_deliver(struct sk_buff *skb)
 {
+#if defined (CONFIG_PPPOL2TP) || defined (CONFIG_PPTP)
+	struct udphdr *udp;
+	struct iphdr *iph;
+#endif
+
 	/*
 	 *	Reassemble IP fragments.
 	 */
@@ -282,14 +296,33 @@ int ip_local_deliver(struct sk_buff *skb)
 			return 0;
 	}
 
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if( IS_SPACE_AVAILABLED(skb) &&
-		((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
-		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
-		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
-	    FOE_ALG(skb)=1;
+#if defined (CONFIG_PPPOL2TP) || defined (CONFIG_PPTP)
+	if( skb->protocol == htons(ETH_P_IP) ) {
+		iph = ip_hdr(skb);
+		
+#if defined (CONFIG_PPPOL2TP) 
+		if( iph->protocol == IPPROTO_UDP &&
+			 (udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
+			 udp->dest == htons(1701) && 
+			 udp->source == htons(1701) &&
+			 l2tp_input(skb) == 1 ) {
+			return 0;
 	}
 #endif
+
+#if defined (CONFIG_PPTP) 
+		if( iph->protocol == IPPROTO_GRE && gre_input(skb) == 1 ) {
+			return 0;
+		}
+#endif
+	}
+#endif
+ 
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	FOE_ALG_SKIP(skb);
+#endif
+
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
 		       ip_local_deliver_finish);
 }
@@ -396,24 +429,6 @@ drop:
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }
-
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-static inline int ip_fast_nat_finish(struct sk_buff *skb) {
-	int ret;
-	int (*fast_nat_hit_hook)(struct sk_buff *skb);
-	
-	ret = 0;
-	
-	if( (fast_nat_hit_hook = rcu_dereference(fast_nat_hit_hook_func)) ) {
-		ret = fast_nat_hit_hook(skb);
-	} else {
-		kfree_skb(skb);
-		ret = -EPERM;
-	}
-	
-	return ret;
-}
-#endif
 
 #ifdef CONFIG_TC_VOIP
 #ifdef CONFIG_CM
@@ -550,28 +565,14 @@ __IMEM int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_typ
 		goto drop;
 	}
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (!ipv4_fastnat_conntrack)
+#endif
 	/* Remove any debris in the socket control block */
 	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
 
 	ret = NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
 		       ip_rcv_finish);
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	if( ret == 0xDEAD ) {
-		if (skb->dst == NULL) {
-			struct iphdr *iph = ip_hdr(skb);
-			struct net_device *dev = skb->dev;
-
-			if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos, dev)) {
-				goto drop;
-			}
-
-			skb->dev = skb->dst->dev;
-		}
-		
-		ret = NF_HOOK(PF_INET, NF_IP_FORWARD, skb, dev, skb->dev,
-		       ip_fast_nat_finish);
-	}
-#endif
 
 	return ret;
 

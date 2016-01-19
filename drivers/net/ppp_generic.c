@@ -155,8 +155,7 @@ static atomic_t channel_count = ATOMIC_INIT(0);
 #define PPP_PROTO(skb)	(((skb)->data[0] << 8) + (skb)->data[1])
 
 /* We limit the length of ppp->file.rq to this (arbitrary) value */
-#define PPP_MAX_RQLEN	128
-#define PPP_MAX_XQLEN	128
+#define PPP_MAX_RQLEN	32
 
 /*
  * Maximum number of multilink fragments queued up.
@@ -850,9 +849,6 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	pp[1] = proto;
 
 	skb_queue_tail(&ppp->file.xq, skb);
-	if( ppp->file.xq.qlen >= PPP_MAX_XQLEN )
-		netif_stop_queue(dev);
-	
 	ppp_xmit_process(ppp);
 	return 0;
 
@@ -946,6 +942,8 @@ ppp_xmit_process(struct ppp *ppp)
 		   code that we can accept some more. */
 		if (ppp->xmit_pending == 0 && skb_peek(&ppp->file.xq) == 0)
 			netif_wake_queue(ppp->dev);
+		else
+			netif_stop_queue(ppp->dev);
 	}
 	ppp_xmit_unlock(ppp);
 }
@@ -1415,13 +1413,13 @@ ppp_do_recv(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
 	struct channel *pch = chan->ppp;
 	
-	if (pch == 0 || pch->ppp == 0 || skb->len == 0 ) return;
+	if (pch == 0 || pch->ppp == 0 ) return;
 	
 	skb->dev = pch->ppp->dev;
 	pch->ppp->stats.rx_packets++;
 	pch->ppp->stats.rx_bytes += skb->len;
+	skb->dev->last_rx = jiffies;
 }
-
 void
 ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 {
@@ -1436,12 +1434,14 @@ ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 	proto = PPP_PROTO(skb);
 	read_lock_bh(&pch->upl);
 	if (pch->ppp == 0 || proto >= 0xc000 || proto == PPP_CCPFRAG) {
-		/* put it on the channel queue */
-		skb_queue_tail(&pch->file.rq, skb);
 		/* drop old frames if queue too long */
 		while (pch->file.rq.qlen > PPP_MAX_RQLEN
 		       && (skb = skb_dequeue(&pch->file.rq)) != 0)
 			kfree_skb(skb);
+		
+		/* put it on the channel queue */
+		skb_queue_tail(&pch->file.rq, skb);
+		
 		wake_up_interruptible(&pch->file.rwait);
 	} else {
 		ppp_do_recv(pch->ppp, skb, pch);
@@ -2769,7 +2769,6 @@ EXPORT_SYMBOL(ppp_unregister_channel);
 EXPORT_SYMBOL(ppp_channel_index);
 EXPORT_SYMBOL(ppp_unit_number);
 EXPORT_SYMBOL(ppp_input);
-EXPORT_SYMBOL(ppp_stat_add);
 EXPORT_SYMBOL(ppp_input_error);
 EXPORT_SYMBOL(ppp_output_wakeup);
 EXPORT_SYMBOL(ppp_register_compressor);

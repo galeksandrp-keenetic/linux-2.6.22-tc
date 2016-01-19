@@ -30,17 +30,12 @@
 #include <linux/socket.h>
 #include <linux/mm.h>
 #include <linux/ip.h>
+#include <net/ip.h>
 #include <linux/in.h>
 #include <linux/udp.h>
-
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-#include <net/ip.h>
-#endif
+#include <linux/tcp.h>
 #include <linux/netfilter_ipv4.h>
-
-
 #if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
-#include <linux/in.h>
 #define NAT_DNS_PORT 53
 #endif
 #include <net/netfilter/nf_conntrack.h>
@@ -155,12 +150,14 @@ static int nf_conntrack_hash_rnd_initted;
 static unsigned int nf_conntrack_hash_rnd;
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-/* Enable or Disable FastNAT */
 extern int ipv4_fastnat_conntrack;
-
 int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
 				enum ip_conntrack_info ctinfo,
-				struct sk_buff **pskb) = NULL;
+                struct sk_buff **pskb,
+                struct nf_conntrack_l3proto *l3proto,
+					 struct nf_conntrack_l4proto *l4proto) = NULL;
+
+				
 EXPORT_SYMBOL(fast_nat_bind_hook_func);
 #endif
 
@@ -1065,14 +1062,31 @@ resolve_normal_ct(struct sk_buff *skb,
 	return ct;
 }
 
-#if defined (CONFIG_PPTP)
-extern int gre_input(struct sk_buff *skb);
-#endif
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+static inline unsigned int skip_offload_proto(u_int8_t proto) {
+	if( proto == IPPROTO_IPIP ||
+		 proto == IPPROTO_ICMP ||
+		 proto == IPPROTO_GRE ||
+		 proto == IPPROTO_ESP ||
+		 proto == IPPROTO_AH ) return 1;
+   return 0;
+};
 
-#if defined (CONFIG_PPPOL2TP)
-extern int l2tp_input(struct sk_buff *skb);
-#endif
+static inline unsigned int skip_offload_nat(struct sk_buff **pskb, u_int8_t proto) {
+	struct udphdr *udph;
+	struct iphdr *iph;
 
+	if( skip_offload_proto(proto) ) return 1;
+
+	if( proto == IPPROTO_UDP ) {
+	  if( (iph = ip_hdr(*pskb)) && (udph = (struct udphdr*)((char*)iph + (iph->ihl << 2))) ) {
+		 if( udph->check == 0 || (udph->dest == htons(1701) && udph->source == htons(1701)) )
+			return 1;
+	  }
+	}
+   return 0;
+};
+#endif
 
 #ifdef CONFIG_MIPS_TC3262
 __IMEM
@@ -1088,16 +1102,16 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	u_int8_t protonum;
 	int set_reply = 0;
 	int ret;
-//	struct nf_conn_help *phelp;
-	struct udphdr *udp;
-	struct iphdr *iph;
-	int is_helper = 0;
+	struct nf_conn_help *phelp;
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	int (*fast_nat_bind_hook)(struct nf_conn *ct,
 		enum ip_conntrack_info ctinfo,
-		struct sk_buff **pskb);
+                struct sk_buff **pskb,
+                struct nf_conntrack_l3proto *l3proto,
+					 struct nf_conntrack_l4proto *l4proto);
 #endif
+	int is_helper;
 
 	/* Previously seen (loopback or untracked)?  Ignore. */
 	if ((*pskb)->nfct) {
@@ -1112,28 +1126,6 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		DEBUGP("not prepared to track yet or error occured\n");
 		return -ret;
 	}
-
-#if defined (CONFIG_PPTP)
-	if( hooknum == NF_IP_PRE_ROUTING &&
-	    (*pskb)->pkt_type == PACKET_HOST && 
-	    protonum == IPPROTO_GRE ) {
-		
-		if( gre_input(*pskb) == 1 ) return NF_STOLEN;
-	}
-#endif
-
-#if defined (CONFIG_PPPOL2TP)
-   if( hooknum == NF_IP_PRE_ROUTING &&
-	    (*pskb)->pkt_type == PACKET_HOST && 
-	    protonum == IPPROTO_UDP &&
-	    (iph = ip_hdr(*pskb)) &&
-		 (udp = (struct udphdr*)((*pskb)->data + (iph->ihl << 2))) &&
-		 udp->dest == htons(1701) && 
-		 udp->source == htons(1701) ) {
-		
-		if( l2tp_input(*pskb) == 1 ) return NF_STOLEN;
-	}
-#endif
 
 	l4proto = __nf_ct_l4proto_find((u_int16_t)pf, protonum);
 
@@ -1173,23 +1165,48 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		NF_CT_STAT_INC_ATOMIC(invalid);
 		return -ret;
 	}
-/*
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if( !(is_helper = skip_offload_nat(pskb, protonum)) ) {
 	phelp = nfct_help(ct);
 	if (phelp && phelp->helper)
 		is_helper = 1;
-*/
+	}
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( is_helper || hooknum == NF_IP_LOCAL_OUT ) 
+		FOE_ALG_SKIP(*pskb);
+#endif
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	if(   (fast_nat_bind_hook = rcu_dereference(fast_nat_bind_hook_func)) &&
-			pf == PF_INET && 
+	if( is_helper )
+		ct->fast_ext = 1;
+#endif
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if( pf == PF_INET &&
+		 !ct->fast_ext &&
 			ipv4_fastnat_conntrack && 
-			!is_helper &&
-			(ct->fast_ext != 1) && /* manual disabled flag */
-			((ctinfo == IP_CT_ESTABLISHED) || (ctinfo == IP_CT_IS_REPLY)) &&
+	    (fast_nat_bind_hook = rcu_dereference(fast_nat_bind_hook_func)) &&
 			(hooknum == NF_IP_PRE_ROUTING) &&
-			((protonum == IPPROTO_TCP) || (protonum == IPPROTO_UDP)))
-	{
+	    (ctinfo == IP_CT_ESTABLISHED || ctinfo == IP_CT_ESTABLISHED + IP_CT_IS_REPLY) &&
+	    (protonum == IPPROTO_TCP || protonum == IPPROTO_UDP)) {
 		struct nf_conntrack_tuple *t1, *t2;
+#if defined(CONFIG_IP_NF_MATCH_WEBSTR) || defined(CONFIG_IP_NF_MATCH_WEBSTR_MODULE)
+		if (ipv4_fastnat_conntrack > 1 && protonum == IPPROTO_TCP ) {
+			struct tcphdr _tcph, *tcph;
+			unsigned char _data[2], *data;
+
+			/* For URL filter; RFC-HTTP: GET, POST, HEAD */
+			if ((tcph = skb_header_pointer(*pskb, dataoff, sizeof(_tcph), &_tcph)) &&
+			    (data = skb_header_pointer(*pskb, dataoff + tcph->doff*4, sizeof(_data), &_data)) &&
+			    ((data[0] == 'G' && data[1] == 'E') ||
+			     (data[0] == 'P' && data[1] == 'O') ||
+			     (data[0] == 'H' && data[1] == 'E'))) {
+				ct->fast_ext = 1;
+				goto pass;
+			}
+		}
+#endif
 		t1 = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
 		t2 = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
 		if (!(t1->dst.u3.ip == t2->src.u3.ip &&
@@ -1197,32 +1214,18 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 				t1->dst.u.all == t2->src.u.all &&
 				t1->src.u.all == t2->dst.u.all)) {
 			
-			ret = fast_nat_bind_hook(ct, ctinfo, pskb);
+			ret = fast_nat_bind_hook(ct, ctinfo, pskb, l3proto, l4proto);
 		}
 	}
+	pass:
 #endif
 
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if( protonum == IPPROTO_UDP &&
-		 (iph = ip_hdr(*pskb)) &&
-		 (udp = (struct udphdr*)((*pskb)->data + (iph->ihl << 2))) ) {
-		 
-		 if( udp->check == 0 || (udp->dest == htons(1701) && udp->source == htons(1701)) ) is_helper = 1;
-	}
-
-	if( is_helper || protonum == IPPROTO_GRE || protonum == IPPROTO_ESP || protonum == IPPROTO_AH || hooknum == NF_IP_LOCAL_OUT ) {
-		if (IS_SPACE_AVAILABLED(*pskb) &&
-          	((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
-           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
-           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE))) {
-          		FOE_ALG(*pskb) = 1;
-	}
-	}
 
 #endif
 	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-		if( hooknum == NF_IP_LOCAL_OUT ) ct->fast_ext = 1;
+		if( hooknum == NF_IP_LOCAL_OUT )
+			ct->fast_ext = 1;
 #endif
 		nf_conntrack_event_cache(IPCT_STATUS, *pskb);
 	}
