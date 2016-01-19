@@ -118,6 +118,7 @@ static void ip_direct_send(struct sk_buff *skb)
 	struct hh_cache *hh = dst->hh;
 	struct net_device *dev = dst->dev;
 	int hh_len = LL_RESERVED_SPACE(dev);
+	unsigned int seq;
 
 	/* Be paranoid, rather than too clever. */
 	if (unlikely(skb_headroom(skb) < hh_len && dev->hard_header)) {
@@ -135,12 +136,12 @@ static void ip_direct_send(struct sk_buff *skb)
 	}
 
 	if (hh) {
-		int hh_alen;
-
-		read_lock_bh(&hh->hh_lock);
-		hh_alen = HH_DATA_ALIGN(hh->hh_len);
-  		memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
-		read_unlock_bh(&hh->hh_lock);
+		do {
+			int hh_alen;
+			seq = read_seqbegin(&hh->hh_lock);
+			hh_alen = HH_DATA_ALIGN(hh->hh_len);
+  			memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
+		} while (read_seqretry(&hh->hh_lock, seq));
 		skb_push(skb, hh->hh_len);
 		hh->hh_output(skb);
 	} else if (dst->neighbour)
@@ -406,8 +407,7 @@ static unsigned int ipt_route_target(struct sk_buff **pskb,
 	return res;
 }
 
-
-static bool ipt_route_checkentry(const char *tablename,
+static int ipt_route_checkentry(const char *tablename,
 				const void *e,
 				const struct xt_target *target,
 				void *targinfo,
