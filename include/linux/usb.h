@@ -761,6 +761,13 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
 	.bInterfaceClass = (cl), \
 	.bInterfaceSubClass = (sc), .bInterfaceProtocol = (pr)
 
+#define USB_DEVICE_INTERFACE_NUMBER(vend, prod, num) \
+	.match_flags = USB_DEVICE_ID_MATCH_DEVICE \
+		| USB_DEVICE_ID_MATCH_INT_NUMBER, \
+	.idVendor = (vend), \
+	.idProduct = (prod), \
+	.bInterfaceNumber = (num)
+
 /* ----------------------------------------------------------------------- */
 
 /* Stuff for dynamic usb ids */

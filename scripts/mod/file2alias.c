@@ -110,6 +110,9 @@ static void do_usb_entry(struct usb_device_id *id,
 	ADD(alias, "ip",
 	    id->match_flags&USB_DEVICE_ID_MATCH_INT_PROTOCOL,
 	    id->bInterfaceProtocol);
+	ADD(alias, "in",
+		id->match_flags&USB_DEVICE_ID_MATCH_INT_NUMBER,
+		id->bInterfaceNumber);
 
 	/* Always end in a wildcard, for future extension */
 	if (alias[strlen(alias)-1] != '*')

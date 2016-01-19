@@ -41,13 +41,18 @@ ssize_t usb_store_new_id(struct usb_dynids *dynids,
 	struct usb_dynid *dynid;
 	u32 idVendor = 0;
 	u32 idProduct = 0;
+	int bInterfaceNumber = -1;
 	int fields = 0;
 	int retval = 0;
 
-	fields = sscanf(buf, "%x %x", &idVendor, &idProduct);
-	if (fields < 2)
-		return -EINVAL;
-
+	fields = sscanf(buf, "%x %x %x", &idVendor, &idProduct, &bInterfaceNumber);
+	if (fields < 3)
+	{
+		fields = sscanf(buf, "%x %x", &idVendor, &idProduct);
+		if (fields < 2)
+			return -EINVAL;
+	}
+	
 	dynid = kzalloc(sizeof(*dynid), GFP_KERNEL);
 	if (!dynid)
 		return -ENOMEM;
@@ -55,8 +60,12 @@ ssize_t usb_store_new_id(struct usb_dynids *dynids,
 	INIT_LIST_HEAD(&dynid->node);
 	dynid->id.idVendor = idVendor;
 	dynid->id.idProduct = idProduct;
-	dynid->id.match_flags = USB_DEVICE_ID_MATCH_DEVICE;
-
+	if( bInterfaceNumber < 0) {
+		dynid->id.match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+	} else {
+		dynid->id.match_flags = USB_DEVICE_ID_MATCH_DEVICE | USB_DEVICE_ID_MATCH_INT_NUMBER;
+		dynid->id.bInterfaceNumber = (u32)bInterfaceNumber;
+	}
 	spin_lock(&dynids->lock);
 	list_add_tail(&dynid->node, &dynids->list);
 	spin_unlock(&dynids->lock);
@@ -425,7 +434,8 @@ int usb_match_one_id(struct usb_interface *interface,
 			!(id->match_flags & USB_DEVICE_ID_MATCH_VENDOR) &&
 			(id->match_flags & (USB_DEVICE_ID_MATCH_INT_CLASS |
 				USB_DEVICE_ID_MATCH_INT_SUBCLASS |
-				USB_DEVICE_ID_MATCH_INT_PROTOCOL)))
+				USB_DEVICE_ID_MATCH_INT_PROTOCOL |
+				USB_DEVICE_ID_MATCH_INT_NUMBER)))
 		return 0;
 
 	if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_CLASS) &&
@@ -438,6 +448,10 @@ int usb_match_one_id(struct usb_interface *interface,
 
 	if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_PROTOCOL) &&
 	    (id->bInterfaceProtocol != intf->desc.bInterfaceProtocol))
+		return 0;
+
+	if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_NUMBER) &&
+		(id->bInterfaceNumber != intf->desc.bInterfaceNumber))
 		return 0;
 
 	return 1;
