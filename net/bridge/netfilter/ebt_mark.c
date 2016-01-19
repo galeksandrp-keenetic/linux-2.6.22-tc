@@ -33,21 +33,6 @@ static int ebt_target_mark(struct sk_buff **pskb, unsigned int hooknr,
 	else
 		(*pskb)->mark ^= info->mark;
 
-#if 0  /*Rodney_20090724*/
-	/* if this is an 8021Q frame, see if we need to do 8021p priority or vlan id remarking*/
-	if (((*pskb)->protocol == __constant_htons(ETH_P_8021Q)) && (((*pskb)->mark & EBT_VLAN_REMARKING))){
-		struct vlan_hdr _frame, *fp;
-		unsigned short TCI;
-
-		fp = skb_header_pointer(*pskb, 0, sizeof(_frame), &_frame);
-		if (fp == NULL)
-			return NF_DROP;
-
-		TCI = ntohs(fp->h_vlan_TCI);
-    	TCI = (TCI & 0x1fff) | ((((*pskb)->mark >> 18) & 0x7) << 13);
-    	fp->h_vlan_TCI = htons(TCI);
-	}
-#endif
 	return info->target | ~EBT_VERDICT_BITS;
 }
 

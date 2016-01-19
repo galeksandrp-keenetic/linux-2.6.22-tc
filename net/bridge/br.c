@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br.c,v 1.1.1.1 2010/04/09 09:36:25 feiyan Exp $
+ *	$Id: br.c,v 1.47 2001/12/24 00:56:41 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -24,6 +24,8 @@
 #include "br_private.h"
 
 int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
+void (*br_igmp_frame_hook)(struct net_device *from_dev, struct sk_buff *skb) = NULL;
+int  (*br_igmp_flood_hook)(struct net_device *to_dev, const struct sk_buff *skb) = NULL;
 
 static struct llc_sap *br_stp_sap;
 
@@ -39,20 +41,27 @@ static int __init br_init(void)
 
 	err = br_fdb_init();
 	if (err)
+	{
+	printk(KERN_ERR "bridge: fdp_init failed\n");
 		goto err_out;
+	}
 
-	err = br_netfilter_init();
-	if (err)
-		goto err_out1;
+//	err = br_netfilter_init();
+//	if (err)
+//		goto err_out1;
 
 	err = register_netdevice_notifier(&br_device_notifier);
 	if (err)
+	{
+	printk(KERN_ERR "bridge: register_netdevice_notifier failed\n");
 		goto err_out2;
-
+	}
 	err = br_netlink_init();
 	if (err)
+	{
+	printk(KERN_ERR "bridge: br_netlink_init failed\n");
 		goto err_out3;
-
+	}
 	brioctl_set(br_ioctl_deviceless_stub);
 	br_handle_frame_hook = br_handle_frame;
 
@@ -63,7 +72,7 @@ static int __init br_init(void)
 err_out3:
 	unregister_netdevice_notifier(&br_device_notifier);
 err_out2:
-	br_netfilter_fini();
+//	br_netfilter_fini();
 err_out1:
 	br_fdb_fini();
 err_out:
@@ -76,7 +85,7 @@ static void __exit br_deinit(void)
 	rcu_assign_pointer(br_stp_sap->rcv_func, NULL);
 
 	br_netlink_fini();
-	br_netfilter_fini();
+//	br_netfilter_fini();
 	unregister_netdevice_notifier(&br_device_notifier);
 	brioctl_set(NULL);
 
@@ -93,6 +102,8 @@ static void __exit br_deinit(void)
 }
 
 EXPORT_SYMBOL(br_should_route_hook);
+EXPORT_SYMBOL(br_igmp_frame_hook);
+EXPORT_SYMBOL(br_igmp_flood_hook);
 
 module_init(br_init)
 module_exit(br_deinit)

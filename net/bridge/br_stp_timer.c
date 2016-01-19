@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_stp_timer.c,v 1.2 2010/05/20 04:56:20 xhshi Exp $
+ *	$Id: br_stp_timer.c,v 1.3 2000/05/05 02:17:17 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -145,9 +145,6 @@ static void br_hold_timer_expired(unsigned long arg)
 
 void br_stp_timer_init(struct net_bridge *br)
 {
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof(igmpsnoop_addtimer_hook) igmpsnoop_addtimer_info;
-#endif
 	setup_timer(&br->hello_timer, br_hello_timer_expired,
 		      (unsigned long) br);
 
@@ -159,18 +156,10 @@ void br_stp_timer_init(struct net_bridge *br)
 		      (unsigned long) br);
 
 	setup_timer(&br->gc_timer, br_fdb_cleanup, (unsigned long) br);
-#ifdef CONFIG_IGMP_SNOOPING
-	igmpsnoop_addtimer_info = rcu_dereference(igmpsnoop_addtimer_hook);
-	if(igmpsnoop_addtimer_info)
-		igmpsnoop_addtimer_info(br,1);
-#endif
 }
 
 void br_stp_port_timer_init(struct net_bridge_port *p)
 {
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof(igmpsnoop_addtimer_hook) igmpsnoop_addtimer_info;
-#endif
 	setup_timer(&p->message_age_timer, br_message_age_timer_expired,
 		      (unsigned long) p);
 
@@ -179,11 +168,6 @@ void br_stp_port_timer_init(struct net_bridge_port *p)
 
 	setup_timer(&p->hold_timer, br_hold_timer_expired,
 		      (unsigned long) p);
-#ifdef CONFIG_IGMP_SNOOPING
-	igmpsnoop_addtimer_info = rcu_dereference(igmpsnoop_addtimer_hook);
-	if(igmpsnoop_addtimer_info)
-		igmpsnoop_addtimer_info(p,2);
-#endif
 }
 
 /* Report ticks left (in USER_HZ) used for API */

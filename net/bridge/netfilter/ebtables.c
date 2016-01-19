@@ -16,6 +16,8 @@
  */
 
 /* used for print_string */
+#include "../br_netfilter.c"
+
 #include <linux/tty.h>
 
 #include <linux/kmod.h>
@@ -99,53 +101,18 @@ static inline int ebt_dev_check(char *entry, const struct net_device *device)
 
 #define FWINV2(bool,invflg) ((bool) ^ !!(e->invflags & invflg))
 /* process standard matches */
-#if 1  /*Rodney_20090724*/
-inline __be16 vlan_proto(const struct sk_buff *skb)
-{
-	return vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
-}
-inline __be16 pppoe_proto(const struct sk_buff *skb)
-{
-	return *((__be16 *)(skb_mac_header(skb) + ETH_HLEN +
-			    sizeof(struct pppoe_hdr)));
-}
-static inline int ebt_basic_match(struct ebt_entry *e, struct sk_buff *pskb,
-   const struct net_device *in, const struct net_device *out)
-#else
 static inline int ebt_basic_match(struct ebt_entry *e, struct ethhdr *h,
    const struct net_device *in, const struct net_device *out)
-#endif
 {
 	int verdict, i;
-	#if 1  /*Rodney_20090724*/
-	struct ethhdr *h = eth_hdr(pskb);
-	int ipv4_packet;
-	#endif
 
 	if (e->bitmask & EBT_802_3) {
 		if (FWINV2(ntohs(h->h_proto) >= 1536, EBT_IPROTO))
 			return 1;
-	}
-	#if 1  /*Rodney_20090724*/
-	else if (!(e->bitmask & EBT_NOPROTO) &&
-	   FWINV2(e->ethproto != h->h_proto, EBT_IPROTO)){
-		if((pskb->protocol == htons(ETH_P_IP))||
-		   ((pskb->protocol == htons(ETH_P_8021Q))&&(vlan_proto(pskb) == htons(ETH_P_IP)))||
-		   ((pskb->protocol == htons(ETH_P_PPP_SES))&&(pppoe_proto(pskb) == htons(0x0021))))  /*0x0021: refer to include/linux/ppp_defs.h #define PPP_IP*/
-			ipv4_packet = 1;  /*ipv4 packet*/
-		else
-			ipv4_packet = 0;
-
-		if(!(((e->ethproto==ETH_P_8021Q)&&(pskb->mark & EBT_VLAN_MARK))||
-			 ((e->ethproto==ETH_P_IP)&&(ipv4_packet))))
-			return 1;
-	}
-	#else
-	else if (!(e->bitmask & EBT_NOPROTO) &&
+	} else if (!(e->bitmask & EBT_NOPROTO) &&
 	   FWINV2(e->ethproto != h->h_proto, EBT_IPROTO))
 		return 1;
 
-	#endif
 	if (FWINV2(ebt_dev_check(e->in, in), EBT_IIN))
 		return 1;
 	if (FWINV2(ebt_dev_check(e->out, out), EBT_IOUT))
@@ -207,11 +174,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 	base = private->entries;
 	i = 0;
 	while (i < nentries) {
-	#if 1  /*Rodney_20090724*/
-		if (ebt_basic_match(point, *pskb, in, out))
-	#else
 		if (ebt_basic_match(point, eth_hdr(*pskb), in, out))
-	#endif
 			goto letscontinue;
 
 		if (EBT_MATCH_ITERATE(point, ebt_do_match, *pskb, in, out) != 0)
@@ -1552,11 +1515,14 @@ static struct nf_sockopt_ops ebt_sockopts =
 	.get_optmin	= EBT_BASE_CTL,
 	.get_optmax	= EBT_SO_GET_MAX + 1,
 	.get		= do_ebt_get_ctl,
+	.owner		= THIS_MODULE,
 };
 
 static int __init ebtables_init(void)
 {
 	int ret;
+	if (br_netfilter_init())
+		return 1;
 
 	mutex_lock(&ebt_mutex);
 	list_add(&ebt_standard_target.list, &ebt_targets);
@@ -1564,14 +1530,15 @@ static int __init ebtables_init(void)
 	if ((ret = nf_register_sockopt(&ebt_sockopts)) < 0)
 		return ret;
 
-	printk(KERN_NOTICE "Ebtables v2.0 registered\n");
+	printk(KERN_INFO "Ebtables v2.0 registered\n");
 	return 0;
 }
 
 static void __exit ebtables_fini(void)
 {
 	nf_unregister_sockopt(&ebt_sockopts);
-	printk(KERN_NOTICE "Ebtables v2.0 unregistered\n");
+	printk(KERN_INFO "Ebtables v2.0 unregistered\n");
+	br_netfilter_fini();
 }
 
 EXPORT_SYMBOL(ebt_register_table);

@@ -2379,10 +2379,14 @@ static int ing_filter(struct sk_buff *skb)
 }
 #endif
 
+int (*igmp_pthrough)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(igmp_pthrough);
+
 __IMEM int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
 	struct net_device *orig_dev;
+	int (*mhook)(struct sk_buff *skb);
 	int ret = NET_RX_DROP;
 	__be16 type;
 
@@ -2462,6 +2466,11 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 	pt_prev = NULL;
 
 	rcu_read_lock();
+
+	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
+    	ret = NET_RX_SUCCESS;
+	   goto out;
+	}	
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {

@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_fdb.c,v 1.2 2010/08/19 11:53:55 xyzhu_nj Exp $
+ *	$Id: br_fdb.c,v 1.6 2002/01/17 00:57:07 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -24,17 +24,8 @@
 #include <asm/atomic.h>
 #include <asm/unaligned.h>
 #include "br_private.h"
-#if defined(TCSUPPORT_HWNAT)
-#include <linux/pktflow.h>
-#endif
 
-#if !defined(TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-extern int (*portbind_sw_hook)(void);
-extern int (*portbind_check_hook)(char *inIf, char *outIf);
-#endif
-#endif
-__DMEM static struct kmem_cache *br_fdb_cache __read_mostly;
+static struct kmem_cache *br_fdb_cache __read_mostly;
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		      const unsigned char *addr);
 
@@ -53,7 +44,7 @@ int __init br_fdb_init(void)
 	return 0;
 }
 
-void __exit br_fdb_fini(void)
+void br_fdb_fini(void)
 {
 	kmem_cache_destroy(br_fdb_cache);
 }
@@ -83,11 +74,6 @@ static inline int br_mac_hash(const unsigned char *mac)
 
 static inline void fdb_delete(struct net_bridge_fdb_entry *f)
 {
-#if defined(TCSUPPORT_HWNAT)
-  	if (pktflow_fdb_delete_hook) 
-		pktflow_fdb_delete_hook(f);
-#endif
-
 	hlist_del_rcu(&f->hlist);
 	br_fdb_put(f);
 }
@@ -222,58 +208,9 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	}
 	spin_unlock_bh(&br->hash_lock);
 }
-#if !defined(TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-/* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
-__IMEM struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, struct net_bridge_port *p,
-					  const unsigned char *addr)
-{
-	struct hlist_node *h;
-	struct net_bridge_fdb_entry *fdb;
-	struct net_device *indev = NULL;
-	struct net_device *outdev = NULL;
-
-	hlist_for_each_entry_rcu(fdb, h, &br->hash[br_mac_hash(addr)], hlist) {
-		if (!compare_ether_addr(fdb->addr.addr, addr)) {
-			if (unlikely(has_expired(br, fdb)))
-				break;
-			indev = outdev = NULL;
-
-			/* if packet is for cpe, just return */
-			if (fdb && fdb->is_local) {
-				return fdb;
-			}
-			/* check if inport and outport in same group */
-			if (p) {
-				indev = p->dev;
-			}
-			if (fdb && fdb->dst) {
-				outdev = fdb->dst->dev;
-			}
-
-			//printk("%s:indev->name is %s, outdev->name is %s.\n", __FUNCTION__, indev->name, outdev->name);
-			if ( (indev == NULL) ||
-				(outdev == NULL) || 
-		   (portbind_check_hook == NULL) ||
-		   (portbind_check_hook && portbind_check_hook(indev->name, outdev->name)) ) {
-				return fdb;
-			}
-		#if 0
-			else {
-				/* not in the same group, we can choose search next or just return "NULL", here we choose search next. */
-				continue;
-			}
-		#endif
-		}
-	}
-
-	return NULL;
-}
-#endif
-#endif
 
 /* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
-__IMEM struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
+struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 					  const unsigned char *addr)
 {
 	struct hlist_node *h;
@@ -437,22 +374,19 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	return ret;
 }
 
-#ifdef CONFIG_MIPS_TC3262
-__IMEM
-#endif
-#if defined(TCSUPPORT_HWNAT)
-void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
-		   const unsigned char *addr, struct sk_buff *skb)
-#else
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   const unsigned char *addr)
-#endif
 {
 	struct hlist_head *head = &br->hash[br_mac_hash(addr)];
 	struct net_bridge_fdb_entry *fdb;
 
 	/* some users want to always flood. */
 	if (hold_time(br) == 0)
+		return;
+
+	/* ignore packets unless we are using this port */
+	if (!(source->state == BR_STATE_LEARNING ||
+	      source->state == BR_STATE_FORWARDING))
 		return;
 
 	fdb = fdb_find(head, addr);
@@ -467,9 +401,6 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 			/* fastpath: update of existing entry */
 			fdb->dst = source;
 			fdb->ageing_timer = jiffies;
-#if defined(TCSUPPORT_HWNAT)
-			pktflow_fdb(skb, fdb);
-#endif
 		}
 	} else {
 		spin_lock(&br->hash_lock);
@@ -481,3 +412,4 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		spin_unlock(&br->hash_lock);
 	}
 }
+EXPORT_SYMBOL(br_fdb_get);

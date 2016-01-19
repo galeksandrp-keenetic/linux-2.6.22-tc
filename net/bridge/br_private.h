@@ -4,7 +4,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_private.h,v 1.4 2010/08/23 05:07:01 xyzhu_nj Exp $
+ *	$Id: br_private.h,v 1.7 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -83,11 +83,6 @@ struct net_bridge_port
 	struct timer_list		message_age_timer;
 	struct kobject			kobj;
 	struct rcu_head			rcu;
-	/* IGMP snooping */
-#ifdef CONFIG_IGMP_SNOOPING
-	unsigned char			is_router;
-	struct timer_list		router_age_timer;
-#endif
 };
 
 struct net_bridge
@@ -100,12 +95,6 @@ struct net_bridge
 	struct hlist_head		hash[BR_HASH_SIZE];
 	struct list_head		age_list;
 	unsigned long			feature_mask;
-	/* IGMP snooping */
-#ifdef CONFIG_IGMP_SNOOPING
-	struct list_head		mc_list;
-	spinlock_t				mc_list_lock;
-	struct timer_list 		mc_list_timer;
-#endif
 
 	/* STP */
 	bridge_id			designated_root;
@@ -160,13 +149,6 @@ extern void br_fdb_changeaddr(struct net_bridge_port *p,
 extern void br_fdb_cleanup(unsigned long arg);
 extern void br_fdb_delete_by_port(struct net_bridge *br,
 				  const struct net_bridge_port *p, int do_all);
-#if !defined(TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-extern struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, 
-											 	    struct net_bridge_port *p,
-					  						        const unsigned char *addr);
-#endif
-#endif
 extern struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 						 const unsigned char *addr);
 extern struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br,
@@ -177,15 +159,9 @@ extern int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
 			 const unsigned char *addr);
-#if defined(TCSUPPORT_HWNAT)
-extern void br_fdb_update(struct net_bridge *br,
-			  struct net_bridge_port *source,
-			  const unsigned char *addr, struct sk_buff *skb);
-#else
 extern void br_fdb_update(struct net_bridge *br,
 			  struct net_bridge_port *source,
 			  const unsigned char *addr);
-#endif
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -194,20 +170,8 @@ extern int br_dev_queue_push_xmit(struct sk_buff *skb);
 extern void br_forward(const struct net_bridge_port *to,
 		struct sk_buff *skb);
 extern int br_forward_finish(struct sk_buff *skb);
-extern void br_flood_deliver(struct net_bridge *br,
-		      struct sk_buff *skb,
-		      int clone);
-#if !defined(TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-extern void br_flood_pb_forward(struct net_bridge *br, 
-						 struct net_bridge_port *p, 
-						 struct sk_buff *skb, 
-						 int clone);
-#endif
-#endif
-extern void br_flood_forward(struct net_bridge *br,
-		      struct sk_buff *skb,
-		      int clone);
+extern void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb);
+extern void br_flood_forward(struct net_bridge *br, struct sk_buff *skb);
 
 /* br_if.c */
 extern void br_port_carrier_check(struct net_bridge_port *p);
@@ -277,6 +241,11 @@ extern struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
 extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 
 
+/* br_imgp.c */
+extern void (*br_igmp_frame_hook)(struct net_device *from_dev, struct sk_buff *skb);
+extern int  (*br_igmp_flood_hook)(struct net_device *to_dev, const struct sk_buff *skb);
+
+
 /* br_netlink.c */
 extern int br_netlink_init(void);
 extern void br_netlink_fini(void);
@@ -298,39 +267,4 @@ extern void br_sysfs_delbr(struct net_device *dev);
 #define br_sysfs_delbr(dev)	do { } while(0)
 #endif /* CONFIG_SYSFS */
 
-#endif
-
-#ifdef CONFIG_IGMP_SNOOPING
-extern void (*br_igmpsnoop_set_enabled_hook)(struct net_bridge *br, unsigned long val);
-extern int (*br_igmpsnoop_get_enabled_hook)(struct net_bridge *br);
-extern void (*br_igmpsnoop_set_ageing_time_hook)(struct net_bridge *br, unsigned long val);
-extern unsigned long (*br_igmpsnoop_get_ageing_time_hook)(struct net_bridge *br);
-extern void (*br_igmpsnoop_set_quickleave_hook)(struct net_bridge *br, unsigned long val);
-extern int (*br_igmpsnoop_get_quickleave_hook)(struct net_bridge *br);
-extern void (*br_igmpsnoop_set_routeportflag_hook)(struct net_bridge *br, unsigned long val);
-extern int (*br_igmpsnoop_get_routeportflag_hook)(struct net_bridge *br);
-extern void (*br_igmpsnoop_set_dbg_hook)(struct net_bridge *br, unsigned long val);
-extern int (*br_igmpsnoop_get_dbg_hook)(struct net_bridge *br);
-extern int (*br_mc_fdb_fillbuf_hook)(struct net_bridge *br, void *buf,unsigned long maxnum, unsigned long skip);
-extern int (*br_mc_forward_hook)(struct net_bridge *br, struct sk_buff *skb, int clone);
-extern int (*br_mc_deliver_hook)(struct net_bridge *br, struct sk_buff *skb, int clone);
-extern void (*br_mc_fdb_delete_by_port_hook)(struct net_bridge *br,const struct net_bridge_port *p);
-extern void (*igmpsnoop_deletetimer_hook)(void*ptr,int flag);
-extern void (*igmpsnoop_modifytimer_hook)(void*ptr,int flag);
-extern void (*igmpsnoop_addtimer_hook)(void*ptr,int flag);
-#endif
-
-/*MLD Snooping*/
-#ifdef CONFIG_MLD_SNOOPING
-extern int (*br_mldsnooping_forward_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
-extern int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
-extern int (*br_mldsnoop_start_hook)(void);
-extern int (*br_mldsnoop_cleanup_hook)(void);
-extern void (*br_mldsnoop_enable_hook)(int is_enable);
-extern void (*br_mldsnoop_set_age_hook)(struct net_bridge *br, unsigned long age);
-extern void (*br_mldsnoop_show_hook)(void);
-#endif
-
-#ifdef TCSUPPORT_HWNAT 
-extern int port_reverse;
 #endif

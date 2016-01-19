@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_notify.c,v 1.1.1.1 2010/04/09 09:36:25 feiyan Exp $
+ *	$Id: br_notify.c,v 1.2 2000/02/21 15:51:34 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License

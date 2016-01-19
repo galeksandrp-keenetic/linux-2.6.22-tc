@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_device.c,v 1.3 2010/05/20 04:56:20 xhshi Exp $
+ *	$Id: br_device.c,v 1.6 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -21,17 +21,6 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
-#ifdef CONFIG_IGMP_SNOOPING
-MODULE_LICENSE("GPL");
-int (*br_mc_deliver_hook)(struct net_bridge *br, struct sk_buff *skb, int clone);
-EXPORT_SYMBOL_GPL(br_mc_deliver_hook);
-#endif
-
-#ifdef CONFIG_MLD_SNOOPING
-int (*br_mldsnooping_deliver_hook)(struct sk_buff *skb, struct net_bridge *br, unsigned char *dest,int clone);
-EXPORT_SYMBOL(br_mldsnooping_deliver_hook);
-#endif
-
 static struct net_device_stats *br_dev_get_stats(struct net_device *dev)
 {
 	struct net_bridge *br = netdev_priv(dev);
@@ -39,20 +28,12 @@ static struct net_device_stats *br_dev_get_stats(struct net_device *dev)
 }
 
 /* net device transmit always called with no BH (preempt_disabled) */
-__IMEM int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
+int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_bridge *br = netdev_priv(dev);
 	const unsigned char *dest = skb->data;
 	struct net_bridge_fdb_entry *dst;
-#if defined(CONFIG_MLD_SNOOPING) || defined(CONFIG_IGMP_SNOOPING)
-	int ret = 0;
-#endif
-#ifdef CONFIG_MLD_SNOOPING
-	typeof(br_mldsnooping_deliver_hook) br_mldsnooping_deliver;
-#endif	
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof(br_mc_deliver_hook) br_mc_deliver_igmpsnoop;
-#endif
+
 	br->statistics.tx_packets++;
 	br->statistics.tx_bytes += skb->len;
 
@@ -60,38 +41,11 @@ __IMEM int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb_pull(skb, ETH_HLEN);
 
 	if (dest[0] & 1)
-#if defined(CONFIG_MLD_SNOOPING) || defined(CONFIG_IGMP_SNOOPING)
-	{
-		switch(ntohs(skb->protocol)){
-			#ifdef CONFIG_IGMP_SNOOPING
-			case ETH_P_IP:	/*IGMP Snooping*/	
-			br_mc_deliver_igmpsnoop = rcu_dereference(br_mc_deliver_hook);
-			if(br_mc_deliver_igmpsnoop)
-				ret = br_mc_deliver_igmpsnoop(br, skb, 0);		
-			break;
-			#endif
-			#ifdef CONFIG_MLD_SNOOPING
-			case ETH_P_IPV6: /*MLD Snooping*/
-				br_mldsnooping_deliver = rcu_dereference(br_mldsnooping_deliver_hook);
-				if(br_mldsnooping_deliver)
-					ret = br_mldsnooping_deliver(skb, br, dest,0);
-				break;
-			#endif
-			default:
-				ret = 0;
-				break;
-		}
-		if(!ret){
-			br_flood_deliver(br, skb, 0);
-		}
-	}
-#else
-		br_flood_deliver(br, skb, 0);
-#endif
+		br_flood_deliver(br, skb);
 	else if ((dst = __br_fdb_get(br, dest)) != NULL)
 		br_deliver(dst->dst, skb);
 	else
-		br_flood_deliver(br, skb, 0);
+		br_flood_deliver(br, skb);
 
 	return 0;
 }
@@ -225,6 +179,5 @@ void br_dev_setup(struct net_device *dev)
 	dev->priv_flags = IFF_EBRIDGE;
 
 	dev->features = NETIF_F_SG | NETIF_F_FRAGLIST | NETIF_F_HIGHDMA |
-			NETIF_F_GSO_SOFTWARE | NETIF_F_NO_CSUM |
-			NETIF_F_GSO_ROBUST | NETIF_F_LLTX;
+			NETIF_F_GSO_MASK | NETIF_F_NO_CSUM | NETIF_F_LLTX;
 }

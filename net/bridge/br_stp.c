@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_stp.c,v 1.1.1.1 2010/04/09 09:36:25 feiyan Exp $
+ *	$Id: br_stp.c,v 1.4 2000/06/19 10:13:35 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License

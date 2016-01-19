@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_stp_if.c,v 1.2 2010/05/20 04:56:20 xhshi Exp $
+ *	$Id: br_stp_if.c,v 1.4 2001/04/14 21:14:39 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -19,15 +19,8 @@
 
 #include "br_private.h"
 #include "br_private_stp.h"
-#ifdef CONFIG_IGMP_SNOOPING
-MODULE_LICENSE("GPL");
-void (*igmpsnoop_deletetimer_hook)(void*ptr,int flag);
-EXPORT_SYMBOL_GPL(igmpsnoop_deletetimer_hook);
-void (*igmpsnoop_modifytimer_hook)(void*ptr,int flag);
-EXPORT_SYMBOL_GPL(igmpsnoop_modifytimer_hook);
-void (*igmpsnoop_addtimer_hook)(void*ptr,int flag);
-EXPORT_SYMBOL_GPL(igmpsnoop_addtimer_hook);
-#endif
+
+
 /* Port id is composed of priority and port number.
  * NB: least significant bits of priority are dropped to
  *     make room for more ports.
@@ -53,17 +46,9 @@ void br_stp_enable_bridge(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof(igmpsnoop_modifytimer_hook) igmpsnoop_modifytimer_info;
-#endif
 	spin_lock_bh(&br->lock);
 	mod_timer(&br->hello_timer, jiffies + br->hello_time);
 	mod_timer(&br->gc_timer, jiffies + HZ/10);
-#ifdef CONFIG_IGMP_SNOOPING
-	igmpsnoop_modifytimer_info = rcu_dereference(igmpsnoop_modifytimer_hook);
-	if(igmpsnoop_modifytimer_info)
-		igmpsnoop_modifytimer_info(br,1);
-#endif
 
 	br_config_bpdu_generation(br);
 
@@ -80,9 +65,6 @@ void br_stp_disable_bridge(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof (igmpsnoop_deletetimer_hook) igmpsnoop_deletetimer_info;
-#endif
 	spin_lock_bh(&br->lock);
 	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED)
@@ -98,11 +80,6 @@ void br_stp_disable_bridge(struct net_bridge *br)
 	del_timer_sync(&br->topology_change_timer);
 	del_timer_sync(&br->tcn_timer);
 	del_timer_sync(&br->gc_timer);
-#ifdef CONFIG_IGMP_SNOOPING
-	igmpsnoop_deletetimer_info = rcu_dereference(igmpsnoop_deletetimer_hook);
-	if(igmpsnoop_deletetimer_info)	
-		igmpsnoop_deletetimer_info(br,1);
-#endif
 }
 
 /* called under bridge lock */
@@ -117,10 +94,6 @@ void br_stp_disable_port(struct net_bridge_port *p)
 {
 	struct net_bridge *br;
 	int wasroot;
-#ifdef CONFIG_IGMP_SNOOPING
-	typeof(br_mc_fdb_delete_by_port_hook) br_mc_fdb_delete_by_port_info;
-	typeof(igmpsnoop_deletetimer_hook) igmpsnoop_deletetimer_info;
-#endif
 
 	br = p->br;
 	printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
@@ -135,19 +108,9 @@ void br_stp_disable_port(struct net_bridge_port *p)
 	del_timer(&p->message_age_timer);
 	del_timer(&p->forward_delay_timer);
 	del_timer(&p->hold_timer);
-#ifdef CONFIG_IGMP_SNOOPING
-	igmpsnoop_deletetimer_info = rcu_dereference(igmpsnoop_deletetimer_hook);
-	if(igmpsnoop_deletetimer_info)	
-		igmpsnoop_deletetimer_info(p,2);
-#endif
 
 	br_fdb_delete_by_port(br, p, 0);
 
-#ifdef CONFIG_IGMP_SNOOPING
-	br_mc_fdb_delete_by_port_info = rcu_dereference(br_mc_fdb_delete_by_port_hook);
-	if(br_mc_fdb_delete_by_port_info)
-		br_mc_fdb_delete_by_port_info(br, p);
-#endif
 	br_configuration_update(br);
 
 	br_port_state_selection(br);
@@ -169,7 +132,7 @@ static void br_stp_start(struct net_bridge *br)
 	} else {
 		br->stp_enabled = BR_KERNEL_STP;
 		printk(KERN_INFO "%s: starting userspace STP failed, "
-				"staring kernel STP\n", br->dev->name);
+				"starting kernel STP\n", br->dev->name);
 
 		/* To start timers on any ports left in blocking */
 		spin_lock_bh(&br->lock);

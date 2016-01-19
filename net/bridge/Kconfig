@@ -30,16 +30,3 @@ config BRIDGE
 	  will be called bridge.
 
 	  If unsure, say N.
-if BRIDGE
-config IGMP_SNOOPING
-	bool "IGMP Snooping Support"
-	help
-	  Say Y here if you want to have IGMP snooping support. Otherwise say N.
-
-if IPV6
-config MLD_SNOOPING
-	bool "MLD Snooping Support"
-	help
-		Say Y here if you want to have MLD Snooping support.Otherwise say N.
-endif
-endif

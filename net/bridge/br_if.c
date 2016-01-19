@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_if.c,v 1.4 2010/05/20 08:31:06 xhshi Exp $
+ *	$Id: br_if.c,v 1.7 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -24,54 +24,30 @@
 #include <net/sock.h>
 
 #include "br_private.h"
-#ifdef CONFIG_IGMP_SNOOPING
-MODULE_LICENSE("GPL");
-void (*br_mc_fdb_delete_by_port_hook)(struct net_bridge *br,
-			   const struct net_bridge_port *p);
-EXPORT_SYMBOL_GPL(br_mc_fdb_delete_by_port_hook);
-#endif
-
-#ifdef CONFIG_MLD_SNOOPING
-int (*br_mldsnoop_cleanup_hook)(void) = NULL;
-int (*br_mldsnoop_start_hook)(void) = NULL;
-EXPORT_SYMBOL(br_mldsnoop_start_hook);
-EXPORT_SYMBOL(br_mldsnoop_cleanup_hook);
-#endif
 
 /*
  * Determine initial path cost based on speed.
  * using recommendations from 802.1d standard
  *
- * Need to simulate user ioctl because not all device's that support
- * ethtool, use ethtool_ops.  Also, since driver might sleep need to
- * not be holding any locks.
+ * Since driver might sleep need to not be holding any locks.
  */
 static int port_cost(struct net_device *dev)
 {
-	struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-	struct ifreq ifr;
-	mm_segment_t old_fs;
-	int err;
+	if (dev->ethtool_ops && dev->ethtool_ops->get_settings) {
+		struct ethtool_cmd ecmd = { .cmd = ETHTOOL_GSET, };
 
-	strncpy(ifr.ifr_name, dev->name, IFNAMSIZ);
-	ifr.ifr_data = (void __user *) &ecmd;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = dev_ethtool(&ifr);
-	set_fs(old_fs);
-
-	if (!err) {
+		if (!dev->ethtool_ops->get_settings(dev, &ecmd)) {
 		switch(ecmd.speed) {
-		case SPEED_100:
-			return 19;
-		case SPEED_1000:
-			return 4;
 		case SPEED_10000:
 			return 2;
+			case SPEED_1000:
+				return 4;
+			case SPEED_100:
+				return 19;
 		case SPEED_10:
 			return 100;
 		}
+	}
 	}
 
 	/* Old silly heuristics based on name */
@@ -157,9 +133,6 @@ static void del_nbp(struct net_bridge_port *p)
 	struct net_bridge *br = p->br;
 	struct net_device *dev = p->dev;
 
-#ifdef CONFIG_IGMP_SNOOPING	
-	typeof(br_mc_fdb_delete_by_port_hook) br_mc_fdb_delete_by_port_info;
-#endif	
 	sysfs_remove_link(&br->ifobj, dev->name);
 
 	dev_set_promiscuity(dev, -1);
@@ -171,11 +144,6 @@ static void del_nbp(struct net_bridge_port *p)
 	br_ifinfo_notify(RTM_DELLINK, p);
 
 	br_fdb_delete_by_port(br, p, 1);
-#ifdef CONFIG_IGMP_SNOOPING
-	br_mc_fdb_delete_by_port_info = rcu_dereference(br_mc_fdb_delete_by_port_hook);
-	if(br_mc_fdb_delete_by_port_info)
-		br_mc_fdb_delete_by_port_info(br, p);
-#endif
 
 	list_del_rcu(&p->list);
 
@@ -191,13 +159,6 @@ static void del_nbp(struct net_bridge_port *p)
 static void del_br(struct net_bridge *br)
 {
 	struct net_bridge_port *p, *n;
-	#ifdef CONFIG_MLD_SNOOPING
-	typeof(br_mldsnoop_cleanup_hook) br_mldsnoop_cleanup;
-	
-	br_mldsnoop_cleanup = rcu_dereference(br_mldsnoop_cleanup_hook);	
-	if(br_mldsnoop_cleanup)			
-		br_mldsnoop_cleanup();
-	#endif
 
 	list_for_each_entry_safe(p, n, &br->port_list, list) {
 		del_nbp(p);
@@ -213,9 +174,6 @@ static struct net_device *new_bridge_dev(const char *name)
 {
 	struct net_bridge *br;
 	struct net_device *dev;
-#ifdef CONFIG_MLD_SNOOPING
-	typeof(br_mldsnoop_start_hook) br_mldsnoop_start;
-#endif
 
 	dev = alloc_netdev(sizeof(struct net_bridge), name,
 			   br_dev_setup);
@@ -229,15 +187,6 @@ static struct net_device *new_bridge_dev(const char *name)
 	spin_lock_init(&br->lock);
 	INIT_LIST_HEAD(&br->port_list);
 	spin_lock_init(&br->hash_lock);
-#ifdef CONFIG_IGMP_SNOOPING
-	INIT_LIST_HEAD(&br->mc_list);
-	spin_lock_init(&br->mc_list_lock);
-#endif
-#ifdef CONFIG_MLD_SNOOPING
-	br_mldsnoop_start = rcu_dereference(br_mldsnoop_start_hook);
-	if(br_mldsnoop_start)
-		br_mldsnoop_start();
-#endif
 
 	br->bridge_id.prio[0] = 0x80;
 	br->bridge_id.prio[1] = 0x00;
@@ -314,11 +263,6 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->kobj.ktype = &brport_ktype;
 	p->kobj.parent = &(dev->dev.kobj);
 	p->kobj.kset = NULL;
-
-	/* IGMP snooping */
-#ifdef CONFIG_IGMP_SNOOPING
-	p->is_router = 0;
-#endif
 
 	return p;
 }
@@ -422,9 +366,6 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	struct net_bridge_port *p;
 	int err = 0;
 
-#ifdef CONFIG_IGMP_SNOOPING	
-	typeof(br_mc_fdb_delete_by_port_hook) br_mc_fdb_delete_by_port_info;
-#endif	
 	if (dev->flags & IFF_LOOPBACK || dev->type != ARPHRD_ETHER)
 		return -EINVAL;
 
@@ -473,11 +414,6 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	return 0;
 err2:
 	br_fdb_delete_by_port(br, p, 1);
-#ifdef CONFIG_IGMP_SNOOPING
-	br_mc_fdb_delete_by_port_info = rcu_dereference(br_mc_fdb_delete_by_port_hook);
-	if(br_mc_fdb_delete_by_port_info)
-		br_mc_fdb_delete_by_port_info(br, p);
-#endif
 err1:
 	kobject_del(&p->kobj);
 err0:

@@ -68,39 +68,18 @@ ebt_filter_vlan(const struct sk_buff *skb,
 	 * (CFI) is a single bit flag value. Currently ignored.
 	 * - VLAN Identifier (VID). The VID is encoded as
 	 * an unsigned binary number. */
-#if 0  /*Rodney_20090724*/
-	if(skb->mark & EBT_VLAN_MARK)  /*vlan interface is on*/
-		TCI = ntohs((skb->mark >> 5) & 0xffff);  /*vlan tag is store in skb->mark bit 5~20*/
-	else
-		TCI = ntohs(fp->h_vlan_TCI);
-#else
 	TCI = ntohs(fp->h_vlan_TCI);
-#endif
 	id = TCI & VLAN_VID_MASK;
 	prio = (TCI >> 13) & 0x7;
 	encap = fp->h_vlan_encapsulated_proto;
 
 	/* Checking VLAN Identifier (VID) */
 	if (GET_BITMASK(EBT_VLAN_ID))
-#if 1  /*Rodney_20090724*/
-	{
-		if (FWINV(id < info->id[0] || id > info->id[1], EBT_VLAN_ID))
-			return EBT_NOMATCH;
-	}
-#else
 		EXIT_ON_MISMATCH(id, EBT_VLAN_ID);
-#endif
 
 	/* Checking user_priority */
 	if (GET_BITMASK(EBT_VLAN_PRIO))
-#if 1  /*Rodney_20090724*/
-	{
-		if (FWINV(prio < info->prio[0] || prio > info->prio[1], EBT_VLAN_PRIO))
-			return EBT_NOMATCH;
-	}
-#else
 		EXIT_ON_MISMATCH(prio, EBT_VLAN_PRIO);
-#endif
 
 	/* Checking Encapsulated Proto (Length/Type) field */
 	if (GET_BITMASK(EBT_VLAN_ENCAP))
@@ -154,15 +133,6 @@ ebt_check_vlan(const char *tablename,
 	 * 0x0FFF - Reserved for implementation use.
 	 * if_vlan.h: VLAN_GROUP_ARRAY_LEN 4096. */
 	if (GET_BITMASK(EBT_VLAN_ID)) {
-#if 1  /*Rodney_20090724*/
-		if((info->id[0] !=0) || (info->id[1] != 0)){ /* if id!=0 => check vid range */
-			if((info->id[0] > VLAN_GROUP_ARRAY_LEN) || (info->id[1] > VLAN_GROUP_ARRAY_LEN)
-					|| (info->id[0] > info->id[1])){
-				DEBUG_MSG("Vlan id  is out of range (1-4096)\n");
-				return -EINVAL;
-			}
-		}
-#else
 		if (!!info->id) { /* if id!=0 => check vid range */
 			if (info->id > VLAN_GROUP_ARRAY_LEN) {
 				DEBUG_MSG
@@ -177,23 +147,14 @@ ebt_check_vlan(const char *tablename,
 			info->bitmask &= ~EBT_VLAN_PRIO;
 		}
 		/* Else, id=0 (null VLAN ID)  => user_priority range (any?) */
-#endif
 	}
 
 	if (GET_BITMASK(EBT_VLAN_PRIO)) {
-#if 1  /*Rodney_20090724*/
-		if ((info->prio[0] > 7) || (info->prio[1] > 7)
-			|| (info->prio[0] > info->prio[1])){
-			DEBUG_MSG("prio is out of range!!\n");
-			return -EINVAL;
-		}
-#else
 		if ((unsigned char) info->prio > 7) {
 			DEBUG_MSG("prio %d is out of range (0-7)\n",
 			     info->prio);
 			return -EINVAL;
 		}
-#endif
 	}
 	/* Check for encapsulated proto range - it is possible to be
 	 * any value for u_short range.
