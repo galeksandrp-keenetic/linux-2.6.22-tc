@@ -1232,6 +1232,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
             /* Check wimax devices, McMCC, 21092010 */
             //printk("usbnet: VID = 0x%04x, PID = 0x%04x\n", xdev->descriptor.idVendor, xdev->descriptor.idProduct);
             if(((xdev->descriptor.idProduct == 0x7112) && (xdev->descriptor.idVendor == 0x0e8d)) || /* ZyXEL on MTK */
+               ((xdev->descriptor.idProduct == 0x002a) && (xdev->descriptor.idVendor == 0x15a9)) || /* Yota WLTUBA-107 */
                ((xdev->descriptor.idProduct == 0x7708) && (xdev->descriptor.idVendor == 0x1076)) || /* Yota Key */
                (((xdev->descriptor.idProduct == 0x8002) || (xdev->descriptor.idProduct == 0x8003)) && (xdev->descriptor.idVendor == 0x1076)) || /* Yota One */ 
                ((xdev->descriptor.idProduct == 0xa4a2) && (xdev->descriptor.idVendor == 0x0525)))   /* Yota Key */
