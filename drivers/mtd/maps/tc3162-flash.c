@@ -47,12 +47,12 @@ static struct mtd_partition tc3162_parts[] = {
                 offset:         0x50000,
         }, {
                 name:           "RootFS", /* mtdblock4 */
-                size:           0x240000,
+                size:           0x270000,
                 offset:         0x180000,
         }, {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
-                offset:         0x3c0000,
+                offset:         0x3f0000,
 #elif defined (CONFIG_FLASH_8M)
                 name:           "Kernel", /* mtdblock3 */
                 size:           0x150000,
@@ -75,55 +75,35 @@ static struct mtd_partition tc3162_parts[] = {
                 offset:         0x50000,
         }, {
                 name:           "RootFS", /* mtdblock4 */
-                size:           0xc50000,
+                size:           0xd50000,
                 offset:         0x1a0000,
         }, {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
-                offset:         0xdf0000,
+                offset:         0xef0000,
         }, {
                 name:           "Storage", /* mtdblock6 */
-                size:           0x200000,
-                offset:         0xe00000,
-#else
+                size:           0x100000,
+                offset:         0xf00000,
+#else /* 32M */
                 name:           "Kernel", /* mtdblock3 */
-                size:           0xF0000,
+                size:           0x150000,
                 offset:         0x50000,
         }, {
                 name:           "RootFS", /* mtdblock4 */
-                size:           0x2B0000,
-                offset:         0x140000,
+                size:           0x1d50000,
+                offset:         0x1a0000,
         }, {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
-                offset:         0x3f0000,
+                offset:         0x1ef0000,
+        }, {
+                name:           "Storage", /* mtdblock6 */
+                size:           0x100000,
+                offset:         0x1f00000,
 #endif
 #else
 #if defined (CONFIG_FLASH_4M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x370000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x3c0000,
-#elif defined (CONFIG_FLASH_8M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x7a0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x7f0000,
-#elif defined (CONFIG_FLASH_16M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0xfa0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0xff0000,
-#else
                 name:           "Kernel", /* mtdblock3 */
                 size:           0x3a0000,
                 offset:         0x50000,
@@ -131,7 +111,42 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
                 offset:         0x3f0000,
-
+#elif defined (CONFIG_FLASH_8M)
+                name:           "Kernel", /* mtdblock3 */
+                size:           0x6a0000,
+                offset:         0x50000,
+        }, {
+                name:           "Config", /* mtdblock5 */
+                size:           0x10000,
+                offset:         0x6f0000,
+        }, {
+                name:           "Storage", /* mtdblock6 */
+                size:           0x100000,
+                offset:         0x700000,
+#elif defined (CONFIG_FLASH_16M)
+                name:           "Kernel", /* mtdblock3 */
+                size:           0xea0000,
+                offset:         0x50000,
+        }, {
+                name:           "Config", /* mtdblock5 */
+                size:           0x10000,
+                offset:         0xef0000,
+        }, {
+                name:           "Storage", /* mtdblock6 */
+                size:           0x100000,
+                offset:         0xf00000,
+#else /* 32M */
+                name:           "Kernel", /* mtdblock3 */
+                size:           0x1ea0000,
+                offset:         0x50000,
+        }, {
+                name:           "Config", /* mtdblock5 */
+                size:           0x10000,
+                offset:         0x1ef0000,
+        }, {
+                name:           "Storage", /* mtdblock6 */
+                size:           0x100000,
+                offset:         0x1f00000,
 #endif	  
 #endif
         }
