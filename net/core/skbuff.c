@@ -91,9 +91,8 @@ __DMEM static struct kmem_cache *skbuff_fclone_cache __read_mostly;
 
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 atomic_t g_used_skb_num;
-int g_max_skb_num = 2560;
+int g_max_skb_num = 10240;
 EXPORT_SYMBOL(g_used_skb_num);
-
 int peak_skb_num = 0;
 #endif
 

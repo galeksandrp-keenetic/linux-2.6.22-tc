@@ -13,7 +13,6 @@ obj-y		     += dev.o dev_mcast.o dst.o netevent.o \
 obj-$(CONFIG_XFRM) += flow.o
 obj-y += net-sysfs.o
 obj-$(CONFIG_QOS) += qos_type.o
-#obj-$(CONFIG_PORT_BINDING) += tc_portbind.o
 obj-$(CONFIG_ETHTOOL) += ethtool.o
 obj-$(CONFIG_NET_PKTGEN) += pktgen.o
 obj-$(CONFIG_NETPOLL) += netpoll.o

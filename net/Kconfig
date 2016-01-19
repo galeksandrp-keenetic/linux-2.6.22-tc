@@ -73,11 +73,6 @@ config SMUX
 	help
 	  This enables smux function to support multi interfaces for each PVC.
 	 
-config PORT_BINDING
-	bool "port bind"
-	help
-	  This enables port bind function.
-
 menuconfig NETFILTER
 	bool "Network packet filtering framework (Netfilter)"
 	---help---

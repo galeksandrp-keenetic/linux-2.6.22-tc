@@ -308,15 +308,6 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
-#if !defined(CONFIG_TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-#define MASK_ORIGIN_DEV   		0x1 	/* flag for port bind set origin dev name */
-#define MASK_OUT_DEV   			0x2 	/* flag for port bind set origin dev name */
-#define	IFNAMSIZ				16
-	__u32		portbind_mark;
-	char		orig_dev_name[IFNAMSIZ];
-#endif
-#endif
 #ifdef	CONFIG_TCSUPPORT_VLAN_TAG
 	__u16		vlan_tags[2];
 #define		VLAN_PACKET				(1<<0)
@@ -1786,12 +1777,6 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 #ifdef CONFIG_BRIDGE_NETFILTER
 	dst->nf_bridge  = src->nf_bridge;
 	nf_bridge_get(src->nf_bridge);
-#endif
-#if !defined(CONFIG_TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-	dst->portbind_mark = src->portbind_mark;
-	memcpy(dst->orig_dev_name, src->orig_dev_name, IFNAMSIZ);
-#endif
 #endif
 #ifdef CONFIG_TCSUPPORT_VLAN_TAG
 	dst->vlan_tags[0] = src->vlan_tags[0];

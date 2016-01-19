@@ -273,17 +273,6 @@ Normal_Handle:
 #endif
 #endif
 	}
-#if !defined(CONFIG_TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-	if (skb->dev->name[0] == 'e') {
-	//	skb->mark |= MASK_ORIGIN_DEV;
-		skb->portbind_mark |= MASK_ORIGIN_DEV;
-		memcpy(skb->orig_dev_name, skb->dev->name, IFNAMSIZ);
-		//printk("vlan_skb_recv: begin orig_dev name is [%s], orig_dev name is [%s]\n", skb->orig_dev_name, orig_dev->name);
-	}
-#endif
-#endif
-
 
 	skb->dev->last_rx = jiffies;
 

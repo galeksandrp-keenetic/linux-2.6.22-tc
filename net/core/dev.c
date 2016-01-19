@@ -1573,15 +1573,6 @@ static inline __be16 pppoe_proto(const struct sk_buff *skb)
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
  */
-#if !defined(CONFIG_TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-int (*portbind_sw_hook)(void);
-int (*portbind_check_hook)(char *inIf, char *outIf);
-EXPORT_SYMBOL(portbind_sw_hook);
-EXPORT_SYMBOL(portbind_check_hook);
-#endif
-#endif
-
 
 #ifdef CONFIG_QOS
 u32 qos_queue_mask = 0;
@@ -1609,10 +1600,6 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 	struct Qdisc *q;
 	int rc = -ENOMEM;
 
-#ifdef CONFIG_PORT_BINDING	
-	char portbind_ret;
-#endif
-	
 #ifdef CONFIG_QOS
 	u32 queue_num = 0;
 	/* add for ppp & dhcp QoS */
@@ -1628,44 +1615,6 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 	int ret, rule_no, rtp_match;
 #endif
 
-#ifdef CONFIG_PORT_BINDING
-/*
-	if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
-		if ((portbind_check_hook) && (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 0)) {
-			//printk("dev_queue_xmit: checkGroup will free skb, skb orig dev is [%s] outgoing dev is [%s]\n", skb->orig_dev_name, skb->dev->name);
-			goto out_kfree_skb;
-		}
-		else {
-			if ('b' != skb->dev->name[0]) {
-				skb->portbind_mark |= MASK_OUT_DEV;
-			}
-		}
-	}
-*/
-	#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-		if ((portbind_sw_hook) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
-	#else
-		if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
-	#endif
-		if (portbind_check_hook) {
-			//only need check once. shnwind 20110407.
-			portbind_ret = portbind_check_hook(skb->orig_dev_name, skb->dev->name);
-			if(portbind_ret == 0){
-				goto out_kfree_skb;
-			}else if(portbind_ret == 1){
-				skb->portbind_mark |= MASK_OUT_DEV;	
-			}
-#if 0	
-			if (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 0) 
-				goto out_kfree_skb;
-			else if (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 1) 
-				skb->portbind_mark |= MASK_OUT_DEV;
-#endif				
-			/* else check again */
-		}
-	}
-#endif
-	
 #ifdef CONFIG_TCSUPPORT_VLAN_TAG
 	#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 	if (check_vtag_hook && (check_vtag_hook()) == 1)
@@ -2421,37 +2370,6 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 
 	if (!orig_dev)
 		return NET_RX_DROP;
-#if !defined(CONFIG_TCSUPPORT_CT) 
-#ifdef CONFIG_PORT_BINDING
-#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
-	if (portbind_sw_hook) {
-#else
-	if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
-#endif
-#ifdef CONFIG_SMUX
-	 /*we only check OSMUX interface and other interface*/
-	 //if((orig_dev->priv_flags & IFF_RSMUX) == 0)
- 	//if((orig_dev->name[0] != 'n') || (orig_dev->priv_flags & IFF_OSMUX))
-	 //{
-		if( (orig_dev->priv_flags & IFF_OSMUX) || (skb->portbind_mark & MASK_ORIGIN_DEV) == 0)
-		{
-			skb->portbind_mark |= MASK_ORIGIN_DEV;
-			memcpy(skb->orig_dev_name, orig_dev->name, IFNAMSIZ);
-			//printk("netif_receive_skb: CONFIG_SMUX origin name is [%s], skb device name is [%s]\n", skb->orig_dev_name, skb->dev->name);
-		}
-
-	 //}
-#else
-	if( (skb->portbind_mark & MASK_ORIGIN_DEV) == 0)
-	{
-		skb->portbind_mark |= MASK_ORIGIN_DEV;
-		memcpy(skb->orig_dev_name, orig_dev->name, IFNAMSIZ);
-		//printk("netif_receive_skb: begin orig_dev name is [%s], skb device name is [%s]\n", skb->orig_dev_name, skb->dev->name);
-	}
-#endif
-	}
-#endif
-#endif
 
 	__get_cpu_var(netdev_rx_stat).total++;
 
