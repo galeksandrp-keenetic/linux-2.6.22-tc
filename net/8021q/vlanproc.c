@@ -317,6 +317,8 @@ static int vlandev_seq_show(struct seq_file *seq, void *offset)
 	const struct vlan_dev_info *dev_info = VLAN_DEV_INFO(vlandev);
 	struct net_device_stats *stats;
 	static const char fmt[] = "%30s %12lu\n";
+	static const char fmt_bytes[] = "%30s %20llu\n";
+	static const char fmt_pkt[] = "%30s %16llu\n";
 	int i;
 
 	if ((vlandev == NULL) || (!(vlandev->priv_flags & IFF_802_1Q_VLAN)))
@@ -329,12 +331,12 @@ static int vlandev_seq_show(struct seq_file *seq, void *offset)
 
 	stats = vlan_dev_get_stats(vlandev);
 
-	seq_printf(seq, fmt, "total frames received", stats->rx_packets);
-	seq_printf(seq, fmt, "total bytes received", stats->rx_bytes);
+	seq_printf(seq, fmt_pkt, "total frames received", stats->rx_packets);
+	seq_printf(seq, fmt_bytes, "total bytes received", stats->rx_bytes);
 	seq_printf(seq, fmt, "Broadcast/Multicast Rcvd", stats->multicast);
 	seq_puts(seq, "\n");
-	seq_printf(seq, fmt, "total frames transmitted", stats->tx_packets);
-	seq_printf(seq, fmt, "total bytes transmitted", stats->tx_bytes);
+	seq_printf(seq, fmt_pkt, "total frames transmitted", stats->tx_packets);
+	seq_printf(seq, fmt_bytes, "total bytes transmitted", stats->tx_bytes);
 	seq_printf(seq, fmt, "total headroom inc",
 		   dev_info->cnt_inc_headroom_on_tx);
 	seq_printf(seq, fmt, "total encap on xmit",
