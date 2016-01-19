@@ -1965,6 +1965,11 @@ __IMEM int netif_rx(struct sk_buff *skb)
 	int  i = 0;
 #endif
 
+	if( !skb->dev ) {
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
+
 	/* if netpoll wants it, pretend we never saw it */
 	if (netpoll_rx(skb))
 		return NET_RX_DROP;
