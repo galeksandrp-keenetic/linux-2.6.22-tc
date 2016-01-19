@@ -255,8 +255,9 @@ void local_bh_enable(void)
 
 	WARN_ON_ONCE(in_irq());
 #endif
+#ifdef CONFIG_SMP
 	WARN_ON_ONCE(irqs_disabled());
-
+#endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	local_irq_save(flags);
 #endif
