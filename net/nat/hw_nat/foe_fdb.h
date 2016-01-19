@@ -219,13 +219,7 @@ struct bf_info_blk1 {
 
 struct _info_blk2 {
 #ifdef __BIG_ENDIAN
-#ifdef HWNAT_6336X
-    uint32_t dscp:8; 
-#else
-    uint32_t resv4:1; 
-    uint32_t resv3:1; 
-    uint32_t act_dp:6; /* actual destination port */
-#endif
+    uint16_t dscp:8; /* DSCP value */
     uint32_t ae:1;  /* account enable */
     uint32_t rmdscp:1; 
     uint32_t port_ag:6; /* port account group */
@@ -247,8 +241,7 @@ struct _info_blk2 {
     uint16_t port_ag:6; /* port account group */
     uint16_t rmdscp:1; /* remark IPv4 DSCP */
     uint16_t ae:1;  /* account enable */
-    uint16_t act_dp:6; /* actual destination port */
-    uint16_t resv3:1; 
+    uint16_t dscp:8; /* DSCP value */
 #endif
 };
 
@@ -354,16 +347,15 @@ struct FoeEntry {
     uint8_t	smac_lo[4];
 
 #ifdef __BIG_ENDIAN
-#ifdef HWNAT_6336X
-    uint8_t act_dp; /* actual destination port */
-#else
-    uint8_t	resv1; 
-#endif
+	uint8_t resv1:2;
+    uint8_t	act_dp:6; /* actual destination port */
     uint8_t	snap_ctrl[3];
 #else
     uint8_t	snap_ctrl[3];
-    uint8_t	resv1; 
+    uint8_t	act_dp:6; /* actual destination port */ 
+	uint8_t resv1:2;
 #endif
+
 #ifdef __BIG_ENDIAN
     uint16_t	resv2;
     uint16_t	vlan2;

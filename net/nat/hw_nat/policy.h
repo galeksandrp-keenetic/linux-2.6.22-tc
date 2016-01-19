@@ -35,23 +35,7 @@ Steven Liu  2007-01-23      Initial version
 /*
  * DEFINITIONS AND MACROS
  */
-#ifdef HWNAT_6336X
 #define POLICY_TBL_BASE    (0xbfb50000 + 0x1000)
-#else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
-#include <asm/rt2880/rt_mmap.h>
-#define POLICY_TBL_BASE    (RALINK_FRAME_ENGINE_BASE + 0x1000)
-#else
-#if defined(CONFIG_RALINK_RT2880_SHUTTLE)
-#define POLICY_TBL_BASE    0xA0311000
-#elif defined (CONFIG_RALINK_RT2880_MP)
-#define POLICY_TBL_BASE    0xA0401000
-#else
-#error Please Choose Chip Version 
-#endif
-#endif
-#endif
-
 
 /*
  * TYPEDEFS AND STRUCTURES

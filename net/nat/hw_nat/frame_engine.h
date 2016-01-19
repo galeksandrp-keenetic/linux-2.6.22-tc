@@ -35,27 +35,8 @@
 /*
  * DEFINITIONS AND MACROS
  */
-#ifdef HWNAT_6336X
 #define FE_BASE		    	(0xbfb50000)
 #define SYS_CTRL_BASE       (0xbfb00000)
-#else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
-#include <asm/rt2880/rt_mmap.h>
-#define FE_BASE		    RALINK_FRAME_ENGINE_BASE
-#define SYS_CTRL_BASE       RALINK_SYSCTL_BASE
-#else
-#if defined(CONFIG_RALINK_RT2880_SHUTTLE)
-#define FE_BASE		   0xA0310000
-#define SYS_CTRL_BASE      0xA0300000
-#elif defined (CONFIG_RALINK_RT2880_MP)
-#define FE_BASE		   0xA0400000
-#define SYS_CTRL_BASE      0xA0300000
-#else
-#error Please Choose Chip Version 
-#endif
-#endif
-#endif
-
 
 #define CHIPID		    SYS_CTRL_BASE + 0x00
 #define REVID		    SYS_CTRL_BASE + 0x0C
@@ -184,13 +165,8 @@ enum FoeCpuReason {
 #define DFL_BYTE_SWAP		(1) /* 1:Enable byte swap, 0: Disable byte swap */
 /* PPE_GLO_CFG, Offset=0x200 */
 #define DFL_TTL0_DRP		(1) /* 1:Drop, 0: Alert CPU */
-#ifdef HWNAT_6336X
-#define DFL_VPRI_EN		(0) /* Use VLAN pri tag as priority desision */
-#define DFL_DPRI_EN		(0) /* Use DSCP as priority decision */
-#else
 #define DFL_VPRI_EN		(1) /* Use VLAN pri tag as priority desision */
 #define DFL_DPRI_EN		(1) /* Use DSCP as priority decision */
-#endif
 
 #if defined (CONFIG_RA_HW_NAT_ACL2UP_HELPER)
 #define DFL_REG_DSCP		(0) /* Re-gePnerate DSCP */
@@ -396,7 +372,7 @@ enum FoeCpuReason {
  */
 #ifdef CONFIG_RA_HW_NAT_HASH0
 #define DFL_FOE_HASH_MODE	0
-#elif CONFIG_RA_HW_NAT_HASH1
+#elif defined(CONFIG_RA_HW_NAT_HASH1)
 #define DFL_FOE_HASH_MODE	1
 #endif
 

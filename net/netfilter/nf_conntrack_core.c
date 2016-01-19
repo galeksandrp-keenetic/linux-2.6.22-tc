@@ -1084,7 +1084,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	u_int8_t protonum;
 	int set_reply = 0;
 	int ret;
-	struct nf_conn_help *phelp;
+//	struct nf_conn_help *phelp;
 	struct udphdr *udp;
 	struct iphdr *iph;
 	int is_helper = 0;
@@ -1156,10 +1156,11 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		NF_CT_STAT_INC_ATOMIC(invalid);
 		return -ret;
 	}
-
+/*
 	phelp = nfct_help(ct);
 	if (phelp && phelp->helper)
 		is_helper = 1;
+*/
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	if(   (fast_nat_bind_hook = rcu_dereference(fast_nat_bind_hook_func)) &&
@@ -1196,9 +1197,11 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		if (IS_SPACE_AVAILABLED(*pskb) &&
           	((FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_PCI) ||
            	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_WLAN) ||
-           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE)))
+           	(FOE_MAGIC_TAG(*pskb) == FOE_MAGIC_GE))) {
           		FOE_ALG(*pskb) = 1;
 	}
+	}
+
 #endif
 	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)

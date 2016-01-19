@@ -36,7 +36,6 @@
  * TYPEDEFS AND STRUCTURES
  */
 enum DstPort {
-#ifndef HWNAT_6336X
     DP_RA0=0,
 #if defined (CONFIG_RT2860V2_AP_MBSS)
     DP_RA1=1,
@@ -101,31 +100,16 @@ enum DstPort {
     defined (CONFIG_RT3572_AP_MESH) || defined (CONFIG_RT5572_AP_MESH)
     DP_MESHI0=45,
 #endif // CONFIG_RTDEV_AP_MESH //
-#else
-    DP_RA0=48,
-    DP_RA1=49,
-#endif
     DP_GMAC=50,
     DP_GMAC2=51,
     DP_PCI=52,
-#if defined(CONFIG_RA_HW_NAT_ATM)
-    DP_NAS0=53,
-    DP_NAS1=54,
-    DP_NAS2=55,
-    DP_NAS3=56,
-    DP_NAS4=57,
-    DP_NAS5=58,
-    DP_NAS6=59,
-    DP_NAS7=60,
-#endif
-    DP_NAS10=61,
     MAX_IF_NUM
 };
 
 typedef struct 
 {
-#ifdef __BIG_ENDIAN
     uint16_t  MAGIC_TAG;
+#ifdef __BIG_ENDIAN
     uint32_t  RESV:4; 
     uint32_t  AIS:1;
     uint32_t  SP:3;
@@ -134,7 +118,6 @@ typedef struct
     uint32_t  FVLD:1;
     uint32_t  FOE_Entry: 14;
 #else
-    uint16_t  MAGIC_TAG;
     uint32_t  FOE_Entry: 14;
     uint32_t  FVLD:1;
     uint32_t  ALG:1;
@@ -162,7 +145,6 @@ typedef struct
 #define FOE_MAGIC_WLAN		    0x7274
 #define FOE_MAGIC_GE		    0x7275
 #define FOE_MAGIC_PPE		    0x7276
-#define FOE_MAGIC_ATM		    0x7277
 
 /* choose one of them to keep HNAT related information in somewhere. */
 //#define HNAT_USE_HEADROOM
@@ -195,7 +177,13 @@ typedef struct
 #define FOE_CB_OFFSET					40
 #define FOE_INFO_START_ADDR(skb)    (skb->cb + FOE_CB_OFFSET)
 #define FOE_MAGIC_TAG(skb)	    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->MAGIC_TAG
+
+#ifdef __BIG_ENDIAN /* future use correct */
 #define FOE_ENTRY_NUM(skb)	    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->FOE_Entry
+#else
+#define FOE_ENTRY_NUM(skb)	    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->FOE_Entry
+#endif
+
 #define FOE_FVLD(skb)		    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->FVLD
 #define FOE_ALG(skb)		    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->ALG 
 #define FOE_AI(skb)		    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->AI
@@ -203,10 +191,8 @@ typedef struct
 #define FOE_AIS(skb)		    ((PdmaRxDescInfo4 *)(&(skb)->cb[FOE_CB_OFFSET]))->AIS
 #endif
 
-
 #define IS_MAGIC_TAG_VALID(skb)	    ((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) || \
 				    (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE)   || \
-				    (FOE_MAGIC_TAG(skb) == FOE_MAGIC_ATM)  || \
 				    (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN))
 
 #define FOE_ALG_RXIF(skb) ((FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ? 0 : 1)
