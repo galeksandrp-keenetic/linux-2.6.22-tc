@@ -103,6 +103,14 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Config", /* mtdblock5 */
                 size:           0x10000,
                 offset:         0x3f0000,
+        }, {
+				name:           "Storage", /* mtdblock6 */
+				size:           0,
+				offset:         0x3d0000,
+		}, {
+				name:           "Full", /* mtdblock7 */
+				size:           0x400000,
+				offset:         0,
 #elif defined (CONFIG_FLASH_8M)
                 name:           "Kernel", /* mtdblock3 */
                 size:           0x150000,
@@ -119,6 +127,10 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Storage", /* mtdblock6 */
                 size:           0x100000,
                 offset:         0x700000,
+		}, {
+				name:           "Full", /* mtdblock7 */
+				size:           0x800000,
+				offset:         0,
 #elif defined (CONFIG_FLASH_16M)
                 name:           "Kernel", /* mtdblock3 */
                 size:           0x150000,
@@ -135,6 +147,10 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Storage", /* mtdblock6 */
                 size:           0x100000,
                 offset:         0xf00000,
+        }, {
+				name:           "Full", /* mtdblock7 */
+				size:           0x1000000,
+				offset:         0,
 #else /* 32M */
                 name:           "Kernel", /* mtdblock3 */
                 size:           0x150000,
@@ -151,6 +167,10 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Storage", /* mtdblock6 */
                 size:           0x100000,
                 offset:         0x1f00000,
+		}, {
+				name:           "Full", /* mtdblock7 */
+				size:           0x2000000,
+				offset:         0,
 #endif
 #else
 #if defined (CONFIG_FLASH_4M)
