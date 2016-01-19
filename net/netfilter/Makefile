@@ -59,16 +59,16 @@ obj-$(CONFIG_NETFILTER_XT_TARGET_CONNSECMARK) += xt_CONNSECMARK.o
 # matches
 obj-$(CONFIG_NETFILTER_XT_MATCH_COMMENT) += xt_comment.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_CONNBYTES) += xt_connbytes.o
-ifeq ($(TCSUPPORT_XT_CONNLIMIT),1)
+ifeq ($(CONFIG_TCSUPPORT_XT_CONNLIMIT),1)
 obj-y += xt_connlimit.o
 endif
-ifeq ($(TCSUPPORT_XT_CONDITION),1)
+ifeq ($(CONFIG_TCSUPPORT_XT_CONDITION),1)
 obj-y += xt_condition.o
 endif
 obj-$(CONFIG_NETFILTER_XT_MATCH_CONNMARK) += xt_connmark.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_CONNTRACK) += xt_conntrack.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_DCCP) += xt_dccp.o
-ifeq ($(TCSUPPORT_XT_MATCH_DSCP),1)
+ifeq ($(CONFIG_TCSUPPORT_XT_MATCH_DSCP),1)
 obj-y += xt_dscp.o
 else
 obj-$(CONFIG_NETFILTER_XT_MATCH_DSCP) += xt_dscp.o

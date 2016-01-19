@@ -91,7 +91,7 @@ __DMEM static struct kmem_cache *skbuff_fclone_cache __read_mostly;
 
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 atomic_t g_used_skb_num;
-int g_max_skb_num = 1280;
+int g_max_skb_num = 2560;
 EXPORT_SYMBOL(g_used_skb_num);
 
 int peak_skb_num = 0;
@@ -510,7 +510,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(iif);
 #endif
 #endif
-#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
 	C(sc_mac_learned);
 #endif
 	
@@ -575,7 +575,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->tc_index	= old->tc_index;
 #endif
 
-#if defined(TCSUPPORT_BRIDGE_FASTPATH)
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
 	new->sc_mac_learned = old->sc_mac_learned;
 #endif
 	
@@ -2193,8 +2193,8 @@ __IMEM struct sk_buff *skbmgr_alloc_skb2k(void)
 
 try_normal:
 	if ((skbmgr_limit == 0) || (atomic_read(&skbmgr_alloc_no) < skbmgr_limit)) {
-#if !defined(TCSUPPORT_CT) 
-#if defined(TCSUPPORT_MEMORY_CONTROL)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL)
 	#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 		skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN | __GFP_TCMC);/*jlliu*/
 	#endif

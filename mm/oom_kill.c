@@ -26,7 +26,7 @@
 #include <linux/notifier.h>
 
 int sysctl_panic_on_oom;
-#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
 #ifdef CONFIG_PROC_FS
 extern int auto_kill_process_flag;
 #endif
@@ -348,7 +348,7 @@ static int oom_kill_task(struct task_struct *p)
 	return 0;
 }
 
-#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
 #ifdef CONFIG_PROC_FS	
 extern void drop_pagecache(void);
 #endif
@@ -359,7 +359,7 @@ static int oom_kill_process(struct task_struct *p, unsigned long points,
 	struct task_struct *c;
 	struct list_head *tsk;
 
-#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
 #ifdef CONFIG_PROC_FS	
 //when out of memory,no need to kill process
 	if(auto_kill_process_flag)

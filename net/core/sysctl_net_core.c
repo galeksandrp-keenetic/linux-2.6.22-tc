@@ -28,9 +28,6 @@ extern int sysctl_xfrm_larval_drop;
 extern u32 sysctl_xfrm_acq_expires;
 #endif
 
-#ifdef TCSUPPORT_QOS
-extern u32 	qos_queue_mask;
-#endif
 
 ctl_table core_table[] = {
 #ifdef CONFIG_NET
@@ -166,16 +163,6 @@ ctl_table core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
-#ifdef TCSUPPORT_QOS
-	{
-		.ctl_name	= NET_CORE_QUEUE_MASK,
-		.procname	= "queue_mask",
-		.data		= &qos_queue_mask,
-		.maxlen		= sizeof(u32),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 

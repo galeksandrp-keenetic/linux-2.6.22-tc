@@ -34,7 +34,7 @@
 #include "usb.h"
 #include "hcd.h"
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_MIPS_TC3262
 #if !defined(CONFIG_MIPS_RT63365)
 //IRQ for RT63365 USB is defined in host/ehci_ohci.c

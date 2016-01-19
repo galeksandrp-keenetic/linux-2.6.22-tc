@@ -341,7 +341,7 @@ static ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 	{
 		.ctl_name	= NET_NF_CONNTRACK_RESERVE,
 		.procname	= "nf_conntrack_reserve",

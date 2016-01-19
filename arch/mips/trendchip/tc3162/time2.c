@@ -110,7 +110,7 @@ timer_WatchDogConfigure (
 {
     uint32 word;
     word = VPint(CR_TIMER_CTL);
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 	word &= 0xfdffffdf;
     word |= ( tick_enable << 5)|(watchdog_enable<<25);
 #endif

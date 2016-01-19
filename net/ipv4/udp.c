@@ -500,9 +500,6 @@ static int udp_push_pending_frames(struct sock *sk)
 		uh->check = CSUM_MANGLED_0;
 
 send:
-#ifdef TCSUPPORT_QOS
-	skb->mark = sk->sk_mark; /*It's for marking rtp packets*/
-#endif
 	err = ip_push_pending_frames(sk);
 out:
 	up->len = 0;
@@ -879,10 +876,6 @@ try_again:
 		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
 	}
 	
-#ifdef TCSUPPORT_FW_UPGRADE_16M
-	sk->sk_mark = skb->mark;
-	//printk("sk mark = %x\n", sk->sk_mark);
-#endif
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 

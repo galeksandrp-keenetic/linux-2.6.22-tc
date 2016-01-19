@@ -27,7 +27,7 @@
 static struct class *mtd_class;
 #endif
 
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 /*#11542: For voice afftected by Flash action issue*/
 atomic_t eraseAction;
 extern int mtd_spiflash_erase_sp(struct mtd_info *mtd, struct erase_info *instr);
@@ -469,11 +469,11 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	case MEMERASE:
 	{
 		struct erase_info *erase;
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 		atomic_set(&eraseAction, 1);
 #endif
 		if(!(file->f_mode & 2)){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -EPERM;
@@ -491,7 +491,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			if (copy_from_user(&erase->addr, argp,
 				    sizeof(struct erase_info_user))) {
 				kfree(erase);
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 				atomic_set(&eraseAction, 0);
 #endif
 				return -EFAULT;
@@ -523,7 +523,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			}
 			kfree(erase);
 		}
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 		atomic_set(&eraseAction, 0);
 #endif
 		break;
@@ -533,25 +533,25 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	{
 		struct mtd_oob_buf buf;
 		struct mtd_oob_ops ops;
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 		atomic_set(&eraseAction, 1);
 #endif
 		if(!(file->f_mode & 2)){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -EPERM;
 		}
 
 		if (copy_from_user(&buf, argp, sizeof(struct mtd_oob_buf))){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -EFAULT;
 		}
 
 		if (buf.length > 4096){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -EINVAL;
@@ -564,7 +564,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 					buf.length) ? 0 : EFAULT;
 
 		if (ret){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return ret;
@@ -576,7 +576,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		ops.mode = MTD_OOB_PLACE;
 
 		if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs)){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -EINVAL;
@@ -584,14 +584,14 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 		ops.oobbuf = kmalloc(buf.length, GFP_KERNEL);
 		if (!ops.oobbuf){
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			return -ENOMEM;
 		}
 
 		if (copy_from_user(ops.oobbuf, buf.ptr, buf.length)) {
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 			atomic_set(&eraseAction, 0);
 #endif
 			kfree(ops.oobbuf);
@@ -606,7 +606,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			ret = -EFAULT;
 
 		kfree(ops.oobbuf);
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 		atomic_set(&eraseAction, 0);
 #endif
 		break;
@@ -861,7 +861,7 @@ static int __init init_mtdchar(void)
 		       MTD_CHAR_MAJOR);
 		return -EAGAIN;
 	}
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 	atomic_set(&eraseAction, 0);
 #endif
 
@@ -895,7 +895,7 @@ static void __exit cleanup_mtdchar(void)
 module_init(init_mtdchar);
 module_exit(cleanup_mtdchar);
 
-#if defined(TCSUPPORT_VOIP)
+#if defined(CONFIG_TCSUPPORT_VOIP)
 EXPORT_SYMBOL(eraseAction);
 #endif
 MODULE_LICENSE("GPL");

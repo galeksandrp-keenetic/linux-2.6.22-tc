@@ -64,7 +64,7 @@
 #include <linux/imq.h>
 #include <net/pkt_sched.h>
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 struct imq_private {
 	struct net_device_stats stats;
 	struct tasklet_struct   imq_tasklet;
@@ -154,7 +154,7 @@ static void imq_skb_destructor(struct sk_buff *skb)
 	}
 }
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 static int imq_dev_xmit2(struct sk_buff *skb, struct net_device *dev)
 #endif
 {
@@ -221,7 +221,7 @@ static int imq_dev_xmit2(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 static void ri_tasklet(unsigned long dev)
 {
 
@@ -447,7 +447,7 @@ static void __exit imq_unhook(void)
 	nf_unregister_queue_handler(PF_INET);
 }
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 static int __init imq_dev_init(struct net_device *dev)
 {
 	struct imq_private *dp = netdev_priv(dev);

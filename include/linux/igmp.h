@@ -207,7 +207,7 @@ struct ip_mc_list
 	char			loaded;
 	unsigned char		gsquery;	/* check source marks? */
 	unsigned char		crcount;
-#ifdef TCSUPPORT_IGMP_QOS
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
 	__u32 	sk_mark;
 #endif
 };
@@ -240,7 +240,7 @@ extern void ip_mc_init_dev(struct in_device *);
 extern void ip_mc_destroy_dev(struct in_device *);
 extern void ip_mc_up(struct in_device *);
 extern void ip_mc_down(struct in_device *);
-#ifdef TCSUPPORT_IGMP_QOS
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
 extern void ip_mc_dec_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark);
 extern void ip_mc_inc_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark);
 #endif

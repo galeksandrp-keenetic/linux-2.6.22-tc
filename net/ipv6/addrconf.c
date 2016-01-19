@@ -150,7 +150,7 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
 	.accept_redirects	= 1,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.autoconf		= 0,
 #else
 	.autoconf		= 1,
@@ -168,7 +168,7 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.accept_ra_defrtr	= 0,
 #else
 	.accept_ra_defrtr	= 1,
@@ -185,7 +185,7 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 2,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.slaac_addr		="",
 #endif
 };
@@ -196,7 +196,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
 	.accept_redirects	= 1,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.autoconf		= 0,
 #else
 	.autoconf		= 1,
@@ -213,7 +213,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.accept_ra_defrtr	= 0,
 #else
 	.accept_ra_defrtr	= 1,
@@ -230,7 +230,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 2,
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	.slaac_addr		="",
 #endif
 };
@@ -1797,7 +1797,7 @@ ok:
 				in6_dev_put(in6_dev);
 				return;
 			}
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 			/*Add for outputing slaac address by RA*/
 			sprintf(in6_dev->cnf.slaac_addr, NIP6_FMT" %d", NIP6(addr), pinfo->prefix_len);
 #endif
@@ -2219,7 +2219,7 @@ static void addrconf_dev_config(struct net_device *dev)
 	if (idev == NULL)
 		return;
 
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	/*Disable lan device add linklocal address,except br0*/
 	if(is_wan_dev(dev) || (strstr(dev->name, "br") != NULL)){
 		memset(&addr, 0, sizeof(struct in6_addr));
@@ -2595,7 +2595,7 @@ static void addrconf_rs_timer(unsigned long data)
 {
 	struct inet6_ifaddr *ifp = (struct inet6_ifaddr *) data;
 
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	/*Enable WAN interface to send RS for SLAAC mode*/
 	if(!is_wan_dev(ifp->idev->dev))
 #else
@@ -2766,7 +2766,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	/* If added prefix is link local and forwarding is off,
 	   start sending router solicitations.
 	 */
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	/*Enable WAN interface to send RS for SLAAC mode*/
 	if(is_wan_dev(ifp->idev->dev) &&
 #else
@@ -4229,7 +4229,7 @@ static struct addrconf_sysctl_table
 			.mode		=	0644,
 			.proc_handler	=	&proc_dointvec,
 		},
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 		{
 			.ctl_name	=	CTL_UNNUMBERED,
 			.procname	=	"slaac_addr",

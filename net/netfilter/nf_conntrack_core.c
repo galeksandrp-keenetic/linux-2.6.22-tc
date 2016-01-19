@@ -39,7 +39,7 @@
 #include <linux/netfilter_ipv4.h>
 
 
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 #include <linux/in.h>
 #define NAT_DNS_PORT 53
 #endif
@@ -79,7 +79,7 @@ EXPORT_SYMBOL_GPL(nf_conntrack_htable_size);
 
 int nf_conntrack_max __read_mostly;
 EXPORT_SYMBOL_GPL(nf_conntrack_max);
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 int nf_conntrack_reserve __read_mostly = 500;
 EXPORT_SYMBOL_GPL(nf_conntrack_reserve);
 int nf_conntrack_reserve_proto __read_mostly = 6;
@@ -332,7 +332,7 @@ nf_ct_get_tuple(const struct sk_buff *skb,
 }
 EXPORT_SYMBOL_GPL(nf_ct_get_tuple);
 
-#if defined(TCSUPPORT_XT_CONNLIMIT)
+#if defined(CONFIG_TCSUPPORT_XT_CONNLIMIT)
 int nf_ct_get_tuplepr(const struct sk_buff *skb,
 		      unsigned int nhoff,
 		      u_int16_t l3num,
@@ -692,7 +692,7 @@ static int early_drop(struct list_head *chain)
 	/* Traverse backwards: gives us oldest, which is roughly LRU */
 	struct nf_conntrack_tuple_hash *h;
 	struct nf_conn *ct = NULL, *tmp = NULL;
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 	struct nf_conn *ct2 = NULL;
 	__be16 dstport;
 	u_int8_t protonum;
@@ -706,12 +706,12 @@ static int early_drop(struct list_head *chain)
 		tmp = nf_ct_tuplehash_to_ctrack(h);	
 		if (!test_bit(IPS_ASSURED_BIT, &tmp->status)) {
 			ct = tmp;
-#if !defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if !defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 			atomic_inc(&ct->ct_general.use);
 #endif
 			break;
 		}
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 		else{
 			if(!flag){
 				protonum = tmp->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum;
@@ -732,7 +732,7 @@ static int early_drop(struct list_head *chain)
 		}
 #endif
 	}
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 	if(ct == NULL && ct2 != NULL){
 		ct = ct2;	
 	}
@@ -753,7 +753,7 @@ static int early_drop(struct list_head *chain)
 	nf_ct_put(ct);
 	return dropped;
 }
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 static int allowToCreateSession(const struct nf_conntrack_tuple *orig){
 	/*return value
 	only support reserve TCP UDP proto now
@@ -800,7 +800,7 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 
 	/* We don't want any race condition at early drop stage */
 	atomic_inc(&nf_conntrack_count);
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 	max = nf_conntrack_max-nf_conntrack_reserve;
 #else
 	max = nf_conntrack_max;
@@ -810,7 +810,7 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 	if (nf_conntrack_max
 	    && tmp_nf_conntrack_count > max) 
 	{
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 		if (tmp_nf_conntrack_count > nf_conntrack_max)
 #endif
 		{
@@ -825,7 +825,7 @@ __nf_conntrack_alloc(const struct nf_conntrack_tuple *orig,
 				goto error;
 			}
 		}
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 		else{
 			/*	here has some limitation. if session count get to max ,but not get to nf_conntrack_max
 			 *	,any session request excpet tcp+80 will drop ,without call early_drop function.

@@ -112,7 +112,7 @@ struct wireless_dev;
  *	Network device statistics. Akin to the 2.0 ether stats but
  *	with byte counters.
  */
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	/*shnwind 20100115*/
 #define PRIORITY_QUEUE_NUM 3
 #define VOIP_RX_PORT_NUM 4
@@ -657,7 +657,7 @@ struct softnet_data
 #ifdef CONFIG_TC_VOIP
 	struct sk_buff_head	voip_queue;
 #endif
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	struct sk_buff_head pri_queue[PRIORITY_QUEUE_NUM];
 #endif
 	struct list_head	poll_list;

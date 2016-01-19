@@ -131,7 +131,7 @@ struct __mc_fdb_entry
 	__u8 host_addr[6];
 	__u16 port_no;
 	__u32 ageing_timer_value;
-	#ifdef TCSUPPORT_IGMP_SNOOPING_V3
+	#ifdef CONFIG_TCSUPPORT_IGMP_SNOOPING_V3
 	__u8 src_addr[16];
 	__u8 filter_mode;
 	#endif

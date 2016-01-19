@@ -22,7 +22,7 @@
 #include <asm/fpu.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
-#if !defined(TCSUPPORT_CT)
+#if !defined(CONFIG_TCSUPPORT_CT)
 #include <asm/spram.h>
 #endif
 

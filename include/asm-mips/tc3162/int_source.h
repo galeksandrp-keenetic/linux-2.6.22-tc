@@ -17,7 +17,7 @@
 #ifndef _INT_SOURCE_H_
 #define _INT_SOURCE_H_
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 enum
 interrupt_source
 	{

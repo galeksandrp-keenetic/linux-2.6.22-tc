@@ -55,7 +55,7 @@
 #include <net/transp_v6.h>
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
-#ifdef TCSUPPORT_DSLITE
+#ifdef CONFIG_TCSUPPORT_DSLITE
 #ifdef CONFIG_IPV6_TUNNEL
 #include <net/ip6_tunnel.h>
 #endif

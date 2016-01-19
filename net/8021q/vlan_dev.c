@@ -37,10 +37,10 @@
 #include <linux/if_vlan.h>
 #include <net/ip.h>
 
-#ifdef TCSUPPORT_VLAN_TAG
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
 extern int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
 extern int (*insert_vtag_hook)(struct sk_buff **pskb);
-#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 extern int (*check_vtag_hook)(void);
 #endif
 #endif
@@ -166,8 +166,8 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	if (!skb->dev) {
 		rcu_read_unlock();
 
-#ifdef TCSUPPORT_VLAN_TAG
-#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 		if (check_vtag_hook && (check_vtag_hook() == 1)) {
 			if (remove_vtag_hook) {
 				 if (remove_vtag_hook(skb, orig_dev) == -1) {
@@ -248,7 +248,7 @@ Normal_Handle:
 		kfree_skb(skb);
 		return -1;
 #else
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 		if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n')))
 #endif
 		{
@@ -273,7 +273,7 @@ Normal_Handle:
 #endif
 #endif
 	}
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 	if (skb->dev->name[0] == 'e') {
 	//	skb->mark |= MASK_ORIGIN_DEV;
@@ -598,7 +598,7 @@ int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 
 	return rc;
 }
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
 
 int vlan_dev_fastbridge_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -641,7 +641,7 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * OTHER THINGS LIKE FDDI/TokenRing/802.3 SNAPs...
 	 */
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 	/* if interface is ethernet interface, let it insert more than one vlan header */
 	if ((veth->h_vlan_proto != htons(ETH_P_8021Q)) || (skb->dev->name[0] == 'e')) {
 #endif

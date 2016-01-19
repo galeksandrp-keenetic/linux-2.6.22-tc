@@ -495,7 +495,7 @@ static __init int tc3162_pcie_init(void)
 
 		if(isRT63368){
 			printk("RT63368_pcie_init\n");
-#if defined(TCSUPPORT_DUAL_WLAN)
+#if defined(CONFIG_TCSUPPORT_DUAL_WLAN)
 			//rt63368 enable pci-e port1 and port1 do not have power will cause hang. shnwind.
 			dual_band_support = 1;
 #else

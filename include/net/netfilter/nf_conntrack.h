@@ -204,7 +204,7 @@ extern void nf_conntrack_hash_insert(struct nf_conn *ct);
 
 extern void nf_conntrack_flush(void);
 
-#if defined(TCSUPPORT_XT_CONNLIMIT)
+#if defined(CONFIG_TCSUPPORT_XT_CONNLIMIT)
 /* for connlimit */
 extern int nf_ct_get_tuplepr(const struct sk_buff *skb,
 			     unsigned int nhoff,
@@ -281,7 +281,7 @@ extern unsigned int nf_conntrack_htable_size;
 extern int nf_conntrack_checksum;
 extern atomic_t nf_conntrack_count;
 extern int nf_conntrack_max;
-#if defined(TCSUPPORT_NAT_SESSION_RESERVE)
+#if defined(CONFIG_TCSUPPORT_NAT_SESSION_RESERVE)
 extern int nf_conntrack_reserve;
 extern int nf_conntrack_reserve_port;
 extern int nf_conntrack_reserve_proto;

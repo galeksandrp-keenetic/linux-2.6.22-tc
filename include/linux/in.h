@@ -75,7 +75,7 @@ struct in_addr {
 #define IP_IPSEC_POLICY	16
 #define IP_XFRM_POLICY	17
 #define IP_PASSSEC	18
-#if 1//def TCSUPPORT_IGMP_QOS
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
 #define	IP_SKB_MARK_FLAG	19
 #endif
 
@@ -105,7 +105,7 @@ struct in_addr {
 #define MCAST_JOIN_SOURCE_GROUP		46
 #define MCAST_LEAVE_SOURCE_GROUP	47
 #define MCAST_MSFILTER			48
-#if 1//def TCSUPPORT_IGMP_QOS
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
 #define	IP_SKB_MARK				50
 #endif
 

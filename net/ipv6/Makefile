@@ -15,8 +15,8 @@ ipv6-$(CONFIG_XFRM) += xfrm6_policy.o xfrm6_state.o xfrm6_input.o \
 ipv6-$(CONFIG_NETFILTER) += netfilter.o
 ipv6-$(CONFIG_IPV6_MULTIPLE_TABLES) += fib6_rules.o
 ipv6-$(CONFIG_IPV6_MIP6) += mip6.o
-ifneq ($(strip $(TCSUPPORT_IPV6_FIREWALL)),)
-#ifneq ($(strip $(TCSUPPORT_TCP6_SYN_COOKIE)),)
+ifneq ($(strip $(CONFIG_TCSUPPORT_IPV6_FIREWALL)),)
+#ifneq ($(strip $(CONFIG_TCSUPPORT_TCP6_SYN_COOKIE)),)
 ipv6-$(CONFIG_SYN_COOKIES) += syncookies.o
 endif
 ipv6-$(CONFIG_PROC_FS) += proc.o
@@ -36,7 +36,7 @@ obj-$(CONFIG_INET6_XFRM_MODE_BEET) += xfrm6_mode_beet.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
 obj-$(CONFIG_IPV6_SIT) += sit.o
-ifneq ($(TCSUPPORT_DSLITE), )
+ifneq ($(CONFIG_TCSUPPORT_DSLITE), )
 obj-$(CONFIG_IPV6_TUNNEL) += ip6_tunnel.o
 endif
 

@@ -773,6 +773,14 @@ source "arch/mips/philips/pnx8550/common/Kconfig"
 
 endmenu
 
+menu "TCSUPPORT flags"
+	depends on MIPS_TC3262
+
+source "arch/mips/trendchip/Kconfig"
+
+endmenu
+
+
 config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y

@@ -157,6 +157,7 @@ static inline int cookie_check(struct sk_buff *skb, __u32 cookie)
 	return mssind < NUM_MSS ? msstab[mssind] + 1 : 0;
 }
 
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 {
 	struct inet_request_sock *ireq;
@@ -282,4 +283,5 @@ out_free:
 	reqsk_free(req);
 	return NULL;
 }
+#endif
 

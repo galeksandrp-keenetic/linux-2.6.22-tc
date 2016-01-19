@@ -1803,7 +1803,7 @@ static int __init nf_conntrack_h323_init(void)
 {
 	int ret;
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
     h323_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
 #else

@@ -53,7 +53,7 @@ int checkGroup(char *inIf, char *outIf)
 {
 	char inIfName[IFNAMSIZ], outIfName[IFNAMSIZ];
 	int i, j, inId = -1, outId = -1;
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 	char inType[4], outType[4];
 #endif
 	struct groupif *pIf = NULL;
@@ -66,7 +66,7 @@ int checkGroup(char *inIf, char *outIf)
 	strcpy(inIfName, inIf);
 	strcpy(outIfName, outIf);
 
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 	memset(inType, 0, sizeof(inType));
 	memset(outType, 0, sizeof(outType));
 #endif
@@ -84,13 +84,13 @@ int checkGroup(char *inIf, char *outIf)
 				}
 				if (!strcmp(inIfName, pIf->ifName)) {
 					inId = gpLst[i].groupid;
-				#ifdef TCSUPPORT_E8B
+				#ifdef CONFIG_TCSUPPORT_E8B
 					strcpy(inType, pIf->ifType);
 				#endif
 				}
 				else if (!strcmp(outIfName, pIf->ifName)) {
 					outId = gpLst[i].groupid;
-				#ifdef TCSUPPORT_E8B
+				#ifdef CONFIG_TCSUPPORT_E8B
 					strcpy(outType, pIf->ifType);
 				#endif
 				}
@@ -104,7 +104,7 @@ int checkGroup(char *inIf, char *outIf)
 		return 1;
 	}
 
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 	/*_______________________________________________________
 	**
 	**  If in dev is lan device and not in some group, 
@@ -165,7 +165,7 @@ static int portbind_addgroup(struct portbindcmdif *pbif)
 	char *p = NULL;
 	int ifNum = pbif->ifNum, i = 0;
 	char *pName = ifName;
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 	char *pType = ifType;
 #endif
 	int find = 0;
@@ -191,7 +191,7 @@ static int portbind_addgroup(struct portbindcmdif *pbif)
 		pIf++;
 	}
 
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 	/* get interface type and store it into groupif struct */
 	i = 0;
 	pIf = pIftmp;
@@ -290,7 +290,7 @@ static int portbind_showgroup(struct portbindcmdif *pbif)
 					if (j != gpLst[i].ifNum - 1) {
 						strcat(ifNameLst, ",");
 					}
-				#ifdef TCSUPPORT_E8B
+				#ifdef CONFIG_TCSUPPORT_E8B
 					strcat(ifTypeLst, pIf->ifType);
 					if (j != gpLst[i].ifNum - 1) {
 						strcat(ifTypeLst, ",");
@@ -322,7 +322,7 @@ static int portbind_showgroup(struct portbindcmdif *pbif)
 			if (j != gpLst[i].ifNum - 1) {
 				strcat(ifNameLst, ",");
 			}
-		#ifdef TCSUPPORT_E8B
+		#ifdef CONFIG_TCSUPPORT_E8B
 			strcat(ifTypeLst, pIf->ifType);
 			if (j != gpLst[i].ifNum - 1) {
 				strcat(ifTypeLst, ",");

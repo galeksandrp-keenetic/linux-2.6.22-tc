@@ -2614,7 +2614,7 @@ static struct neigh_sysctl_table {
 			.proc_handler	= &proc_dointvec_ms_jiffies,
 			.strategy	= &sysctl_ms_jiffies,
 		},
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 		{
 			.ctl_name	= NET_NEIGH_DEFAULT_ROUTE,
 			.procname	= "default_route",
@@ -2693,7 +2693,7 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 
 	t->neigh_vars[16].data  = &p->retrans_time;
 	t->neigh_vars[17].data  = &p->base_reachable_time;
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	t->neigh_vars[18].data  = &p->dlf_route;
 #endif
 	if (handler || strategy) {

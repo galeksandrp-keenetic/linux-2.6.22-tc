@@ -241,7 +241,7 @@ static inline int ipv6_addr_is_ll_all_routers(const struct in6_addr *addr)
 		addr->s6_addr32[3] == htonl(0x00000002));
 }
 
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 static inline int is_wan_dev(struct net_device *dev)
 {
 	return (strstr(dev->name, "nas") != NULL || strstr(dev->name, "ppp") != NULL);

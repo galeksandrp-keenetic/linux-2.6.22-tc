@@ -79,6 +79,6 @@ obj-$(CONFIG_IP_NF_ARPFILTER) += arptable_filter.o
 
 obj-$(CONFIG_IP_NF_QUEUE) += ip_queue.o
 
-ifeq ($(TCSUPPORT_PORT_TRIGGER),1)
+ifeq ($(CONFIG_TCSUPPORT_PORT_TRIGGER),1)
 obj-y += ipt_TRIGGER.o
 endif

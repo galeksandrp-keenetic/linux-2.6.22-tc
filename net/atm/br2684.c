@@ -25,7 +25,7 @@ Authors: Marcell GAL, 2000, XDSL Ltd, Hungary
 
 #include "common.h"
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 #ifdef RA_MTD_RW_BY_NUM
 int ra_mtd_read(int num, loff_t from, size_t len, u_char *buf);
 #else
@@ -76,7 +76,7 @@ static void skb_debug(const struct sk_buff *skb)
 #define PAD_BRIDGED		0x00, 0x00
 
 #ifdef CONFIG_SMUX
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 int (*check_smuxIf_exist_hook)(struct net_device *dev);
 EXPORT_SYMBOL(check_smuxIf_exist_hook);
 #endif
@@ -387,7 +387,7 @@ static void br2684_close_vcc(struct br2684_vcc *brvcc)
 	module_put(THIS_MODULE);
 }
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 static unsigned char s_macaddr[8];
 
 struct atm_vcc* find_next_atmvcc(short vpi,int vci,struct atm_vcc* vcc)
@@ -540,8 +540,8 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			skb_pull(skb, sizeof(llc_oui_pid_pad));
 			skb->protocol = eth_type_trans(skb, net_dev);
 
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
-#if !defined(TCSUPPORT_CT) 
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT) 
 			skb->fb_flags |= FB_WAN_ENABLE;
 #endif
 #endif
@@ -581,8 +581,8 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			skb_pull(skb, BR2684_PAD_LEN); /* pad, dstmac, srcmac, ethtype */
 			skb->protocol = eth_type_trans(skb, net_dev);
 
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
-#if !defined(TCSUPPORT_CT) 
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT) 
 			skb->fb_flags |= FB_WAN_ENABLE;
 #endif
 #endif		
@@ -602,7 +602,7 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	}
 #endif /* CONFIG_ATM_BR2684_IPFILTER */
 	skb->dev = net_dev;
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	if (get_share_refcnt(atmvcc->vpi,atmvcc->vci) > 1)
 	{
 		if (skb->pkt_type == PACKET_BROADCAST ||skb->pkt_type == PACKET_MULTICAST )
@@ -952,7 +952,7 @@ extern struct proc_dir_entry *atm_proc_root;	/* from proc.c */
 
 static int __init br2684_init(void)
 {
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	int i;
 	unsigned char mac_zero[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	unsigned char mac_ff[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -965,7 +965,7 @@ static int __init br2684_init(void)
 #endif
 	register_atm_ioctl(&br2684_ioctl_ops);
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	memset(s_macaddr,0,sizeof(s_macaddr));
     /* Get mac address from flash */
 #ifdef RA_MTD_RW_BY_NUM

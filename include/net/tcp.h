@@ -1311,7 +1311,7 @@ extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
 extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
 extern struct request_sock_ops tcp_request_sock_ops;
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 extern struct request_sock_ops tcp6_request_sock_ops;
 #endif
 

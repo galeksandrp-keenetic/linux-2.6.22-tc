@@ -39,7 +39,7 @@
 
 
 #define     IFNAMSIZ					16
-#ifdef TCSUPPORT_E8B
+#ifdef CONFIG_TCSUPPORT_E8B
 #define 	MAX_GROUP_NUM			64
 #else
 #define 	MAX_GROUP_NUM			16

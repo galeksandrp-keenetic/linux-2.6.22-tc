@@ -250,9 +250,6 @@ struct sock {
 	struct page		*sk_sndmsg_page;
 	struct sk_buff		*sk_send_head;
 	__u32			sk_sndmsg_off;
-#if 1//def TCSUPPORT_IGMP_QOS || defined(TCSUPPORT_REDIRECT_WITH_PORTMASK)
-	__u32			sk_mark;
-#endif
 	int			sk_write_pending;
 	void			*sk_security;
 	void			(*sk_state_change)(struct sock *sk);

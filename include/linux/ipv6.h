@@ -186,7 +186,7 @@ struct ipv6_devconf {
 #endif
 	__s32		disable_ipv6;
 	__s32		accept_dad;
-#ifdef TCSUPPORT_IPV6_ENHANCEMENT
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
 	char			slaac_addr[64];
 #endif
 	void		*sysctl;

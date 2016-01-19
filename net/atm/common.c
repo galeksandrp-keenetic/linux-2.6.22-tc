@@ -40,7 +40,7 @@
 struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 DEFINE_RWLOCK(vcc_sklist_lock);
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 #define BR2684_VIRDEV_NUM 8
 struct _share_atmdev
 {
@@ -236,7 +236,7 @@ static void vcc_destroy_socket(struct sock *sk)
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	struct atm_vcc* atmvcc;
 #endif
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
@@ -247,7 +247,7 @@ static void vcc_destroy_socket(struct sock *sk)
 		if (vcc->push)
 			vcc->push(vcc, NULL); /* atmarpd has no push */
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 		del_share_atmdev(vcc->vpi,vcc->vci);
 		if (get_share_refcnt(vcc->vpi,vcc->vci) > 0 )
 		{
@@ -440,7 +440,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 		return error;
 	vcc->dev = dev;
 	write_lock_irq(&vcc_sklist_lock);
-#ifdef TCSUPPORT_SHARE_PVC	
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC	
 	if (test_bit(ATM_DF_REMOVED, &dev->flags)) 
 	{
 		write_unlock_irq(&vcc_sklist_lock);
@@ -488,7 +488,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
 
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	if ( get_share_refcnt(vpi,vci) == 1)
 	{
 		if (dev->ops->open) {
@@ -876,7 +876,7 @@ int vcc_getsockopt(struct socket *sock, int level, int optname,
 static int __init atm_init(void)
 {
 	int error;
-#ifdef TCSUPPORT_SHARE_PVC
+#ifdef CONFIG_TCSUPPORT_SHARE_PVC
 	memset(share_atmdev,0,sizeof(share_atmdev));
 #endif
 	if ((error = proto_register(&vcc_proto, 0)) < 0)

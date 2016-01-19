@@ -530,7 +530,7 @@ done:
 	dst_release(dst);
 	return err;
 }
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 static inline void syn_flood_warning(struct sk_buff *skb)
 {
 #ifdef CONFIG_SYN_COOKIES
@@ -1242,11 +1242,7 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 		return NULL;
 	}
 
-#if 0 /*def CONFIG_SYN_COOKIES*/
-	if (!th->rst && !th->syn && th->ack)
-		sk = cookie_v6_check(sk, skb, &(IPCB(skb)->opt));
-#endif
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 #ifdef CONFIG_SYN_COOKIES
 	if (!th->rst && !th->syn && th->ack)
 		sk = cookie_v6_check(sk, skb);
@@ -1266,7 +1262,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct request_sock *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 #ifdef CONFIG_SYN_COOKIES
 	int want_cookie = 0;
 #else
@@ -1284,7 +1280,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	 *	There are no SYN attacks on IPv6, yet...
 	 */
 	if (inet_csk_reqsk_queue_is_full(sk) && !isn) {
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 		if (net_ratelimit())
 			syn_flood_warning(skb);
 #ifdef CONFIG_SYN_COOKIES
@@ -1318,7 +1314,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 
 	tcp_parse_options(skb, &tmp_opt, 0);
 
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 	if (want_cookie && !tmp_opt.saw_tstamp)
 		tcp_clear_options(&tmp_opt);
 #endif
@@ -1328,7 +1324,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	treq = inet6_rsk(req);
 	ipv6_addr_copy(&treq->rmt_addr, &ipv6_hdr(skb)->saddr);
 	ipv6_addr_copy(&treq->loc_addr, &ipv6_hdr(skb)->daddr);
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 	if (!want_cookie)
 		TCP_ECN_create_request(req, tcp_hdr(skb));
 
@@ -1381,7 +1377,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (tcp_v6_send_synack(sk, req, NULL))
 		goto drop;
 
-#ifdef TCSUPPORT_TCP6_SYN_COOKIE
+#ifdef CONFIG_TCSUPPORT_TCP6_SYN_COOKIE
 	if (!want_cookie) {
 		inet6_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);
 		return 0;

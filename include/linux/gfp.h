@@ -46,8 +46,8 @@ struct vm_area_struct;
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
 
-#if !defined(TCSUPPORT_CT) 
-#if defined(TCSUPPORT_MEMORY_CONTROL)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL)
 #define __GFP_TCMC	((__force gfp_t)0x80000u)/* Memory control flag,used by skbmgr_alloc_skb2k,jlliu */
 #define __GFP_TC_CRITICAL	((__force gfp_t)0x100000u)/* Memory critical flag,used by skbmgr_alloc_skb2k_tc_critical */
 #define __GFP_BITS_SHIFT 21	/* Room for 21 __GFP_FOO bits */
@@ -56,7 +56,7 @@ struct vm_area_struct;
 #endif
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
-#if defined(TCSUPPORT_MEMORY_CONTROL)
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL)
 /* if you forget to add the bitmask here kernel will crash, period */
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \

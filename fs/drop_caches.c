@@ -25,7 +25,7 @@ static void drop_pagecache_sb(struct super_block *sb)
 	spin_unlock(&inode_lock);
 }
 
-#if defined(TCSUPPORT_MEMORY_CONTROL) || defined(TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
 EXPORT_SYMBOL(drop_pagecache);
 #endif
 void drop_pagecache(void)

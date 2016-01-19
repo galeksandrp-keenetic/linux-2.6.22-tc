@@ -160,8 +160,8 @@
  *		86DD	IPv6
  */
 
-#if !defined(TCSUPPORT_CT)
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
 int (*hook_bridge_shortcut_process)(struct net_device *net_dev, struct sk_buff *skb);
 EXPORT_SYMBOL(hook_bridge_shortcut_process);
 void (*hook_dev_shortcut_learn)(struct sk_buff *skb, struct net_device *dev);
@@ -183,12 +183,12 @@ static spinlock_t net_dma_event_lock;
 extern unsigned int dbgEnable;
 #endif
 #ifdef CONFIG_QOS
-#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
 int tc_qos_switch = 0;
 #endif
 #endif
 extern void tc3162wdog_kick(void);
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 /*use for set voip rx port in application, shnwind add 20110215.*/
 unsigned short int voip_rx_port[VOIP_RX_PORT_NUM] = {0};
 EXPORT_SYMBOL(voip_rx_port);
@@ -1482,8 +1482,8 @@ __IMEM int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				goto gso;
 		}
 
-#if !defined(TCSUPPORT_CT)
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
 		if(hook_dev_shortcut_learn){
 			hook_dev_shortcut_learn(skb, dev);
 		}
@@ -1573,7 +1573,7 @@ static inline __be16 pppoe_proto(const struct sk_buff *skb)
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
  */
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 int (*portbind_sw_hook)(void);
 int (*portbind_check_hook)(char *inIf, char *outIf);
@@ -1587,22 +1587,22 @@ EXPORT_SYMBOL(portbind_check_hook);
 u32 qos_queue_mask = 0;
 #endif
 
-#ifdef TCSUPPORT_VLAN_TAG
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
 int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
 int (*insert_vtag_hook)(struct sk_buff **pskb);
-#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 int (*check_vtag_hook)(void);
 #endif
 int (*get_vtag_hook)(struct net_device *dev, struct sk_buff *skb);
 EXPORT_SYMBOL(remove_vtag_hook);
 EXPORT_SYMBOL(insert_vtag_hook);
-#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 EXPORT_SYMBOL(check_vtag_hook);
 #endif
 EXPORT_SYMBOL(get_vtag_hook);
 #endif
 
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 __IMEM int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
@@ -1642,7 +1642,7 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 		}
 	}
 */
-	#if defined(TCSUPPORT_FTP_THROUGHPUT)
+	#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 		if ((portbind_sw_hook) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
 	#else
 		if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
@@ -1666,8 +1666,8 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 	}
 #endif
 	
-#ifdef TCSUPPORT_VLAN_TAG
-	#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+	#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 	if (check_vtag_hook && (check_vtag_hook()) == 1)
 	#endif
 		if (insert_vtag_hook && (-1 == insert_vtag_hook(&skb)))
@@ -1675,7 +1675,7 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 #endif
 
 #ifdef CONFIG_QOS
-#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
 	if(1 == tc_qos_switch)
 	{
 #endif
@@ -1774,7 +1774,7 @@ __IMEM int dev_queue_xmit(struct sk_buff *skb)
 			}
 		}
 #endif
-#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
 	}
 #endif
 #endif
@@ -1946,7 +1946,7 @@ EXPORT_SYMBOL(mod_skb_off);
 
 #endif
 
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 int isVoipPacket(unsigned char *ip_header){
 	unsigned short int skb_port;
 	unsigned char protocol;
@@ -2047,7 +2047,7 @@ __IMEM int netif_rx(struct sk_buff *skb)
 	unsigned char tmp_skb_ppp_CODE;
 
 #endif
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	unsigned char *mac_header;
 	unsigned char *ip_header;
 	int total_queue_len;
@@ -2128,7 +2128,7 @@ voip_enqueue:
 input_check:
 
 #endif
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	//caclute total queue len
 	total_queue_len = queue->input_pkt_queue.qlen;
 	for( i = 0 ; i < PRIORITY_QUEUE_NUM; i++){
@@ -2397,8 +2397,8 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 		skb->iif = skb->dev->ifindex;
 
 	orig_dev = skb_bond(skb);
-#if !defined(TCSUPPORT_CT)
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
 	if(hook_bridge_shortcut_process)
 	{
 		if( hook_bridge_shortcut_process(skb->dev, skb) ){
@@ -2408,8 +2408,8 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 #endif
 #endif
 
-#ifdef TCSUPPORT_VLAN_TAG
-	#if !defined(TCSUPPORT_FTP_THROUGHPUT)
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+	#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 	if (check_vtag_hook && (check_vtag_hook() == 1))
 	#endif
 		if (get_vtag_hook)
@@ -2421,9 +2421,9 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 
 	if (!orig_dev)
 		return NET_RX_DROP;
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
-#if defined(TCSUPPORT_FTP_THROUGHPUT)
+#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
 	if (portbind_sw_hook) {
 #else
 	if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
@@ -2514,8 +2514,8 @@ ncls:
 		smux_pkt_recv_hook) {
 		atomic_inc(&skb->users);
               ret = smux_pkt_recv_hook(skb, skb->dev, orig_dev);		  
-#if (defined(TCSUPPORT_WAN_ETHER) || defined(TCSUPPORT_WAN_PTM)) && defined(TCSUPPORT_MULTISERVICE_ON_WAN)
-#ifdef TCSUPPORT_VLAN_TAG
+#if (defined(CONFIG_TCSUPPORT_WAN_ETHER) || defined(CONFIG_TCSUPPORT_WAN_ATM)) && defined(CONFIG_TCSUPPORT_MULTISERVICE_ON_WAN)
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
 			  if (skb) {
 			  	skb->vlan_tag_flag |= VLAN_TAG_FROM_INDEV;
 			  }
@@ -2557,7 +2557,7 @@ __IMEM static int process_backlog(struct net_device *backlog_dev, int *budget)
 {
 	int work = 0;
 	int quota = min(backlog_dev->quota, *budget);
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	int i;
 #endif	
 
@@ -2588,7 +2588,7 @@ __IMEM static int process_backlog(struct net_device *backlog_dev, int *budget)
 			voip_work++;
 		}
 #else
-#ifdef TCSUPPORT_DOWNSTREAM_QOS		
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS		
 		//dequeue priority queue
 		if(downstream_qos_enable){
 		for( i = 0 ; i < PRIORITY_QUEUE_NUM; i++){
@@ -2608,7 +2608,7 @@ __IMEM static int process_backlog(struct net_device *backlog_dev, int *budget)
 			skb = __skb_dequeue(&queue->input_pkt_queue);
 		if (!skb)
 			goto job_done;
-#ifdef TCSUPPORT_DOWNSTREAM_QOS			
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS			
 		}	
 #endif		
 #endif
@@ -4403,7 +4403,7 @@ static int __init net_dev_init(void)
 {
 	int i, rc = -ENOMEM;
 
-#ifdef TCSUPPORT_DOWNSTREAM_QOS
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
 	int j;
 #endif
 	BUG_ON(!dev_boot_phase);
@@ -4438,7 +4438,7 @@ static int __init net_dev_init(void)
 #ifdef CONFIG_TC_VOIP
 		skb_queue_head_init(&queue->voip_queue);
 #endif
-#ifdef TCSUPPORT_DOWNSTREAM_QOS        
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS        
 		for( j = 0 ; j < PRIORITY_QUEUE_NUM; j++){
 			skb_queue_head_init(&queue->pri_queue[j]);	
 		}	
@@ -4512,7 +4512,7 @@ EXPORT_SYMBOL(dev_load);
 #endif
 
 #ifdef CONFIG_QOS
-#ifdef TCSUPPORT_SBTHROUGHPUT_ENHANCE
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
 EXPORT_SYMBOL(tc_qos_switch);
 #endif
 #endif

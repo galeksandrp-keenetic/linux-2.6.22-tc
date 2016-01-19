@@ -4,7 +4,7 @@
 
 # Link order matters here.
 #obj-$(CONFIG_IP6_NF_IPTABLES) += ip6_tables.o
-ifneq ($(strip $(TCSUPPORT_IPV6_ADVANCE)),)
+ifneq ($(strip $(CONFIG_TCSUPPORT_IPV6_ADVANCE)),)
 obj-m += ip6_tables.o
 endif
 obj-$(CONFIG_IP6_NF_MATCH_RT) += ip6t_rt.o
@@ -15,7 +15,7 @@ obj-$(CONFIG_IP6_NF_MATCH_AH) += ip6t_ah.o
 obj-$(CONFIG_IP6_NF_MATCH_EUI64) += ip6t_eui64.o
 obj-$(CONFIG_IP6_NF_MATCH_OWNER) += ip6t_owner.o
 #obj-$(CONFIG_IP6_NF_FILTER) += ip6table_filter.o
-ifneq ($(strip $(TCSUPPORT_IPV6_ADVANCE)),)
+ifneq ($(strip $(CONFIG_TCSUPPORT_IPV6_ADVANCE)),)
 obj-m += ip6table_filter.o
 endif
 obj-$(CONFIG_IP6_NF_MANGLE) += ip6table_mangle.o
@@ -23,7 +23,7 @@ obj-$(CONFIG_IP6_NF_TARGET_IMQ) += ip6t_IMQ.o
 obj-$(CONFIG_IP6_NF_TARGET_HL) += ip6t_HL.o
 obj-$(CONFIG_IP6_NF_QUEUE) += ip6_queue.o
 #obj-$(CONFIG_IP6_NF_TARGET_LOG) += ip6t_LOG.o
-ifneq ($(strip $(TCSUPPORT_IPV6_ADVANCE)),)
+ifneq ($(strip $(CONFIG_TCSUPPORT_IPV6_ADVANCE)),)
 obj-m += ip6t_LOG.o
 endif
 obj-$(CONFIG_IP6_NF_RAW) += ip6table_raw.o
@@ -36,7 +36,7 @@ nf_conntrack_ipv6-objs  :=  nf_conntrack_l3proto_ipv6.o nf_conntrack_proto_icmpv
 
 # l3 independent conntrack
 #obj-$(CONFIG_NF_CONNTRACK_IPV6) += nf_conntrack_ipv6.o
-ifneq ($(strip $(TCSUPPORT_IPV6_ADVANCE)),)
+ifneq ($(strip $(CONFIG_TCSUPPORT_IPV6_ADVANCE)),)
 obj-m += nf_conntrack_ipv6.o
 endif
 

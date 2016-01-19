@@ -196,11 +196,6 @@ try_again:
 			datagram_recv_ctl(sk, msg, skb);
 	}
 
-#ifdef TCSUPPORT_FW_UPGRADE_16M
-	sk->sk_mark = skb->mark;
-	//printk("v6 sk mark = %x\n", sk->sk_mark);
-#endif
-
 	err = copied;
 	if (flags & MSG_TRUNC)
 		err = ulen;

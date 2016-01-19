@@ -308,7 +308,7 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 #define MASK_ORIGIN_DEV   		0x1 	/* flag for port bind set origin dev name */
 #define MASK_OUT_DEV   			0x2 	/* flag for port bind set origin dev name */
@@ -317,7 +317,7 @@ struct sk_buff {
 	char		orig_dev_name[IFNAMSIZ];
 #endif
 #endif
-#ifdef	TCSUPPORT_VLAN_TAG
+#ifdef	CONFIG_TCSUPPORT_VLAN_TAG
 	__u16		vlan_tags[2];
 #define		VLAN_PACKET				(1<<0)
 #define		VLAN_2TAGS_PACKET		(1<<1)
@@ -346,15 +346,15 @@ struct sk_buff {
 //#define QOS_WANIF_MARK			0xff000
 //#define QOS_DSCP_MARK  			0x3f00000
 #endif
-#if !defined(TCSUPPORT_CT)
-#ifdef TCSUPPORT_BRIDGE_FASTPATH
+#if !defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
 #define FB_WAN_ENABLE 	(1<<0)
 #define FB_FLOOD_PKT 	(1<<1)
 	__u8	fb_flags;
 	__u8    sc_mac_learned;
 #endif
 #endif
-#if defined(CONFIG_MIPS_RT63365) && defined(TCSUPPORT_WAN_ETHER)
+#if defined(CONFIG_MIPS_RT63365) && defined(CONFIG_TCSUPPORT_WAN_ETHER)
 	__u8    wan_port_flag;
 #endif
 	__u32			mark;  /*The first 4 bits are used to identify LAN interfaces. 0x10000000~0x90000000:LAN1~LAN4,ra0~ra3,usb0*/
@@ -1226,7 +1226,7 @@ static inline int skb_network_offset(const struct sk_buff *skb)
  * headroom, you should not reduce this.
  */
 #ifndef NET_SKB_PAD
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 /* Temporary set NET_SKB_PAD as 16 for RT65168 */
 #if defined(CONFIG_MIPS_RT65168)
 //#define NET_SKB_PAD	16
@@ -1787,13 +1787,13 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 	dst->nf_bridge  = src->nf_bridge;
 	nf_bridge_get(src->nf_bridge);
 #endif
-#if !defined(TCSUPPORT_CT) 
+#if !defined(CONFIG_TCSUPPORT_CT) 
 #ifdef CONFIG_PORT_BINDING
 	dst->portbind_mark = src->portbind_mark;
 	memcpy(dst->orig_dev_name, src->orig_dev_name, IFNAMSIZ);
 #endif
 #endif
-#ifdef TCSUPPORT_VLAN_TAG
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
 	dst->vlan_tags[0] = src->vlan_tags[0];
 	dst->vlan_tags[1] = src->vlan_tags[1];
 	dst->vlan_tag_flag = src->vlan_tag_flag;
