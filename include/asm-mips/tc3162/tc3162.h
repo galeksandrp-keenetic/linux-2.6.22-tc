@@ -164,20 +164,21 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #define TC3162L2		1
 #endif
 
-#define isTC3162L2P2 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)!=0)?1:0)
-#define isTC3162L3P3 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==7)?1:0)
-#define isTC3162L4P4 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==8)?1:0)
-#define isTC3162L5P5E2 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0xa)?1:0)
-#define isTC3162L5P5E3 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0xb)?1:0)
+#define isTC3162L2P2 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)!=0)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
+#define isTC3162L3P3 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==7)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
+#define isTC3162L4P4 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==8)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
+#define isTC3162L5P5E2 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0xa)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
+#define isTC3162L5P5E3 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0xb)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
 #define isTC3162L5P5 (isTC3162L5P5E2 || isTC3162L5P5E3)
-#define isTC3162U ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x10)?1:0)
-#define isRT63260 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x20)?1:0)
+#define isTC3162U ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x10)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
+#define isRT63260 ((((unsigned char)(VPint(0xbfb0008c)>>12)&0xff)==0x20)&&(((VPint(0xbfb00064)&0xffffffff))==0x00000000)?1:0)
 
 #define isTC3169 	(((VPint(0xbfb00064)&0xffff0000))==0x00000000)
 #define isTC3182 	(((VPint(0xbfb00064)&0xffff0000))==0x00010000)
 #define isRT65168 	(((VPint(0xbfb00064)&0xffff0000))==0x00020000)
 #define isRT63165 	(((VPint(0xbfb00064)&0xffff0000))==0x00030000)
 #define isRT63365 	(((VPint(0xbfb00064)&0xffff0000))==0x00040000)
+#define isRT63368   (isRT63365 ? ((((VPint(0xbfb0008c)>>8) & 0x3) == 0x3) ? 1 : 0): 0)
 
 #ifdef TC3162L2
 #define RT63260_SYS_HCLK ((12*(((VPint(0xbfb000b0))&0x1ff)+1)/(((VPint(0xbfb000b0)>>9)&0x1f)+1))/5)

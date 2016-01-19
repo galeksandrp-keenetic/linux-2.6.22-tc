@@ -69,13 +69,6 @@ static int tc3162_pciebios_read(struct pci_bus *bus, unsigned int devfn, int whe
 	u32 data;
 
 	spin_lock_irqsave(&pcie_lock, flags);
-	if(isRT63165 || isRT63365){
-		if((devfn & 0xFF) != 0){
-			*val = 0xffffffff;
-			spin_unlock_irqrestore(&pcie_lock, flags);
-			return PCIBIOS_SUCCESSFUL;
-		}
-	}
 	write_cfgaddr(mkaddr(bus,devfn,where));
 	data = read_cfgdata();
 

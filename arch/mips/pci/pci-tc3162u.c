@@ -36,6 +36,7 @@ extern uint32 pcie_config_data;
 
 static int ahb_status=0;
 static int pcie_soft_patch=1;
+int dual_band_support = 0;
 
 static struct resource tc3162_pcie_io_resource = {
 	.name   = "pcie IO space",
@@ -72,13 +73,18 @@ EXPORT_SYMBOL(setahbstat);
 
 void pcieReset(void){	
 	int i;
+	
 	if(isRT63165){
 		return;		
 	}
 
 	if(isRT63365){
 		//disable interrupt
-		VPint(0xbfb8000c) &= ~(1<<20);
+		if(dual_band_support){
+			VPint(0xbfb8000c) &= ~((1<<20) | (1<<21));
+		}else{
+			VPint(0xbfb8000c) &= ~(1<<20);
+		}	
 		mdelay(5);
 		//PCI-E reset
 		if (VPint(CR_AHB_HWCONF)&(1<<31)) {		
@@ -88,13 +94,18 @@ void pcieReset(void){
 			VPint(0xbfb00834) |= (1<<26);
 			mdelay(1);
 		}else{	
-			/* disabled PCIe port 1 */
-			VPint(0xbfb00088) &= ~(1<<22);
-			mdelay(1);
-			VPint(0xbfb00834) |= ((1<<26) | (1<<29));
-			mdelay(1);
-			VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
-			mdelay(1);
+			//rt63368 enable pci-e port1 and port1 do not have power will cause hang. shnwind.
+			if(dual_band_support){
+				VPint(0xbfb00834) |= ((1<<26) | (1<<27) | (1<<29));
+				mdelay(1);
+				VPint(0xbfb00834) &= ~((1<<26) | (1<<27) | (1<<29));
+				mdelay(1);
+			}else{
+				VPint(0xbfb00834) |= ((1<<26) | (1<<29));
+				mdelay(1);
+				VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
+				mdelay(1);
+			}	
 		}		
 
 		VPint(0xbfb80000) |= (1<<1);
@@ -104,20 +115,52 @@ void pcieReset(void){
 		//wait device link up
 		for(i=0 ; i<1000 ; i++){
 			mdelay(1);
-			if((VPint(0xbfb82050) & 0x1) != 0){
-				break;
-			}   
+			if(dual_band_support){
+				if(((VPint(0xbfb82050) & 0x1) != 0) || ((VPint(0xbfb83050) & 0x1) != 0)){
+					break;
+				}	
+			}else{
+				if((VPint(0xbfb82050) & 0x1) != 0){
+					break;
+				}
+			}	
 		}
 		if(i == 1000){
 			printk("PCI-E RC can not link up\n");
 			return -1;
 		}
-		//config PCI-E RC
-		VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
+		if(dual_band_support){		
+			if((VPint(0xbfb82050) & 0x1) != 0){
+				//config PCI-E RC
+				VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
 
-		//change class PCI-PCI Bridge
-		VPint(0xbfb82034) = 0x06040001;
+				//change class PCI-PCI Bridge
+				VPint(0xbfb82034) = 0x06040001;
+			}else{
+				//disable port 0
+				VPint(0xbfb00088) &= ~(1<<23);
+				mdelay(1);
+			}
 
+			if((VPint(0xbfb83050) & 0x1) != 0){
+				//config PCI-E RC
+				VPint(0xbfb83010) = 0xffff0001;//disable support BAR0
+
+				//change class PCI-PCI Bridge
+				VPint(0xbfb83034) = 0x06040001;
+			}else{
+				//disable port 1
+				VPint(0xbfb00088) &= ~(1<<22);
+				mdelay(1);
+			}
+		}else{
+			//config PCI-E RC
+			VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
+
+			//change class PCI-PCI Bridge
+			VPint(0xbfb82034) = 0x06040001;
+		}	
+		
 		//Enable CRC count .
 		VPint(KSEG1ADDR(pcie_config_addr)) = 0x118;
 		VPint(KSEG1ADDR(pcie_config_data)) |= (1<<8);
@@ -261,9 +304,15 @@ int pcieRegInitConfig(void)
 		}	
 		reg2_val = 0xffffffff;
 		//Enable Interrupt
-		VPint(0xbfb8000c) |= (1<<20);
+		if(VPint(0xbfb82050) == 1){
+			VPint(0xbfb8000c) |= (1<<20);
+		}	
 		//second band
-		//VPint(0xbfb8000c) |= (1<<21);
+		if(dual_band_support){
+			if(VPint(0xbfb83050) == 1){
+				VPint(0xbfb8000c) |= (1<<21);
+			}	
+		}	
 	}else{	
 		do
 		{
@@ -441,16 +490,26 @@ static __init int tc3162_pcie_init(void)
 	struct proc_dir_entry *ahb_status_proc;
 	int i;
 	uint32 tmp;
-	
 
 	if(isRT63365){
-		printk("RT63365_pcie_init\n");
+
+		if(isRT63368){
+			printk("RT63368_pcie_init\n");
+#if defined(TCSUPPORT_DUAL_WLAN)
+			//rt63368 enable pci-e port1 and port1 do not have power will cause hang. shnwind.
+			dual_band_support = 1;
+#else
+			dual_band_support = 0;
+#endif			
+		}else{	
+			printk("RT63365_pcie_init\n");
+		}	
 
 		//change memory mapping affress.
 		tc3162_pcie_mem_resource.start = 0x20000000;
 		tc3162_pcie_mem_resource.end   = 0x2FFFFFFF;
 
-		//chane pcie addr and data window.
+		//change pcie addr and data window.
 		pcie_config_addr = 0x1fb80020;
 		pcie_config_data = 0x1fb80024;
 
@@ -461,16 +520,21 @@ static __init int tc3162_pcie_init(void)
 			mdelay(1);
 			VPint(0xbfb00834) |= (1<<26);
 			mdelay(1);
-		}else{	
-			/* disabled PCIe port 1 */
-			VPint(0xbfb00088) &= ~(1<<22);
-			mdelay(1);
-			VPint(0xbfb00834) |= ((1<<26)  | (1<<29));
-			mdelay(1);
-			VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
-			mdelay(1);
-			
-			//mhbErrChkdelay(1);
+		}else{
+			if(dual_band_support){
+				VPint(0xbfb00834) |= ((1<<26) | (1<<27) | (1<<29));
+				mdelay(1);
+				VPint(0xbfb00834) &= ~((1<<26) | (1<<27) | (1<<29));
+				mdelay(1);
+			}else{	
+				/* disabled PCIe port 1 */
+				VPint(0xbfb00088) &= ~(1<<22);
+				mdelay(1);
+				VPint(0xbfb00834) |= ((1<<26)  | (1<<29));
+				mdelay(1);
+				VPint(0xbfb00834) &= ~((1<<26) | (1<<29));
+				mdelay(1);
+			}
 		}		
 
 		VPint(0xbfb80000) |= (1<<1);
@@ -491,7 +555,8 @@ static __init int tc3162_pcie_init(void)
 		//wait device link up
 		for(i=0 ; i<1000 ; i++){
 			mdelay(1);
-			if((VPint(0xbfb82050) & 0x1) != 0){
+			if(((VPint(0xbfb82050) & 0x1) != 0) ||
+				((isRT63368) && ((VPint(0xbfb83050) & 0x1) != 0))){
 				break;
 			}   
 		}
@@ -499,16 +564,38 @@ static __init int tc3162_pcie_init(void)
 			printk("PCI-E RC can not link up\n");
 			return -1;
 		}
+		if(dual_band_support){
+			if((VPint(0xbfb82050) & 0x1) != 0){
+				//config PCI-E RC
+				VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
 
-		//config PCI-E RC
-		VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
+				//change class PCI-PCI Bridge
+				VPint(0xbfb82034) = 0x06040001;
+			}else{
+				//disable port 0
+				VPint(0xbfb00088) &= ~(1<<23);
+				mdelay(1);
+			}
 
-		//change class PCI-PCI Bridge
-		VPint(0xbfb82034) = 0x06040001;
+			if((VPint(0xbfb83050) & 0x1) != 0){
+				//config PCI-E RC
+				VPint(0xbfb83010) = 0xffff0001;//disable support BAR0
 
-		//set pci-e burst size
-		//VPint(0xbfb82060) = 0x3; // need check
+				//change class PCI-PCI Bridge
+				VPint(0xbfb83034) = 0x06040001;
+			}else{
+				//disable port 1
+				VPint(0xbfb00088) &= ~(1<<22);
+				mdelay(1);
+			}	
+		}else{
+			//config PCI-E RC
+			VPint(0xbfb82010) = 0xffff0001;//disable support BAR0
 
+			//change class PCI-PCI Bridge
+			VPint(0xbfb82034) = 0x06040001;
+		}
+		
 		//Enable CRC count .
 		VPint(KSEG1ADDR(pcie_config_addr)) = 0x118;
 		VPint(KSEG1ADDR(pcie_config_data)) |= (1<<8);

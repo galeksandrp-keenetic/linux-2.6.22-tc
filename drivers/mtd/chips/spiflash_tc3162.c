@@ -1052,7 +1052,7 @@ static struct mtd_chip_driver spiflash_chipdrv = {
 	.module	 = THIS_MODULE
 };
 
-#if defined(TCSUPPORT_SUPPORT_FLASH)
+#if  defined(TCSUPPORT_SUPPORT_FLASH)
 static int read_proc_support_flash(char *page, char **start, off_t off,
 	int count, int *eof, void *data)
 {
@@ -1121,6 +1121,12 @@ static int __init spiflash_probe_init(void)
 
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	reg0x28 = *((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM));
+
+	if  (isRT63368) {
+		reg0x28 &= (0xf000ffff);
+		reg0x28 |= (0x10 << 16);
+		VPint(SPI_REG_MASTER) = reg0x28;
+	}
 #endif
 	register_mtd_chip_driver(&spiflash_chipdrv);
 	return 0;

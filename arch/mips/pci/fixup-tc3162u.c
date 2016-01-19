@@ -23,6 +23,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 }
 #endif
 
+extern int dual_band_support;
 static void tc3162_pcie_fixup(struct pci_dev *dev)
 {
 	/* setup COMMAND register */
@@ -48,9 +49,15 @@ static void tc3162_pcie_fixup_ra63165(struct pci_dev *dev)
 		
 	//pci-e interrupt enable_dma
 	if(isRT63365){
+		if(VPint(0xbfb82050) == 1){
 		VPint(0xbfb8000c) |= (1<<20); 
+		}
 		//second band
-		//VPint(0xbfb8000c) |= (1<<21);
+		if(dual_band_support){
+		if(VPint(0xbfb83050) == 1){
+			VPint(0xbfb8000c) |= (1<<21);
+			}
+		}
 	}else{
 		VPint(0xbfb8100c) |= (1<<20);
 	}	

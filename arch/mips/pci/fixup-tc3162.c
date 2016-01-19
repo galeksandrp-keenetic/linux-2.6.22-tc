@@ -19,6 +19,11 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	if (slot == 0){
 		return PCIE_A_INT;
 	}
+#ifdef CONFIG_MIPS_TC3262	
+	else if((isRT63365) && (slot == 1)){
+		return USB11_INT; //rt63365 use original usb 11 INT number
+	}
+#endif	
 #endif
     return irq_tab_tc3162[slot];
 }
