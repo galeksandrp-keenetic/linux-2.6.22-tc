@@ -317,13 +317,15 @@ pppol2tp_session_find(struct pppol2tp_tunnel *tunnel, u16 session_id)
 	struct pppol2tp_session *session;
 
 	//TODO: Switch to RCU
+	spin_lock_bh(&tunnel->hlist_lock);
 	hlist_for_each_safe(walk, tmp, session_list) {
 		session = hlist_entry(walk, struct pppol2tp_session, hlist);
 		if (session->tunnel_addr.s_session == session_id) {
+			spin_unlock_bh(&tunnel->hlist_lock);
 			return session;
 		}
 	}
-
+	spin_unlock_bh(&tunnel->hlist_lock);
 	return NULL;
 }
 
@@ -512,7 +514,6 @@ static void pppol2tp_recv_dequeue_skb(struct pppol2tp_session *session, struct s
 static void pppol2tp_recv_dequeue(struct pppol2tp_session *session)
 {
 	struct sk_buff *skb;
-	struct sk_buff *tmp;
 
 	ENTER_FUNCTION;
 
@@ -521,7 +522,7 @@ static void pppol2tp_recv_dequeue(struct pppol2tp_session *session)
 	 * in-sequence packets behind it.
 	 */
 	spin_lock_bh(&session->reorder_q.lock);
-	skb_queue_walk_safe(&session->reorder_q, skb, tmp) {
+	while ((skb = __skb_dequeue(&session->reorder_q))) {
 		if (time_after(jiffies, PPPOL2TP_SKB_CB(skb)->expires)) {
 			session->stats.rx_seq_discards++;
 			session->stats.rx_errors++;
@@ -531,7 +532,6 @@ static void pppol2tp_recv_dequeue(struct pppol2tp_session *session)
 			       session->name, PPPOL2TP_SKB_CB(skb)->ns,
 			       PPPOL2TP_SKB_CB(skb)->length, session->nr,
 			       skb_queue_len(&session->reorder_q));
-			__skb_unlink(skb, &session->reorder_q);
 			kfree_skb(skb);
 			sock_put(session->sock);
 			continue;
@@ -539,16 +539,16 @@ static void pppol2tp_recv_dequeue(struct pppol2tp_session *session)
 
 		if (PPPOL2TP_SKB_CB(skb)->has_seq) {
 			if (PPPOL2TP_SKB_CB(skb)->ns != session->nr) {
+		  	  __skb_queue_head(&session->reorder_q, skb);
 				PRINTK(session->debug, PPPOL2TP_MSG_SEQ, KERN_DEBUG,
 				       "%s: holding oos pkt %hu len %d, "
 				       "waiting for %hu, reorder_q_len=%d\n",
 					session->name, PPPOL2TP_SKB_CB(skb)->ns,
 					PPPOL2TP_SKB_CB(skb)->length, session->nr,
 					skb_queue_len(&session->reorder_q));
-				goto out;
+		     break;
 			}
 		}
-		__skb_unlink(skb, &session->reorder_q);
 		
 		/* Process the skb. We release the queue lock while we
 		 * do so to let other contexts process the queue.
@@ -558,7 +558,6 @@ static void pppol2tp_recv_dequeue(struct pppol2tp_session *session)
 		spin_lock_bh(&session->reorder_q.lock);
 	}
 
-out:
 	spin_unlock_bh(&session->reorder_q.lock);
 	EXIT_FUNCTION;
 }
@@ -883,7 +882,6 @@ static int pppol2tp_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (likely(err == 0))
 		err = len;
 
-	if (skb)
 		kfree_skb(skb);
 
 error:
