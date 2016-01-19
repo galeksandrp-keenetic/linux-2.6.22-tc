@@ -71,7 +71,9 @@ ipv6header_match(const struct sk_buff *skb,
 		}
 
 		hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
-		BUG_ON(hp == NULL);
+		if(hp == NULL);
+			return 0;
+		//BUG_ON(hp == NULL);
 
 		/* Calculate the header length */
 		if (nexthdr == NEXTHDR_FRAGMENT) {

@@ -518,7 +518,9 @@ conntrack_pptp_help(struct sk_buff **pskb, unsigned int protoff,
 
 	nexthdr_off = protoff;
 	tcph = skb_header_pointer(*pskb, nexthdr_off, sizeof(_tcph), &_tcph);
-	BUG_ON(!tcph);
+	if(tcph == NULL)
+		return NF_ACCEPT;
+	//BUG_ON(!tcph);
 	nexthdr_off += tcph->doff * 4;
 	datalen = tcplen - tcph->doff * 4;
 

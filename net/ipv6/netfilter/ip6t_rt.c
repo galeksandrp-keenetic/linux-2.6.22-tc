@@ -180,7 +180,9 @@ match(const struct sk_buff *skb,
 							+ temp * sizeof(_addr),
 							sizeof(_addr),
 							&_addr);
-				BUG_ON(ap == NULL);
+				if(ap == NULL)
+					return 0;
+				//BUG_ON(ap == NULL);
 
 				if (!ipv6_addr_equal(ap, &rtinfo->addrs[temp]))
 					break;

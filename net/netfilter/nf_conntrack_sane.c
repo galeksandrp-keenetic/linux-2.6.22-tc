@@ -94,7 +94,6 @@ static int help(struct sk_buff **pskb,
 	th = skb_header_pointer(*pskb, protoff, sizeof(_tcph), &_tcph);
 	if (th == NULL)
 		return NF_ACCEPT;
-
 	/* No data? */
 	dataoff = protoff + th->doff * 4;
 	if (dataoff >= (*pskb)->len)
@@ -104,7 +103,12 @@ static int help(struct sk_buff **pskb,
 
 	spin_lock_bh(&nf_sane_lock);
 	sb_ptr = skb_header_pointer(*pskb, dataoff, datalen, sane_buffer);
-	BUG_ON(sb_ptr == NULL);
+	if (sb_ptr == NULL)
+	{
+		spin_unlock_bh(&nf_sane_lock);
+		return NF_ACCEPT;
+	}
+	//BUG_ON(sb_ptr == NULL);
 
 	if (dir == IP_CT_DIR_ORIGINAL) {
 		if (datalen != sizeof(struct sane_request))

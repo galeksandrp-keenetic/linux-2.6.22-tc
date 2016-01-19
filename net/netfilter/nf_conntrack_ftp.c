@@ -399,7 +399,12 @@ static int help(struct sk_buff **pskb,
 
 	spin_lock_bh(&nf_ftp_lock);
 	fb_ptr = skb_header_pointer(*pskb, dataoff, datalen, ftp_buffer);
-	BUG_ON(fb_ptr == NULL);
+	if(fb_ptr == NULL)
+	{
+		spin_unlock_bh(&nf_ftp_lock);
+		return NF_ACCEPT;
+	}
+	//BUG_ON(fb_ptr == NULL);
 
 	ends_in_nl = (fb_ptr[datalen - 1] == '\n');
 	seq = ntohl(th->seq) + datalen;

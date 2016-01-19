@@ -402,7 +402,12 @@ static int help(struct sk_buff **pskb, unsigned int protoff,
         spin_lock_bh(&rtsp_buffer_lock);
         rb_ptr = skb_header_pointer(*pskb, dataoff,
                                     (*pskb)->len - dataoff, rtsp_buffer);
-        BUG_ON(rb_ptr == NULL);
+        if(rb_ptr == NULL)
+        {
+                spin_unlock_bh(&rtsp_buffer_lock);
+                return NF_ACCEPT;
+        }
+        //BUG_ON(rb_ptr == NULL);
 
 #if 0
         /* Checksum invalid?  Ignore. */

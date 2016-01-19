@@ -397,7 +397,12 @@ static void tcp_options(const struct sk_buff *skb,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+	if(ptr == NULL)
+	{
+		//printk("tcp_options (BUG_ON): dataoff = %d\n", dataoff);
+		return;
+	}
+	//BUG_ON(ptr == NULL);
 
 	state->td_scale =
 	state->flags = 0;
@@ -452,7 +457,12 @@ static void tcp_sack(const struct sk_buff *skb, unsigned int dataoff,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+	if(ptr == NULL)
+	{
+		//printk("tcp_sack (BUG_ON): dataoff = %d\n", dataoff);
+		return;
+	}
+	//BUG_ON(ptr == NULL);
 
 	/* Fast path for timestamp-only option */
 	if (length == TCPOLEN_TSTAMP_ALIGNED*4
@@ -843,7 +853,12 @@ static int tcp_packet(struct nf_conn *conntrack,
 	unsigned int index;
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if(th == NULL)
+	{
+		//printk("tcp_packet (BUG_ON): dataoff = %d\n", dataoff);
+		return -NF_ACCEPT;
+	}
+	//BUG_ON(th == NULL);
 
 	write_lock_bh(&tcp_lock);
 	old_state = conntrack->proto.tcp.state;
@@ -1013,7 +1028,12 @@ static int tcp_new(struct nf_conn *conntrack,
 #endif
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if(th == NULL)
+	{
+		//printk("tcp_new (BUG_ON): dataoff = %d\n", dataoff);
+		return 0;
+	}
+	//BUG_ON(th == NULL);
 
 	/* Don't need lock here: this conntrack not in circulation yet */
 	new_state
