@@ -185,6 +185,30 @@ static struct nand_info flash_tables[] = {
 		badblockpos: (51),
 		opcode_type: STANDARD_LARGE_FLASH,
 	},
+	{
+		mfr_id: MANUFACTURER_SAMSUNG,
+		dev_id: K9F1G08U0D,
+		name:   "SAMSUNG K9F1G08U0D",
+		numchips: (1),
+		chip_shift: SIZE_128MiB_BIT,
+		page_shift: SIZE_2KiB_BIT,
+		erase_shift: SIZE_128KiB_BIT,
+		oob_shift: SIZE_64iB_BIT,
+		badblockpos: (51),
+		opcode_type: STANDARD_LARGE_FLASH,
+	},
+	{
+		mfr_id: MANUFACTURER_SPANSION,
+		dev_id: S34ML01G1,
+		name:   "SPANSION S34ML01G1",
+		numchips: (1),
+		chip_shift: SIZE_128MiB_BIT,
+		page_shift: SIZE_2KiB_BIT,
+		erase_shift: SIZE_128KiB_BIT,
+		oob_shift: SIZE_64iB_BIT,
+		badblockpos: (51),
+		opcode_type: STANDARD_LARGE_FLASH,
+	},
 };
 
 
@@ -2182,8 +2206,8 @@ nand_setup(void)
 	dev_id = ((flash_id >> nbits) & id_mask);
 	#endif
 
-//	printk("mfr_id : %2x\n", mfr_id);
-//	printk("dev_id : %2x\n", dev_id);
+	//printk("mfr_id : %2x\n", mfr_id);
+	//printk("dev_id : %2x\n", dev_id);
 
 	for (i=0; i < ARRAY_SIZE(flash_tables); i++) {
 
@@ -2196,13 +2220,16 @@ nand_setup(void)
 			break;
 		}
 	}
-	
+
 	if (flash == NULL) {
 		printk("Undefined Manufactor ID and Devcie ID\n");
 		return -1;
+	} else {
+		printk("NAND Flash      : %s %dMB\n", flash->name, (1 << flash->chip_shift) / (1024 * 1024));
+		printk("NAND Block size : %dKB\n", (1 << flash->erase_shift) / 1024);
+		printk("NAND Page size  : %dB\n", (1 << flash->page_shift));
 	}
-	
-	
+
 	if (flash->page_shift == SIZE_512iB_BIT) {
 		subpage_bit = 1;
 	}

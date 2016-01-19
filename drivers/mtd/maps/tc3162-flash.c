@@ -25,6 +25,56 @@ static struct map_info tc3162_map = {
 
 static struct mtd_partition tc3162_parts[] = {
         {
+#ifdef CONFIG_MTD_NAND_RALINK
+                name:           "U-Boot",  /* mtdblock0 */
+                size:           0x20000,  /* 128K */
+                offset:         0,
+                mask_flags:     0  /* force read-only */
+        }, {
+                name:           "U-Config", /* mtdblock1 */
+                size:           0x20000,  /* 128K */
+                offset:         0x20000,
+                mask_flags:     0  /* force read-only */
+        }, {
+                name:           "RF-EEPROM", /* mtdblock2 */
+                size:           0x20000,  /* 128K */
+                offset:         0x40000,
+                mask_flags:     0  /* force read-only */
+        }, {
+#ifdef CONFIG_ROOTFS_IN_FLASH
+                name:           "Kernel", /* mtdblock3 */
+                size:           0x140000,
+                offset:         0x60000,
+        }, {
+                name:           "RootFS", /* mtdblock4 */
+                size:           0x800000,
+                offset:         0x1A0000,
+        }, {
+                name:           "Config", /* mtdblock5 */
+                size:           0x20000,
+                offset:         0x9A0000,
+        }, {
+                name:           "Storage", /* mtdblock6 */
+                size:           0x800000,
+                offset:         0x9C0000,
+#else
+                name:           "Kernel", /* mtdblock3 */
+                size:           0x940000,
+                offset:         0x60000,
+        }, {
+                name:           "Config", /* mtdblock4 */
+                size:           0x20000,
+                offset:         0x9A0000,
+        }, {
+                name:           "Storage", /* mtdblock5 */
+                size:           0x800000,
+                offset:         0x9C0000,
+#endif /* IN_FLASH */
+        }, {
+                name:           "System", /* mtdblock6/7 */
+                size:           (0x8000000 - 0x11C0000), /* Flash 128Mb */
+                offset:         0x11C0000,
+#else
                 name:           "U-Boot",  /* mtdblock0 */
                 size:           0x30000,  /* 192K */
                 offset:         0,
@@ -147,8 +197,9 @@ static struct mtd_partition tc3162_parts[] = {
                 name:           "Storage", /* mtdblock6 */
                 size:           0x100000,
                 offset:         0x1f00000,
-#endif	  
 #endif
+#endif
+#endif /* NAND */
         }
 };
 
@@ -180,7 +231,9 @@ static int __init tc3162_mtd_init(void)
 	simple_map_init(&tc3162_map);
 
 	/* check if boot from SPI flash */
-	if (IS_SPIFLASH) {
+	if (IS_NANDFLASH) {
+		tc3162_mtd_info = do_map_probe("nandflash_probe", &tc3162_map);
+	} else if (IS_SPIFLASH) {
 		tc3162_mtd_info = do_map_probe("spiflash_probe", &tc3162_map);
 	} else {
 		tc3162_mtd_info = do_map_probe("cfi_probe", &tc3162_map);

@@ -41,19 +41,24 @@
 #define MANUFACTURER_ST3A 		0x20
 #define MANUFACTURER_ST4A 		0x0020
 #define	MANUFACTURER_MIRCON		0x2c
+#define MANUFACTURER_SAMSUNG		0xec
+#define MANUFACTURER_SPANSION		0x01
 
 /* ST Device ID */
-#define ST128W3A				0x73
-#define ST512W3A				0x76
+#define ST128W3A			0x73
+#define ST512W3A			0x76
 
 /* MICRON Device ID */
 #define MT29F2G08AAD			0xda
 #define MT29F4G08AAC			0xdc
 
+#define K9F1G08U0D			0xf1
+#define S34ML01G1			0xf1
 
 /* SIZE BIT*/
 #define SIZE_512MiB_BIT			(29)
 #define SIZE_256MiB_BIT			(28)
+#define SIZE_128MiB_BIT			(27)
 #define SIZE_64MiB_BIT			(26)
 #define SIZE_16MiB_BIT			(24)
 #define SIZE_128KiB_BIT			(17)
