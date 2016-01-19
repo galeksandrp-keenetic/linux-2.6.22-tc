@@ -270,16 +270,13 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
  * 	Deliver IP Packets to the higher protocol layers.
  */
 
-#if defined (CONFIG_PPPOL2TP)
-extern int l2tp_input(struct sk_buff *skb);
-#endif
+extern int (*l2tp_input)(struct sk_buff *skb);
 
 int ip_local_deliver(struct sk_buff *skb)
 {
-#if defined (CONFIG_PPPOL2TP)
 	struct udphdr *udp;
 	struct iphdr *iph;
-#endif
+	int (*l2tp_rx)(struct sk_buff *skb);
 
 	/*
 	 *	Reassemble IP fragments.
@@ -291,18 +288,16 @@ int ip_local_deliver(struct sk_buff *skb)
 			return 0;
 	}
 
-#if defined (CONFIG_PPPOL2TP) 
 	if( skb->protocol == htons(ETH_P_IP) && (iph = ip_hdr(skb)) ) {
 		if( iph->protocol == IPPROTO_UDP &&
 			 (udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
 			 udp->dest == htons(1701) && 
 			 udp->source == htons(1701) &&
-			 l2tp_input(skb) == 1 ) {
+			 (l2tp_rx = rcu_dereference(l2tp_input)) &&
+			 l2tp_rx(skb) == 1 ) {
 			return 0;
 	}
 	}
-#endif
- 
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	FOE_ALG_SKIP(skb);

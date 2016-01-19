@@ -58,6 +58,7 @@
 
 extern int (*vpn_pthrough)(struct sk_buff *skb, int in);
 extern int (*vpn_pthrough_setup)(uint32_t sip, int add);
+extern int (*l2tp_input)(struct sk_buff *skb);
 
 static struct proc_dir_entry *proc_cmd = NULL;
 
@@ -385,7 +386,7 @@ end:
 
 extern void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb);
 
-int l2tp_input(struct sk_buff *skb) {
+int l2tp_input_proc(struct sk_buff *skb) {
 	struct iphdr *iph;
 	u8 *ptr, *psh;
 	u16 hdrflags, tid, sid, offset, nr, ns, hlen, len, plen;
@@ -557,8 +558,6 @@ skip_put:
 	sock_put(sk);	
 	return 0;
 }
-
-EXPORT_SYMBOL(l2tp_input);
 
 int l2tp_read_cmd(char *pdata, char **pstart, off_t uoff, int icount, int *pieof, void *pref) {
 	int iread;
@@ -798,6 +797,7 @@ static int __init l2tp_init(void) {
    	 proc_cmd->owner = THIS_MODULE;
     }
 
+   rcu_assign_pointer(l2tp_input, l2tp_input_proc);
 
 out:
 	return err;
@@ -808,6 +808,8 @@ out_unregister_l2tp_proto:
 }
 
 static void __exit l2tp_exit(void) {
+	rcu_assign_pointer(l2tp_input, NULL);
+
 	if( proc_cmd ) {
    	 remove_proc_entry("l2tp_tun", proc_net);
    	 proc_cmd = NULL;
@@ -820,7 +822,7 @@ static void __exit l2tp_exit(void) {
 module_init(l2tp_init);
 module_exit(l2tp_exit);
 
-MODULE_AUTHOR( "Andrey V.Panukov <andrey.panukov@gmail.com>" );
+MODULE_LICENSE("Artistic");
+MODULE_AUTHOR("http://www.ndmsystems.com");
 MODULE_DESCRIPTION("PPP over L2TP over UDP");
-MODULE_LICENSE("GPL");
 MODULE_VERSION(PPPOL2TP_DRV_VERSION);
