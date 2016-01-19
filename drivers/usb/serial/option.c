@@ -38,6 +38,7 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
 
@@ -67,58 +68,65 @@ static int  option_tiocmset(struct usb_serial_port *port, struct file *file,
 static int  option_send_setup(struct usb_serial_port *port);
 
 /* Vendor and product IDs */
-#define OPTION_VENDOR_ID			0x0AF0
-#define OPTION_PRODUCT_COLT			0x5000
-#define OPTION_PRODUCT_RICOLA			0x6000
-#define OPTION_PRODUCT_RICOLA_LIGHT		0x6100
-#define OPTION_PRODUCT_RICOLA_QUAD		0x6200
-#define OPTION_PRODUCT_RICOLA_QUAD_LIGHT	0x6300
-#define OPTION_PRODUCT_RICOLA_NDIS		0x6050
-#define OPTION_PRODUCT_RICOLA_NDIS_LIGHT	0x6150
-#define OPTION_PRODUCT_RICOLA_NDIS_QUAD		0x6250
+#define OPTION_VENDOR_ID						0x0AF0
+#define OPTION_PRODUCT_COLT						0x5000
+#define OPTION_PRODUCT_RICOLA					0x6000
+#define OPTION_PRODUCT_RICOLA_LIGHT				0x6100
+#define OPTION_PRODUCT_RICOLA_QUAD				0x6200
+#define OPTION_PRODUCT_RICOLA_QUAD_LIGHT		0x6300
+#define OPTION_PRODUCT_RICOLA_NDIS				0x6050
+#define OPTION_PRODUCT_RICOLA_NDIS_LIGHT		0x6150
+#define OPTION_PRODUCT_RICOLA_NDIS_QUAD			0x6250
 #define OPTION_PRODUCT_RICOLA_NDIS_QUAD_LIGHT	0x6350
-#define OPTION_PRODUCT_COBRA			0x6500
-#define OPTION_PRODUCT_COBRA_BUS		0x6501
-#define OPTION_PRODUCT_VIPER			0x6600
-#define OPTION_PRODUCT_VIPER_BUS		0x6601
-#define OPTION_PRODUCT_GT_MAX_READY		0x6701
-#define OPTION_PRODUCT_GT_MAX			0x6711
-#define OPTION_PRODUCT_FUJI_MODEM_LIGHT		0x6721
-#define OPTION_PRODUCT_FUJI_MODEM_GT		0x6741
-#define OPTION_PRODUCT_FUJI_MODEM_EX		0x6761
-#define OPTION_PRODUCT_FUJI_NETWORK_LIGHT	0x6731
-#define OPTION_PRODUCT_FUJI_NETWORK_GT		0x6751
-#define OPTION_PRODUCT_FUJI_NETWORK_EX		0x6771
-#define OPTION_PRODUCT_KOI_MODEM		0x6800
-#define OPTION_PRODUCT_KOI_NETWORK		0x6811
-#define OPTION_PRODUCT_SCORPION_MODEM		0x6901
-#define OPTION_PRODUCT_SCORPION_NETWORK		0x6911
-#define OPTION_PRODUCT_ETNA_MODEM		0x7001
-#define OPTION_PRODUCT_ETNA_NETWORK		0x7011
-#define OPTION_PRODUCT_ETNA_MODEM_LITE		0x7021
-#define OPTION_PRODUCT_ETNA_MODEM_GT		0x7041
-#define OPTION_PRODUCT_ETNA_MODEM_EX		0x7061
-#define OPTION_PRODUCT_ETNA_NETWORK_LITE	0x7031
-#define OPTION_PRODUCT_ETNA_NETWORK_GT		0x7051
-#define OPTION_PRODUCT_ETNA_NETWORK_EX		0x7071
-#define OPTION_PRODUCT_ETNA_KOI_MODEM		0x7100
-#define OPTION_PRODUCT_ETNA_KOI_NETWORK		0x7111
+#define OPTION_PRODUCT_COBRA					0x6500
+#define OPTION_PRODUCT_COBRA_BUS				0x6501
+#define OPTION_PRODUCT_VIPER					0x6600
+#define OPTION_PRODUCT_VIPER_BUS				0x6601
+#define OPTION_PRODUCT_GT_MAX_READY				0x6701
+#define OPTION_PRODUCT_GT_MAX					0x6711
+#define OPTION_PRODUCT_FUJI_MODEM_LIGHT			0x6721
+#define OPTION_PRODUCT_FUJI_MODEM_GT			0x6741
+#define OPTION_PRODUCT_FUJI_MODEM_EX			0x6761
+#define OPTION_PRODUCT_FUJI_NETWORK_LIGHT		0x6731
+#define OPTION_PRODUCT_FUJI_NETWORK_GT			0x6751
+#define OPTION_PRODUCT_FUJI_NETWORK_EX			0x6771
+#define OPTION_PRODUCT_KOI_MODEM				0x6800
+#define OPTION_PRODUCT_KOI_NETWORK				0x6811
+#define OPTION_PRODUCT_SCORPION_MODEM			0x6901
+#define OPTION_PRODUCT_SCORPION_NETWORK			0x6911
+#define OPTION_PRODUCT_ETNA_MODEM				0x7001
+#define OPTION_PRODUCT_ETNA_NETWORK				0x7011
+#define OPTION_PRODUCT_ETNA_MODEM_LITE			0x7021
+#define OPTION_PRODUCT_ETNA_MODEM_GT			0x7041
+#define OPTION_PRODUCT_ETNA_MODEM_EX			0x7061
+#define OPTION_PRODUCT_ETNA_NETWORK_LITE		0x7031
+#define OPTION_PRODUCT_ETNA_NETWORK_GT			0x7051
+#define OPTION_PRODUCT_ETNA_NETWORK_EX			0x7071
+#define OPTION_PRODUCT_ETNA_KOI_MODEM			0x7100
+#define OPTION_PRODUCT_ETNA_KOI_NETWORK			0x7111
 
-#define HUAWEI_VENDOR_ID			0x12D1
-#define HUAWEI_PRODUCT_E600			0x1001
-#define HUAWEI_PRODUCT_E220			0x1003
+#define HUAWEI_VENDOR_ID						0x12D1
+#define HUAWEI_PRODUCT_E600						0x1001
+#define HUAWEI_PRODUCT_E220						0x1003
+#define HUAWEI_PRODUCT_E220BIS					0x1004
 
-#define NOVATELWIRELESS_VENDOR_ID		0x1410
+#define NOVATELWIRELESS_VENDOR_ID				0x1410
+#define DELL_VENDOR_ID							0x413C
 
-#define ANYDATA_VENDOR_ID			0x16d5
-#define ANYDATA_PRODUCT_ADU_E100A		0x6501
-#define ANYDATA_PRODUCT_ADU_500A		0x6502
+#define ANYDATA_VENDOR_ID						0x16d5
+#define ANYDATA_PRODUCT_ADU_E100A				0x6501
+#define ANYDATA_PRODUCT_ADU_500A				0x6502
 
-#define BANDRICH_VENDOR_ID			0x1A8D
-#define BANDRICH_PRODUCT_C100_1			0x1002
-#define BANDRICH_PRODUCT_C100_2			0x1003
+#define BANDRICH_VENDOR_ID						0x1A8D
+#define BANDRICH_PRODUCT_C100_1					0x1002
+#define BANDRICH_PRODUCT_C100_2					0x1003
 
-#define DELL_VENDOR_ID				0x413C
+#define ZTE_VENDOR_ID							0x19d2
+#define ZTE_PRODUCT_MF626						0x0031
+
+#define ALCATEL_VENDOR_ID						0x1bbb
+#define CRESCENT_VENDOR_ID						0x1c9e
+#define ALCATEL_PRODUCT_X100					0x9603
 
 static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
@@ -156,8 +164,10 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_ETNA_NETWORK_EX) },
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_ETNA_KOI_MODEM) },
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_ETNA_KOI_NETWORK) },
+	{ USB_DEVICE(OPTION_VENDOR_ID, 0x7501) }, /* Option GI 0431 */
 	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E600) },
 	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E220) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E220BIS) },
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1100) }, /* Novatel Merlin XS620/S640 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1110) }, /* Novatel Merlin S620 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1120) }, /* Novatel Merlin EX720 */
@@ -170,11 +180,119 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2110) }, /* Novatel Merlin ES620 / Merlin ES720 / Ovation U720 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2130) }, /* Novatel Merlin ES620 SM Bus */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2410) }, /* Novatel EU740 */
+	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x4400) }, /* Novatel MC930D */
+	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x6000) }, /* Novatel MC760 */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8114) },	/* Dell Wireless 5700 Mobile Broadband CDMA/EVDO Mini-Card == Novatel Expedite EV620 CDMA/EV-DO */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8115) },	/* Dell Wireless 5500 Mobile Broadband HSDPA Mini-Card == Novatel Expedite EU740 HSDPA/3G */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8116) },	/* Dell Wireless 5505 Mobile Broadband HSDPA Mini-Card == Novatel Expedite EU740 HSDPA/3G */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8117) },	/* Dell Wireless 5700 Mobile Broadband CDMA/EVDO ExpressCard == Novatel Merlin XV620 CDMA/EV-DO */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8118) },	/* Dell Wireless 5510 Mobile Broadband HSDPA ExpressCard == Novatel Merlin XU870 HSDPA/3G */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8128) },	/* Dell Wireless 5700 Mobile Broadband CDMA/EVDO Mini-Card == Novatel Expedite E720 CDMA/EV-DO */
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8137) },	/* Dell Wireless HSDPA 5520 */
 	{ USB_DEVICE(ANYDATA_VENDOR_ID, ANYDATA_PRODUCT_ADU_E100A) },
 	{ USB_DEVICE(ANYDATA_VENDOR_ID, ANYDATA_PRODUCT_ADU_500A) },
 	{ USB_DEVICE(BANDRICH_VENDOR_ID, BANDRICH_PRODUCT_C100_1) },
 	{ USB_DEVICE(BANDRICH_VENDOR_ID, BANDRICH_PRODUCT_C100_2) },
-	{ USB_DEVICE(DELL_VENDOR_ID, 0x8118) },		/* Dell Wireless 5510 Mobile Broadband HSDPA ExpressCard */
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0001) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0002) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0015) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0016) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0017) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0022) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, ZTE_PRODUCT_MF626) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0037) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0052) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0055) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0063) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0064) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0066) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0091) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0094) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0104) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0108) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0116) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0117) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0121) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0124) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x0128) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x1003) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x1008) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x1010) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x1015) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x2002) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0x2003) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0xfff1) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0xfffe) },
+	{ USB_DEVICE(ZTE_VENDOR_ID, 0xffff) },
+	{ USB_DEVICE(ALCATEL_VENDOR_ID, 0x0000) },
+	{ USB_DEVICE(ALCATEL_VENDOR_ID, 0x0017) },
+	{ USB_DEVICE(CRESCENT_VENDOR_ID, 0x6061) },
+	{ USB_DEVICE(CRESCENT_VENDOR_ID, ALCATEL_PRODUCT_X100) },
+	{ USB_DEVICE(CRESCENT_VENDOR_ID, 0x9605) },
+	{ USB_DEVICE(0x1726, 0x1000) },
+	{ USB_DEVICE(0x16d8, 0x6803) },
+	{ USB_DEVICE(0x211f, 0x6801) },
+	{ USB_DEVICE(0x22de, 0x6801) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x140b) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x140c) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1412) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1413) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x141b) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1433) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1436) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1444) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1464) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1465) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1491) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x14a5) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x14ac) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x14ae) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x14c6) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1c05) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1c08) },
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, 0x1d09) },
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x01) }, /* Huawei E392 Prot=01 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x02) }, /* Huawei E392 Prot=02 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x03) }, /* Huawei E392 Prot=03 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x10) }, /* Huawei E39x Prot=10 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x12) }, /* Huawei E39x Prot=12 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x10) }, /* Huawei E3276 Prot=10 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x12) }, /* Huawei E3276 Prot=12 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x13) }, /* Huawei E39x Prot=13 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x01) }, /* Huawei E398 Prot=01 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x02) }, /* Huawei E398 Prot=02 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x03) }, /* Huawei E398 Prot=03 */
+	{ USB_DEVICE(0x1011, 0x3198) }, /* Airplus MCD-650 old */
+	{ USB_DEVICE_INTERFACE_NUMBER(0x0408, 0xea40, 2) }, /* Yota/MTS: Use only iface #2 as ttyUSB0 */
+	{ USB_DEVICE_INTERFACE_NUMBER(0x0408, 0xea42, 2) }, /* Yota/Megafon: Use only iface #2 as ttyUSB0 */
+	{ USB_DEVICE(0x19d2, 0x1272) }, /*ZTE MF752*/
+	{ USB_DEVICE(0x16d8, 0x6008) }, /* Sprint U301 */
+	{ USB_DEVICE(0x16d8, 0x6002) }, /* Sprint U301 */
+	{ USB_DEVICE(0x1199, 0x0301) }, /* Sprint 250U */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x01) }, /* Huawei E352 Prot=01 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x02) }, /* Huawei E352 Prot=02 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x03) }, /* Huawei E352 Prot=03 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x61) }, /* Huawei 320D Prot=61 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x62) }, /* Huawei E352 Prot=62 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x01, 0x63) }, /* Huawei E352 Prot=63 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0xff, 0xff) }, /* Huawei E352 Prot=ff */
+	{ USB_DEVICE(0x1199, 0x68a3) }, /* Sierra Wireless AirCard USB 305 (AT&T)*/
+//	{ USB_DEVICE(0x12d1, 0x14fe) }, /* Huawei E171 */
+//	{ USB_DEVICE(0x12d1, 0x1506) }, /*Huawei E3276*/
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x61) }, /*Huawei E3131 Prot=61*/
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x62) }, /*Huawei E3131 Prot=62*/
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x63) }, /*Huawei E3131 Prot=63*/
+//	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x76) }, /*Huawei E3131 Prot=76*/
+	{ USB_DEVICE(0x0408, 0xea42) }, /*Megafon/Yota LTE*/
+	{ USB_DEVICE(0x201e, 0x10f8) }, /*smartfren CE81B*/
+	{ USB_DEVICE(0x0408, 0xea40) }, /*MTS/Yota*/
+	{ USB_DEVICE(0x19d2, 0x1217) }, /*MTS ZTEMF652*/
+	{ USB_DEVICE(0x1410, 0xb001) }, /*Novatel Wireles Интертелеком USB551L*/
+	{ USB_DEVICE(0x20a6, 0x1105) }, /*TE*/
+	{ USB_DEVICE(0x1bbb, 0x00b7)},  /*Alcatel X600D */
+	{ USB_DEVICE(0x2001, 0x7d02)},  /*D-Link DWM-157 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x19d2, 0x0167, 0xff, 0xff, 0xff) },/*ZTE MF821D */
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x2020, 0x4000, 0xff, 0x02, 0x01) }, /*Rostelekom Sense R41*/
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
@@ -229,15 +347,9 @@ static int debug;
 /* per port private data */
 
 #define N_IN_URB 4
-#define N_OUT_URB 1
+#define N_OUT_URB 4
 #define IN_BUFLEN 4096
-
-//increase buffer size. shnwind
-#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
-#define OUT_BUFLEN 512
-#else
-#define OUT_BUFLEN 128
-#endif
+#define OUT_BUFLEN 4096
 
 struct option_port_private {
 	/* Input endpoints and buffer for this port */
@@ -246,6 +358,7 @@ struct option_port_private {
 	/* Output endpoints and buffer for this port */
 	struct urb *out_urbs[N_OUT_URB];
 	char out_buffer[N_OUT_URB][OUT_BUFLEN];
+	unsigned long out_busy;		/* Bit vector of URBs in use */
 
 	/* Settings for the port */
 	int rts_state;	/* Handshaking pins (outputs) */
@@ -376,7 +489,7 @@ static int option_write(struct usb_serial_port *port,
 			todo = OUT_BUFLEN;
 
 		this_urb = portdata->out_urbs[i];
-		if (this_urb->status == -EINPROGRESS) {
+		if (test_and_set_bit(i, &portdata->out_busy)) {
 			if (time_before(jiffies,
 					portdata->tx_start_time[i] + 10 * HZ))
 				continue;
@@ -400,6 +513,7 @@ static int option_write(struct usb_serial_port *port,
 			dbg("usb_submit_urb %p (write bulk) failed "
 				"(%d, has %d)", this_urb,
 				err, this_urb->status);
+			clear_bit(i, &portdata->out_busy);
 			continue;
 		}
 		portdata->tx_start_time[i] = jiffies;
@@ -419,15 +533,16 @@ static void option_indat_callback(struct urb *urb)
 	struct usb_serial_port *port;
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
+	int status = urb->status;
 
 	dbg("%s: %p", __FUNCTION__, urb);
 
 	endpoint = usb_pipeendpoint(urb->pipe);
 	port = (struct usb_serial_port *) urb->context;
 
-	if (urb->status) {
+	if (status) {
 		dbg("%s: nonzero status: %d on endpoint %02x.",
-		    __FUNCTION__, urb->status, endpoint);
+		    __FUNCTION__, status, endpoint);
 	} else {
 		tty = port->tty;
 		if (urb->actual_length) {
@@ -439,7 +554,7 @@ static void option_indat_callback(struct urb *urb)
 		}
 
 		/* Resubmit urb so we continue receiving */
-		if (port->open_count && urb->status != -ESHUTDOWN) {
+		if (port->open_count && status != -ESHUTDOWN) {
 			err = usb_submit_urb(urb, GFP_ATOMIC);
 			if (err)
 				printk(KERN_ERR "%s: resubmit read urb failed. "
@@ -452,17 +567,29 @@ static void option_indat_callback(struct urb *urb)
 static void option_outdat_callback(struct urb *urb)
 {
 	struct usb_serial_port *port;
+	struct option_port_private *portdata;
+	int i;
 
 	dbg("%s", __FUNCTION__);
 
 	port = (struct usb_serial_port *) urb->context;
 
 	usb_serial_port_softint(port);
+
+	portdata = usb_get_serial_port_data(port);
+	for (i = 0; i < N_OUT_URB; ++i) {
+		if (portdata->out_urbs[i] == urb) {
+			smp_mb__before_clear_bit();
+			clear_bit(i, &portdata->out_busy);
+			break;
+		}
+	}
 }
 
 static void option_instat_callback(struct urb *urb)
 {
 	int err;
+	int status = urb->status;
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	struct option_port_private *portdata = usb_get_serial_port_data(port);
 	struct usb_serial *serial = port->serial;
@@ -470,7 +597,7 @@ static void option_instat_callback(struct urb *urb)
 	dbg("%s", __FUNCTION__);
 	dbg("%s: urb %p port %p has data %p", __FUNCTION__,urb,port,portdata);
 
-	if (urb->status == 0) {
+	if (status == 0) {
 		struct usb_ctrlrequest *req_pkt =
 				(struct usb_ctrlrequest *)urb->transfer_buffer;
 
@@ -501,10 +628,10 @@ static void option_instat_callback(struct urb *urb)
 				req_pkt->bRequestType,req_pkt->bRequest);
 		}
 	} else
-		dbg("%s: error %d", __FUNCTION__, urb->status);
+		dbg("%s: error %d", __FUNCTION__, status);
 
 	/* Resubmit urb so we continue receiving IRQ data */
-	if (urb->status != -ESHUTDOWN) {
+	if (status != -ESHUTDOWN) {
 		urb->dev = serial->dev;
 		err = usb_submit_urb(urb, GFP_ATOMIC);
 		if (err)
@@ -524,7 +651,7 @@ static int option_write_room(struct usb_serial_port *port)
 
 	for (i=0; i < N_OUT_URB; i++) {
 		this_urb = portdata->out_urbs[i];
-		if (this_urb && this_urb->status != -EINPROGRESS)
+		if (this_urb && !test_bit(i, &portdata->out_busy))
 			data_len += OUT_BUFLEN;
 	}
 
@@ -543,7 +670,7 @@ static int option_chars_in_buffer(struct usb_serial_port *port)
 
 	for (i=0; i < N_OUT_URB; i++) {
 		this_urb = portdata->out_urbs[i];
-		if (this_urb && this_urb->status == -EINPROGRESS)
+		if (this_urb && test_bit(i, &portdata->out_busy))
 			data_len += this_urb->transfer_buffer_length;
 	}
 	dbg("%s: %d", __FUNCTION__, data_len);
