@@ -870,10 +870,8 @@ int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
-	printk("%s: Setting MAC address to ", dev->name);
-	for (i = 0; i < 6; i++)
-		printk(" %2.2x", dev->dev_addr[i]);
-	printk(".\n");
+	printk("%s: Setting MAC address to %02X:%02X:%02X:%02X:%02X:%02X.\n", dev->name,
+		dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2], dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
 
 	if (memcmp(VLAN_DEV_INFO(dev)->real_dev->dev_addr,
 		   dev->dev_addr,
