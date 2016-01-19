@@ -2189,6 +2189,7 @@ int uart_register_driver(struct uart_driver *drv)
 	normal->owner		= drv->owner;
 	normal->driver_name	= drv->driver_name;
 	normal->name		= drv->dev_name;
+	normal->devfs_name	= drv->devfs_name;
 	normal->major		= drv->major;
 	normal->minor_start	= drv->minor;
 	normal->type		= TTY_DRIVER_TYPE_SERIAL;

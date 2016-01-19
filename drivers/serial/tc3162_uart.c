@@ -316,7 +316,8 @@ static struct uart_port tc3162ser_ports[] = {
 
 static struct uart_driver tc3162ser_reg = {
 	.owner	=		THIS_MODULE,
-	.driver_name =	"ttyS",
+	.driver_name =	"serial",
+	.devfs_name  =  "tts/",
 	.dev_name =		"ttyS",
 	.major =		TTY_MAJOR,
 	.minor =		64,
