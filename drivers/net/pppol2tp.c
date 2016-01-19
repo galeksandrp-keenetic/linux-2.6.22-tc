@@ -56,8 +56,10 @@
 #include <linux/../../net/nat/hw_nat/ra_nat.h>
 #endif
 
+static struct proc_dir_entry *proc_cmd = NULL;
 
-#define PPPOL2TP_DRV_VERSION	"1.02"
+
+#define PPPOL2TP_DRV_VERSION	"1.03"
 
 /* L2TP header constants */
 #define L2TP_HDRFLAG_T	   0x8000
@@ -69,6 +71,7 @@
 #define L2TP_HDR_VER	   0x0002
 #define PPPOL2TP_HEADER_OVERHEAD	40
 #define PPPOL2TP_L2TP_HDR_SIZE 	6
+#define PPPOL2TP_L2TP_HDR_SIZE_ZLB 	12
 
 #define SK_STATE(sk) (sk)->sk_state
 
@@ -78,6 +81,8 @@ typedef struct l2tp_sess {
 	struct sock *sk;
 	struct rtable *rt;
 	uint32_t magic;
+	uint16_t remns;
+	uint16_t remnr;
 } L2TP_SESS, *PL2TP_SESS;
 
 PL2TP_SESS pses_head = NULL, pses_tail = NULL;
@@ -101,6 +106,25 @@ PL2TP_SESS l2tp_find_src(uint16_t sid, uint16_t tid) {
 	spin_unlock_bh(&lock_chan);
 	return pses;
 }
+
+PL2TP_SESS l2tp_find_src_tid(uint16_t tid) {
+	PL2TP_SESS pses;
+
+	switch( atomic_read(&chan_cnt) ) {
+	case 0: return NULL;
+	case 1: return (pses_head->l2a.s_tunnel == tid) ? pses_head : NULL;
+	default: break;
+	}
+	
+	spin_lock_bh(&lock_chan);
+	pses = pses_head;
+	while( pses ) 
+		if( pses->l2a.s_tunnel == tid ) break;
+		else pses = pses->pnext;
+	spin_unlock_bh(&lock_chan);
+	return pses;
+}
+
 
 inline PL2TP_SESS l2tp_find_dst(struct sock *sk) {
 	return (PL2TP_SESS)sk->sk_user_data;
@@ -199,53 +223,15 @@ static inline void pppol2tp_build_l2tp_header(PL2TP_SESS pses, void *buf) {
 	*bufp++ = htons(pses->l2a.d_session);
 }
 
-static int l2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb) {
-	static const u8 ppph[2] = { 0xff, 0x03 };
- 	struct sock *sk = (struct sock *) chan->private;
-	int error;
-	u16 udp_len;
-	int hdr_len;
-	int headroom;
-	int data_len = skb->len;
+static void l2tp_xmit_dev(PL2TP_SESS pses, struct sock *sk, struct sk_buff *skb) {
 	struct udphdr *uh;
 	struct iphdr  *iph;
-	PL2TP_SESS pses;
 	struct rtable *rt;
-	struct net_device *tdev;
-	struct sk_buff *new_skb;
-
-	if( sock_flag(sk, SOCK_DEAD) || 
-		 !(sk->sk_state & PPPOX_CONNECTED) ||
-		 !(pses = l2tp_find_dst(sk)) ||
-		 !(pses->rt) ) {
-		error = -ENOTCONN;
-		goto end;
-	}
+	u16 udp_len;
 
 	rt = pses->rt;
-	tdev = rt->u.dst.dev;
 
-	hdr_len = PPPOL2TP_L2TP_HDR_SIZE;
-
-	headroom = LL_RESERVED_SPACE(tdev) + sizeof(struct iphdr) + sizeof(struct udphdr) + hdr_len + sizeof(ppph);
-
-	if (skb_headroom(skb) < headroom || skb_cloned(skb) || skb_shared(skb)) {
-		new_skb = skb_realloc_headroom(skb, headroom);
-		if (!new_skb) {
-		goto end;
-	}
-		if (skb->sk) skb_set_owner_w(new_skb, skb->sk);
-		kfree_skb(skb);
-		skb = new_skb;
-	}
-
-	skb_push(skb, sizeof(ppph));
-	skb->data[0] = ppph[0];
-	skb->data[1] = ppph[1];
-
-	pppol2tp_build_l2tp_header(pses, skb_push(skb, hdr_len));
-
-	udp_len = sizeof(struct udphdr) + hdr_len + sizeof(ppph) + data_len;
+	udp_len = sizeof(struct udphdr) + skb->len;
 	
 	uh = (struct udphdr *)skb_push(skb, sizeof(*uh));
 	skb_reset_transport_header(skb);
@@ -292,7 +278,47 @@ static int l2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb) {
 #endif
 
 	dst_output(skb);
+}
 	
+static int l2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb) {
+	static const u8 ppph[2] = { 0xff, 0x03 };
+ 	struct sock *sk = (struct sock *) chan->private;
+	int error;
+	u16 *ptr;
+	int headroom;
+	PL2TP_SESS pses;
+	struct sk_buff *new_skb;
+
+	if( sock_flag(sk, SOCK_DEAD) || 
+		 !(sk->sk_state & PPPOX_CONNECTED) ||
+		 !(pses = l2tp_find_dst(sk)) ||
+		 !(pses->rt) ) {
+		error = -ENOTCONN;
+		goto end;
+	}
+
+	headroom = LL_RESERVED_SPACE(pses->rt->u.dst.dev) + sizeof(struct iphdr) + sizeof(struct udphdr) + PPPOL2TP_L2TP_HDR_SIZE + sizeof(ppph);
+
+	if (skb_headroom(skb) < headroom || skb_cloned(skb) || skb_shared(skb)) {
+		new_skb = skb_realloc_headroom(skb, headroom);
+		if (!new_skb) {
+		goto end;
+	}
+		if (skb->sk) skb_set_owner_w(new_skb, skb->sk);
+		kfree_skb(skb);
+		skb = new_skb;
+	}
+
+	skb_push(skb, sizeof(ppph));
+	skb->data[0] = ppph[0];
+	skb->data[1] = ppph[1];
+	
+	ptr = (u16 *)skb_push(skb, PPPOL2TP_L2TP_HDR_SIZE);
+	*ptr++ = htons(L2TP_HDR_VER);
+	*ptr++ = htons(pses->l2a.d_tunnel);
+	*ptr++ = htons(pses->l2a.d_session);
+	
+	l2tp_xmit_dev(pses, sk, skb);
 	return 1;
 end:
 	if( skb ) kfree_skb(skb);
@@ -305,7 +331,7 @@ extern void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb);
 int l2tp_input(struct sk_buff *skb) {
 	struct iphdr *iph;
 	u8 *ptr, *psh;
-	u16 hdrflags, tid, sid, offset, len, plen;
+	u16 hdrflags, tid, sid, offset, nr, ns, hlen, len, plen;
 	PL2TP_SESS pses;
 	struct sock *sk;
 	struct pppox_sock *po;
@@ -320,37 +346,80 @@ int l2tp_input(struct sk_buff *skb) {
 #endif
 
 	if( atomic_read(&chan_cnt) ) {
-		if( !pskb_may_pull(skb, 14) ) goto drop;
+		if( !pskb_may_pull(skb, 14) ) goto skip;
 
 		iph = ip_hdr(skb);
 		ptr = psh = (u8 *)((char *)iph + iph->ihl * 4 + sizeof(struct udphdr));
 
 		hdrflags = ntohs(*(u16*)ptr);
-      if( hdrflags & L2TP_HDRFLAG_T ) goto drop; /* control packet, to userspace */
 	  	ptr += 2;
-		if( hdrflags & L2TP_HDRFLAG_L ) ptr += 2;
+		
+		if( hdrflags & L2TP_HDRFLAG_L ) {
+			hlen = ntohs(*(u16*)ptr);
+			ptr += 2;
+		}
 
 		tid = ntohs(*(u16 *) ptr);
 		ptr += 2;
 		sid = ntohs(*(u16 *) ptr);
+		ptr += 2;
 
-		if( (pses = l2tp_find_src(sid, tid)) && (iph->saddr == pses->l2a.addr.sin_addr.s_addr) ) {
-			dst_release(skb->dst);
-			skb->dst = NULL;
-			nf_reset(skb);
+		if( hdrflags & L2TP_HDRFLAG_T ) {
+			if( !(pses = l2tp_find_src_tid(tid)) || (iph->saddr != pses->l2a.addr.sin_addr.s_addr) || !pses->rt ) goto skip;
+		} else {
+			if( !(pses = l2tp_find_src(sid, tid)) || (iph->saddr != pses->l2a.addr.sin_addr.s_addr) || !pses->rt ) goto skip;
+		}
 
+		sk = pses->sk;
+		sock_hold(sk);
+		
+		if( !(sk->sk_state & PPPOX_CONNECTED) || sock_flag(sk, SOCK_DEAD) ) goto skip_put;
+
+		
+		if( hdrflags & L2TP_HDRFLAG_S ) {
+     		ns = ntohs(*(u16 *) ptr);
 			ptr += 2;
-			if( hdrflags & L2TP_HDRFLAG_S ) ptr += 4;
-			if( hdrflags & L2TP_HDRFLAG_O ) ptr += 2 + ntohs(*(u16 *) ptr);
+			nr = ntohs(*(u16 *) ptr);
+			ptr += 2;
+		}
 
+		if( hdrflags & L2TP_HDRFLAG_O ) ptr += 2 + ntohs(*(u16 *) ptr);
 			offset = (int)(ptr - psh) + iph->ihl * 4 + sizeof(struct udphdr) ;
 	
-			sk = pses->sk;
-			sock_hold(sk);
+      if( hdrflags & L2TP_HDRFLAG_T ) { /* control packet, process hello and send to userspace */
+     		if( !(hdrflags & L2TP_HDRFLAG_S) || !pskb_may_pull(skb, offset + 8) ) goto skip_put;
 
-			if( !(sk->sk_state & PPPOX_CONNECTED) || !pskb_may_pull(skb, offset + 2) ) {
-				kfree_skb(skb);
+     		ptr += 6;
+     		if( ntohs(*(u16 *) ptr) != 0x6 ) goto skip_put; /* check hello avp type */
+     		
+     		/* build zlb */
+     		skb_pull(skb, (iph->ihl * 4 + sizeof(struct udphdr))); /* l2tp header len */
+     		*((u16 *) psh) = htons(L2TP_HDRFLAG_T | L2TP_HDRFLAG_L | L2TP_HDRFLAG_S |  L2TP_HDR_VER);
+     		psh += 2;
+     		*((u16 *) psh) = htons(PPPOL2TP_L2TP_HDR_SIZE_ZLB);
+     		psh += 2;
+			*((u16 *) psh) = htons(pses->l2a.d_tunnel);
+			psh += 2;
+			*((u16 *) psh) = 0;
+			psh += 2;
+			*((u16 *) psh) = htons(nr);
+			psh += 2;
+			*((u16 *) psh) = htons(ns + 1);
+			psh += 2;
+			
+			skb_trim(skb, PPPOL2TP_L2TP_HDR_SIZE_ZLB);
+			
+			pses->remns = ns + 1;
+			pses->remnr = nr;
+			
+			l2tp_xmit_dev(pses, sk, skb);
 			} else {
+     		if( !pskb_may_pull(skb, offset + 2) ) goto skip_put; /* data packet failed to parse, back to stack */
+
+     		dst_release(skb->dst);
+			skb->dst = NULL;
+			nf_reset(skb);
+	
 				po = pppox_sk(sk);
 				skb_pull(skb, offset);
 
@@ -416,17 +485,47 @@ int l2tp_input(struct sk_buff *skb) {
 			}
 
 			sock_put(sk);
-
 			return 1;
 	}
-	}
 
-drop:
+skip:
+	return 0;
+
+skip_put:
+	sock_put(sk);	
 	return 0;
 }
 
 EXPORT_SYMBOL(l2tp_input);
 
+int l2tp_read_cmd(char *pdata, char **pstart, off_t uoff, int icount, int *pieof, void *pref) {
+	int iread;
+	char *pst;
+	PL2TP_SESS pses;
+                     
+   if( uoff > 0 ) {
+     *pieof = 1;
+     return 0;
+   }
+   
+   pst = pdata;
+   *pdata = 0;
+   
+   spin_lock_bh(&lock_chan);
+	pses = pses_head;
+	while( pses && icount > 0 ) {
+		iread = snprintf(pdata, icount - 1, "%d,%d,%d,%d\n", pses->l2a.s_session, pses->l2a.s_tunnel, pses->remns, pses->remnr);
+		
+		icount -= iread;
+  		pdata  += iread;
+  		*pdata = 0;
+
+		pses = pses->pnext;
+	}
+	spin_unlock_bh(&lock_chan);
+   
+   return (int)(pdata - pst);
+}                               
 
 static int l2tp_getname(struct socket *sock, struct sockaddr *uaddr,
 			    int *usockaddr_len, int peer)
@@ -644,6 +743,12 @@ static int __init l2tp_init(void) {
 
 	printk(KERN_INFO "L2TP kernel driver, v%s\n", PPPOL2TP_DRV_VERSION);
 
+	if( (proc_cmd = create_proc_entry("l2tp_tun", 0644, proc_net)) ) {
+   	 proc_cmd->read_proc = l2tp_read_cmd;
+   	 proc_cmd->owner = THIS_MODULE;
+    }
+
+
 out:
 	return err;
 
@@ -653,6 +758,11 @@ out_unregister_l2tp_proto:
 }
 
 static void __exit l2tp_exit(void) {
+	if( proc_cmd ) {
+   	 remove_proc_entry("l2tp_tun", proc_net);
+   	 proc_cmd = NULL;
+   }
+
 	unregister_pppox_proto(PX_PROTO_OL2TP);
 	proto_unregister(&l2tp_sk_proto);
 }
