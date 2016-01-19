@@ -52,8 +52,8 @@
 #include <linux/LzmaDecode.h>
 
 /* default LZMA settings, should be in sync with mksquashfs */
-#define LZMA_LC 3
-#define LZMA_LP 0
+#define LZMA_LC 0
+#define LZMA_LP 2
 #define LZMA_PB 2
 
 #define LZMA_WORKSPACE_SIZE ((LZMA_BASE_SIZE + \
@@ -985,6 +985,11 @@ static int squashfs_fill_super(struct super_block *s, void *data, int silent)
 	int i;
 	char b[BDEVNAME_SIZE];
 	struct inode *root;
+#ifdef SALT
+	unsigned char *psrc, *psalt;
+	int ipos;
+#endif
+
 
 	TRACE("Entered squashfs_read_superblock\n");
 
@@ -1015,6 +1020,19 @@ static int squashfs_fill_super(struct super_block *s, void *data, int silent)
 		SERROR("unable to read superblock\n");
 		goto failed_mount;
 	}
+
+#ifdef SALT
+	/* decrypt block */
+	ipos = 4;
+	psrc = (unsigned char*)sblk;
+	psalt = NULL;
+	while( ipos < sizeof(struct squashfs_super_block) ) {
+		if( !psalt || !*psalt ) psalt = SALT;
+		psrc[ipos] ^= (ipos & 0xff) ^ *psalt++;
+		ipos++; 
+	}	
+#endif
+
 
 	/* Check it is a SQUASHFS superblock */
 	msblk->swap = 0;
