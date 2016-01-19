@@ -93,7 +93,9 @@
 #define S25FL128P          		0x2018
 
 /* EON */
+#define EN25Q32          		0x3016
 #define EN25Q64          		0x3017
+#define EN25Q128          		0x3018
 
 #if defined(TC_SOC) 
 static __u32 reg0x28;
@@ -663,9 +665,23 @@ static struct spi_flash_info flash_tables[] = {
 	},
 	{
 		mfr_id: MANUFACTURER_EON,
+		dev_id: EN25Q32,
+		name: "EN25Q32",
+		DeviceSize: SIZE_4MiB,
+		EraseSize: SIZE_64KiB,
+	},
+	{
+		mfr_id: MANUFACTURER_EON,
 		dev_id: EN25Q64,
 		name: "EN25Q64",
 		DeviceSize: SIZE_8MiB,
+		EraseSize: SIZE_64KiB,
+	},
+	{
+		mfr_id: MANUFACTURER_EON,
+		dev_id: EN25Q128,
+		name: "EN25Q128",
+		DeviceSize: SIZE_16MiB,
 		EraseSize: SIZE_64KiB,
 	},
 };
