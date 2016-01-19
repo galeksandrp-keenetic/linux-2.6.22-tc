@@ -65,7 +65,7 @@ static struct mtd_partition tc3162_parts[] = {
 #ifdef CONFIG_MTD_PURE_BRIDGE
 		  size	     :  0x000a0000,		 	/* Size */
 #else
-		  size		 :	0x000d0000,
+		  size		 :	0x00130000,
 #endif
 		  offset     : MTDPART_OFS_APPEND	/* Append after bootloader section */
 	},
