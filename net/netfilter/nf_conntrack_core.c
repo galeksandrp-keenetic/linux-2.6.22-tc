@@ -56,6 +56,9 @@
 
 
 
+static struct proc_dir_entry *nf_proc_cmd = NULL;
+
+
 DEFINE_RWLOCK(nf_conntrack_lock);
 EXPORT_SYMBOL_GPL(nf_conntrack_lock);
 
@@ -1375,6 +1378,21 @@ void nf_conntrack_flush(void)
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_flush);
 
+
+static int kill_all_udp(struct nf_conn *i, void *data)
+{
+	if( i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == IPPROTO_UDP ) return 1;
+	else return 0;
+}
+
+void nf_conntrack_flush_udp(void)
+{
+	nf_ct_iterate_cleanup(kill_all_udp, NULL);
+}
+EXPORT_SYMBOL_GPL(nf_conntrack_flush_udp);
+
+
+
 /* Mishearing the voices in his head, our hero wonders how he's
    supposed to kill the mall. */
 void nf_conntrack_cleanup(void)
@@ -1486,6 +1504,19 @@ int set_hashsize(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
+static ssize_t nf_cmd(struct file *filp, const char __user *pbuff, unsigned long ulen, void *pdata) {
+	char ccmd[32];
+	
+	if( ulen > sizeof(ccmd) - 1 || copy_from_user(ccmd, pbuff, ulen) ) 
+      return -EFAULT;
+      
+   ccmd[ulen] = 0;
+	if( !strncmp(ccmd, "all", 3) ) nf_conntrack_flush();
+	else if( !strncmp(ccmd, "udp", 3) ) nf_conntrack_flush_udp();
+	
+   return ulen;
+}
+
 module_param_call(hashsize, set_hashsize, param_get_uint,
 		  &nf_conntrack_htable_size, 0600);
 
@@ -1545,6 +1576,10 @@ int __init nf_conntrack_init(void)
 	atomic_set(&nf_conntrack_untracked.ct_general.use, 1);
 	/*  - and look it like as a confirmed connection */
 	set_bit(IPS_CONFIRMED_BIT, &nf_conntrack_untracked.status);
+
+	if( (nf_proc_cmd = create_proc_entry("net/nf_flush_cmd", 0220, NULL)) ) {
+   	nf_proc_cmd->write_proc = nf_cmd;
+   }
 
 	return ret;
 
