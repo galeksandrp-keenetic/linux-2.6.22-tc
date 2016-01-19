@@ -285,9 +285,9 @@ static void usblp_bulk_read(struct urb *urb)
 
 	if (unlikely(!usblp->present))
 		goto unplug;
-	if (unlikely(urb->status))
-		warn("usblp%d: nonzero read/write bulk status received: %d",
-			usblp->minor, urb->status);
+//	if (unlikely(urb->status))
+//		warn("usblp%d: nonzero read/write bulk status received: %d",
+//			usblp->minor, urb->status);
 	usblp->rcomplete = 1;
 unplug:
 	wake_up_interruptible(&usblp->wait);
@@ -301,9 +301,9 @@ static void usblp_bulk_write(struct urb *urb)
 		return;
 	if (unlikely(!usblp->present))
 		goto unplug;
-	if (unlikely(urb->status))
-		warn("usblp%d: nonzero read/write bulk status received: %d",
-			usblp->minor, urb->status);
+//	if (unlikely(urb->status))
+//		warn("usblp%d: nonzero read/write bulk status received: %d",
+//			usblp->minor, urb->status);
 	usblp->wcomplete = 1;
 unplug:
 	wake_up_interruptible(&usblp->wait);
