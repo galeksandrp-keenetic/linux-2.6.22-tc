@@ -232,6 +232,11 @@ ipt_do_table(struct sk_buff **pskb,
 	/* Initialization */
 	ip = ip_hdr(*pskb);
 	datalen = (*pskb)->len - ip->ihl * 4;
+
+#ifdef CONFIG_IP_NF_INPUTNAT
+	if( !in ) in = __dev_get_by_index((*pskb)->siif);
+#endif
+	
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
 	/* We handle fragments by dealing with the first fragment as

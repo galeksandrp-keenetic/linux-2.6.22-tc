@@ -425,6 +425,11 @@ config IP_NF_RAW
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+# postrouting on input device
+config IP_NF_INPUTNAT
+ 	bool  'input device postrouting support (use for MASQUERADE/SNAT)'
+ 	depends on IP_NF_IPTABLES
+
 # ARP tables
 config IP_NF_ARPTABLES
 	tristate "ARP tables support"

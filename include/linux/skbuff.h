@@ -245,7 +245,14 @@ struct sk_buff {
 	struct sock		*sk;
 	ktime_t			tstamp;
 	struct net_device	*dev;
+ 
+#ifdef CONFIG_IP_NF_INPUTNAT
+	short			iif;
+	short			siif;
+#else
 	int			iif;
+#endif	
+	
 	/* 4 byte hole on 64 bit*/
 
 	struct  dst_entry	*dst;

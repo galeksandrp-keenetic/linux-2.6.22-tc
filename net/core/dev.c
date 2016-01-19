@@ -2320,8 +2320,12 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 	if (!skb->tstamp.tv64)
 		net_timestamp(skb);
 
-	if (!skb->iif)
-		skb->iif = skb->dev->ifindex;
+#ifdef CONFIG_IP_NF_INPUTNAT
+	skb->siif = (short)skb->dev->ifindex;
+	if (!skb->iif)  skb->iif = skb->siif;
+#else
+	if (!skb->iif)  skb->iif = skb->dev->ifindex;
+#endif
 
 	orig_dev = skb_bond(skb);
 
