@@ -4,6 +4,10 @@
 
 menu "Character devices"
 
+config RALINK_GPIO
+	tristate "Ralink GPIO Support"
+	default n
+
 config VT
 	bool "Virtual terminal" if EMBEDDED
 	depends on !S390
