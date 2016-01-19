@@ -1,11 +1,11 @@
 /*                                                                                    
- *MIME functions for netfilter modules.  This file provides implementations      
- *for basic MIME parsing.  MIME headers are used in many protocols, such as      
- *HTTP, RTSP, SIP, etc.                                                          
-                                                                                
- *gcc will warn for defined but unused functions, so we only include the         
- *functions requested.  The following macros are used:                           
- *NF_NEED_MIME_NEXTLINE      nf_mime_nextline()                                
+ * MIME functions for netfilter modules.  This file provides implementations
+ * for basic MIME parsing.  MIME headers are used in many protocols, such as
+ * HTTP, RTSP, SIP, etc.
+ *
+ * gcc will warn for defined but unused functions, so we only include the
+ * functions requested.  The following macros are used:
+ *   NF_NEED_MIME_NEXTLINE      nf_mime_nextline()
  */                                                                               
 #ifndef _NETFILTER_MIME_H                                                       
 #define _NETFILTER_MIME_H                                                       

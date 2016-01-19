@@ -48,10 +48,6 @@
 #include <linux/netfilter_mime.h>
 
 #include <linux/ctype.h>
-#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
-#include <asm-mips/tc3162/tc3162.h>
-#endif
-
 #define MAX_SIMUL_SETUP 8 /* XXX: use max_outstanding */
 #define INFOP(fmt, args...) printk(KERN_INFO "%s: %s: " fmt, __FILE__, __FUNCTION__ , ## args)
 #if 0
@@ -64,9 +60,7 @@
 static int ports[MAX_PORTS];
 static int num_ports = 0;
 static int max_outstanding = 8;
-#if !defined(TCSUPPORT_TTNET) 
 static unsigned int setup_timeout = 300;
-#endif
 
 MODULE_AUTHOR("Tom Marshall <tmarshall at real.com>");
 MODULE_DESCRIPTION("RTSP connection tracking module");
@@ -327,10 +321,7 @@ help_out(struct sk_buff **pskb, unsigned char *rb_ptr, unsigned int datalen,
                 DEBUGP("udp transport found, ports=(%d,%hu,%hu)\n",
                        (int)expinfo.pbtype, expinfo.loport, expinfo.hiport);
         
-		DEBUGP("new udp transport ports=(%d,%hu,%hu)\n",
-                       (int)expinfo.pbtype, expinfo.loport, expinfo.hiport);
-    
-                exp = nf_conntrack_expect_alloc(ct);
+		exp = nf_conntrack_expect_alloc(ct);
                 if (!exp) {
                         ret = NF_DROP;
                         goto out;
@@ -338,7 +329,7 @@ help_out(struct sk_buff **pskb, unsigned char *rb_ptr, unsigned int datalen,
 
                 be_loport = htons(expinfo.loport);
 
-                nf_conntrack_expect_init(exp, ct->tuplehash[!dir].tuple.src.l3num,
+		nf_conntrack_expect_init(exp, ct->tuplehash[!dir].tuple.src.l3num,
                         &ct->tuplehash[!dir].tuple.src.u3, &ct->tuplehash[!dir].tuple.dst.u3,
                         IPPROTO_UDP, NULL, &be_loport); 
 
@@ -349,7 +340,7 @@ help_out(struct sk_buff **pskb, unsigned char *rb_ptr, unsigned int datalen,
 
                 if (expinfo.pbtype == pb_range) {
                         DEBUGP("Changing expectation mask to handle multiple ports\n");
-                        exp->mask.dst.u.udp.port  = 0xfffe;
+			//exp->mask.dst.u.udp.port  = 0xfffe;
                 }
 
                 DEBUGP("expect_related %u.%u.%u.%u:%u-%u.%u.%u.%u:%u\n",
@@ -361,11 +352,11 @@ help_out(struct sk_buff **pskb, unsigned char *rb_ptr, unsigned int datalen,
                 if (nf_nat_rtsp_hook)
                         /* pass the request off to the nat helper */
                         ret = nf_nat_rtsp_hook(pskb, ctinfo, hdrsoff, hdrslen, &expinfo, exp);
-                else if (nf_conntrack_expect_related(exp) != 0) {
+		else if (nf_conntrack_expect_related(exp) != 0) {
                         INFOP("nf_conntrack_expect_related failed\n");
                         ret  = NF_DROP;
                 }
-                nf_conntrack_expect_put(exp);
+		nf_conntrack_expect_put(exp);
                 goto out;
         }
 out:
@@ -389,10 +380,6 @@ static int help(struct sk_buff **pskb, unsigned int protoff,
         char *rb_ptr;
         int ret = NF_DROP;
 
-	/*for RTSP ALG switch*/
-	if(!nf_conntrack_rtsp_enable)
-		return NF_ACCEPT;//rtsp switch is off, just accept packet and do not do ALG
-		
         /* Until there's been traffic both ways, don't look in packets. */
         if (ctinfo != IP_CT_ESTABLISHED && 
             ctinfo != IP_CT_ESTABLISHED + IP_CT_IS_REPLY) {
@@ -477,14 +464,8 @@ init(void)
                 printk("nf_conntrack_rtsp: setup_timeout must be a positive integer\n");
                 return -EBUSY;
         }
-#if !defined(TCSUPPORT_CT) 
-#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
-		rtsp_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
-#else
-        rtsp_buffer = kmalloc(65536, GFP_KERNEL);
-#endif
-#endif
 		
+	rtsp_buffer = kmalloc(65536, GFP_KERNEL);
         if (!rtsp_buffer) 
                 return -ENOMEM;
 
@@ -496,11 +477,11 @@ init(void)
         for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
                 hlpr = &rtsp_helpers[i];
                 memset(hlpr, 0, sizeof(struct nf_conntrack_helper));
-                //hlpr->tuple.src.l3num = AF_INET;
+		hlpr->tuple.src.l3num = AF_INET;
                 hlpr->tuple.src.u.tcp.port = htons(ports[i]);
                 hlpr->tuple.dst.protonum = IPPROTO_TCP;
-                hlpr->mask.src.u.tcp.port = 0xFFFF;
-                hlpr->mask.dst.protonum = 0xFF;
+		//hlpr->mask.src.u.tcp.port = 0xFFFF;
+		//hlpr->mask.dst.protonum = 0xFF;
                 hlpr->max_expected = max_outstanding;
                 hlpr->timeout = setup_timeout;
                 hlpr->me = THIS_MODULE;

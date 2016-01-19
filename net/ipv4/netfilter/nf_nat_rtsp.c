@@ -157,7 +157,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
         for (loport = prtspexp->loport; loport != 0; loport++) /* XXX: improper wrap? */ 
         { 
             t->dst.u.udp.port = htons(loport); 
-            if (nf_conntrack_expect_related(exp) == 0) 
+            if (nf_conntrack_expect_related(exp) == 0)
             { 
                 DEBUGP("using port %hu\n", loport); 
                 break; 
@@ -173,10 +173,9 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
         for (loport = prtspexp->loport; loport != 0; loport += 2) /* XXX: improper wrap? */ 
         { 
             t->dst.u.udp.port = htons(loport); 
-            if (nf_conntrack_expect_related(exp) == 0) 
+            if (nf_conntrack_expect_related(exp) == 0)
             { 
-                hiport = loport + ~exp->mask.dst.u.udp.port; 
-                //hiport = loport + 1;// ~exp->mask.dst.u.udp.port; 
+                hiport = loport + 1; //~exp->mask.dst.u.udp.port;
                 DEBUGP("using ports %hu-%hu\n", loport, hiport); 
                 break; 
             } 
@@ -191,7 +190,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
         for (loport = prtspexp->loport; loport != 0; loport++) /* XXX: improper wrap? */ 
         { 
             t->dst.u.udp.port = htons(loport); 
-            if (nf_conntrack_expect_related(exp) == 0) 
+            if (nf_conntrack_expect_related(exp) == 0)
             { 
                 DEBUGP("using port %hu (1 of 2)\n", loport); 
                 break; 
@@ -200,7 +199,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
         for (hiport = prtspexp->hiport; hiport != 0; hiport++) /* XXX: improper wrap? */ 
         { 
             t->dst.u.udp.port = htons(hiport); 
-            if (nf_conntrack_expect_related(exp) == 0) 
+            if (nf_conntrack_expect_related(exp) == 0)
             { 
                 DEBUGP("using port %hu (2 of 2)\n", hiport); 
                 break; 
@@ -225,8 +224,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
     { 
         return 0;   /* cannot get replacement port(s) */ 
     } 
-	DEBUGP("rbuf1 %s\n", rbuf1); 
-	DEBUGP("rbufa  %s\n", rbufa); 
+
     /* Transport: tran;field;field=val,tran;field;field=val,... */ 
     while (off < tranlen) 
     { 
@@ -236,7 +234,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
  
         pparamend = memchr(ptran+off, ',', tranlen-off); 
         pparamend = (pparamend == NULL) ? ptran+tranlen : pparamend+1; 
-        nextparamoff = pparamend-ptcp; 
+        nextparamoff = pparamend-ptran;
  
         /* 
          * We pass over each param twice.  On the first pass, we look for a 
@@ -263,12 +261,12 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
                 if (dstact == DSTACT_STRIP || (dstact == DSTACT_AUTO && !is_stun)) 
                 { 
                     diff = nextfieldoff-off; 
-			DEBUGP("do nf_nat_mangle_tcp_packet, buf is null\n"); 
-                   if (!nf_nat_mangle_tcp_packet(pskb, ct, ctinfo, 
-                                                         off, diff, NULL, 0)) 
+                    
+                    if (!__nf_nat_mangle_tcp_packet(pskb, ct, ctinfo,
+                                                  (ptran-ptcp) + off, diff, NULL, 0, true))
                     { 
                         /* mangle failed, all we can do is bail */ 
-                        nf_conntrack_unexpect_related(exp); 
+			nf_conntrack_unexpect_related(exp);
                         return 0; 
                     } 
                     get_skb_tcpdata(*pskb, &ptcp, &tcplen); 
@@ -309,12 +307,11 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
                 numlen = nf_strtou16(ptran+off, &port); 
                 off += numlen; 
                 origlen += numlen; 
-		  DEBUGP("multiple ports found, port %hu, %hu\n", port, prtspexp->loport);
-                //if (port != prtspexp->loport) 
-                //{ 
-                    //DEBUGP("multiple ports found, port %hu ignored\n", port); 
-                //} 
-                //else 
+                if (port != prtspexp->loport)
+                {
+                    DEBUGP("multiple ports found, port %hu ignored\n", port);
+                }
+                else
                 { 
                     if (ptran[off] == '-' || ptran[off] == '/') 
                     { 
@@ -326,7 +323,7 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
                         rbuf = rbufa; 
                         rbuflen = rbufalen; 
                     } 
-			DEBUGP("new buffer is  %s\n", rbuf);
+
                     /* 
                      * note we cannot just memcpy() if the sizes are the same. 
                      * the mangle function does skb resizing, checks for a 
@@ -335,13 +332,11 @@ rtsp_mangle_tran(enum ip_conntrack_info ctinfo,
                      * parameter 4 below is offset from start of tcp data. 
                      */ 
                     diff = origlen-rbuflen; 
-			DEBUGP("do nf_nat_mangle_tcp_packet, buf is %s\n", rbuf); 		
-                    if (!nf_nat_mangle_tcp_packet(pskb, ct, ctinfo, 
-                                              origoff, origlen, rbuf, rbuflen)) 
+                    if (!__nf_nat_mangle_tcp_packet(pskb, ct, ctinfo,
+                                              origoff, origlen, rbuf, rbuflen, true))
                     { 
                         /* mangle failed, all we can do is bail */ 
-   			DEBUGP("mangle failed, all we can do is bail \n");
-                        nf_conntrack_unexpect_related(exp); 
+			nf_conntrack_unexpect_related(exp);
                         return 0; 
                     } 
                     get_skb_tcpdata(*pskb, &ptcp, &tcplen); 
@@ -373,11 +368,8 @@ help_out(struct sk_buff **pskb, enum ip_conntrack_info ctinfo,
     uint    linelen; 
     uint    off; 
  
-    //struct iphdr* iph = (struct iphdr*)(*pskb)->nh.iph; 
-    //struct tcphdr* tcph = (struct tcphdr*)((void*)iph + iph->ihl*4); 
- 
     get_skb_tcpdata(*pskb, &ptcp, &tcplen); 
-    hdrsoff = matchoff;//exp->seq - ntohl(tcph->seq); 
+    hdrsoff = matchoff;
     hdrslen = matchlen; 
     off = hdrsoff; 
     DEBUGP("NAT rtsp help_out\n"); 

@@ -41,10 +41,11 @@ static inline void
 adjust_tcp_sequence(u32 seq,
 		    int sizediff,
 		    struct nf_conn *ct,
-		    enum ip_conntrack_info ctinfo)
+		    enum ip_conntrack_info ctinfo,
+		    bool force_seq)
 {
 	int dir;
-	struct nf_nat_seq *this_way, *other_way;
+	struct nf_nat_seq *this_way;
 	struct nf_conn_nat *nat = nfct_nat(ct);
 
 	DEBUGP("nf_nat_resize_packet: old_size = %u, new_size = %u\n",
@@ -53,7 +54,6 @@ adjust_tcp_sequence(u32 seq,
 	dir = CTINFO2DIR(ctinfo);
 
 	this_way = &nat->info.seq[dir];
-	other_way = &nat->info.seq[!dir];
 
 	DEBUGP("nf_nat_resize_packet: Seq_offset before: ");
 	DUMP_OFFSET(this_way);
@@ -69,6 +69,8 @@ adjust_tcp_sequence(u32 seq,
 		   this_way->correction_pos = seq;
 		   this_way->offset_before = this_way->offset_after;
 		   this_way->offset_after += sizediff;
+	} else if( force_seq ) {
+		this_way->offset_after += sizediff;
 	}
 	spin_unlock_bh(&nf_nat_seqofs_lock);
 
@@ -145,13 +147,14 @@ static int enlarge_skb(struct sk_buff **pskb, unsigned int extra)
  *
  * */
 int
-nf_nat_mangle_tcp_packet(struct sk_buff **pskb,
+__nf_nat_mangle_tcp_packet(struct sk_buff **pskb,
 			 struct nf_conn *ct,
 			 enum ip_conntrack_info ctinfo,
 			 unsigned int match_offset,
 			 unsigned int match_len,
 			 const char *rep_buffer,
-			 unsigned int rep_len)
+			 unsigned int rep_len,
+			 bool force_seq)
 {
 	struct rtable *rt = (struct rtable *)(*pskb)->dst;
 	struct iphdr *iph;
@@ -201,14 +204,14 @@ nf_nat_mangle_tcp_packet(struct sk_buff **pskb,
 		set_bit(IPS_SEQ_ADJUST_BIT, &ct->status);
 		adjust_tcp_sequence(ntohl(tcph->seq),
 				    (int)rep_len - (int)match_len,
-				    ct, ctinfo);
+				    ct, ctinfo, force_seq);
 		/* Tell TCP window tracking about seq change */
 		nf_conntrack_tcp_update(*pskb, ip_hdrlen(*pskb),
 					ct, CTINFO2DIR(ctinfo));
 	}
 	return 1;
 }
-EXPORT_SYMBOL(nf_nat_mangle_tcp_packet);
+EXPORT_SYMBOL(__nf_nat_mangle_tcp_packet);
 
 /* Generic function for mangling variable-length address changes inside
  * NATed UDP connections (like the CONNECT DATA XXXXX MESG XXXXX INDEX XXXXX

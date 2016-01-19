@@ -56,13 +56,8 @@ extern unsigned int (*nf_nat_rtsp_hook)(struct sk_buff **pskb,
  
 extern void (*nf_nat_rtsp_hook_expectfn)(struct nf_conn *ct, struct nf_conntrack_expect *exp); 
  
- /*TCP Port*/
 #define RTSP_PORT   554
 
-/*UDP Ports*/
-#define MIN_PORT_RTP	6970
-#define MAX_PORT_RTP	7000
- 
 #endif /* __KERNEL__ */ 
  
 #endif /* _IP_CONNTRACK_RTSP_H */
