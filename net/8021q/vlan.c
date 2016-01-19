@@ -240,8 +240,10 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 			 * interlock with HW accelerating devices or SW vlan
 			 * input packet processing.
 			 */
-			if (real_dev->features & NETIF_F_HW_VLAN_FILTER)
+			if (real_dev->features &
+			    (NETIF_F_HW_VLAN_RX | NETIF_F_HW_VLAN_FILTER)) {
 				real_dev->vlan_rx_kill_vid(real_dev, vlan_id);
+			}
 
 			vlan_group_set_device(grp, vlan_id, NULL);
 			synchronize_net();
@@ -407,14 +409,16 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	}
 
 	if ((real_dev->features & NETIF_F_HW_VLAN_RX) &&
-	    !real_dev->vlan_rx_register) {
+	    (real_dev->vlan_rx_register == NULL ||
+	     real_dev->vlan_rx_kill_vid == NULL)) {
 		printk(VLAN_DBG "%s: Device %s has buggy VLAN hw accel.\n",
 			__FUNCTION__, real_dev->name);
 		goto out_put_dev;
 	}
 
 	if ((real_dev->features & NETIF_F_HW_VLAN_FILTER) &&
-	    (!real_dev->vlan_rx_add_vid || !real_dev->vlan_rx_kill_vid)) {
+	    (real_dev->vlan_rx_add_vid == NULL ||
+	     real_dev->vlan_rx_kill_vid == NULL)) {
 		printk(VLAN_DBG "%s: Device %s has buggy VLAN hw accel.\n",
 			__FUNCTION__, real_dev->name);
 		goto out_put_dev;
@@ -488,6 +492,11 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	 * hope the underlying device can handle it.
 	 */
 	new_dev->mtu = real_dev->mtu;
+
+#if defined (CONFIG_TCSUPPORT_RAETH_TSO)
+	/* make pseudo interface has same capacity like real interface */
+	new_dev->features = real_dev->features;
+#endif
 
 	/* TODO: maybe just assign it to be ETHERNET? */
 	new_dev->type = real_dev->type;
@@ -736,7 +745,8 @@ static int vlan_ioctl_handler(void __user *arg)
 	case SET_VLAN_NAME_TYPE_CMD:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (args.u.name_type < VLAN_NAME_TYPE_HIGHEST) {
+		if ((args.u.name_type >= 0) &&
+		    (args.u.name_type < VLAN_NAME_TYPE_HIGHEST)) {
 			vlan_name_type = args.u.name_type;
 			err = 0;
 		} else {
