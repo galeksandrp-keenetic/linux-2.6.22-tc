@@ -1,20 +1,4 @@
 /*
- ***************************************************************************
- * Ralink Tech Inc.
- * 4F, No. 2 Technology 5th Rd.
- * Science-based Industrial Park
- * Hsin-chu, Taiwan, R.O.C.
- *
- * (c) Copyright 2002-2006, Ralink Technology, Inc.
- *
- * All rights reserved. Ralink's source code is an unpublished work and the
- * use of a copyright notice does not imply otherwise. This source code
- * contains confidential trade secret material of Ralink Tech. Any attempt
- * or participation in deciphering, decoding, reverse engineering or in any
- * way altering the source code is stricitly prohibited, unless the prior
- * written consent of Ralink Technology, Inc. is obtained.
- ***************************************************************************
-
     Module Name:
     foe_fdb.h
 
@@ -87,92 +71,171 @@ enum FoeTblSize {
 };
 
 enum VlanAction {
-    NO_ACT=0,
-    MODIFY=1,
-    INSERT=2,
-    DELETE=3
+	NO_ACT = 0,
+	MODIFY = 1,
+	INSERT = 2,
+	DELETE = 3
 };
 
 enum FoeEntryState {
-    INVALID=0,
-    UNBIND=1,
-    BIND=2,
-    FIN=3
-};
-
-enum FoeEntryFmt {
-    IPV4_NAPT=0,
-    IPV4_NAT=1,
-    IPV6_ROUTING=2
+	INVALID = 0,
+	UNBIND = 1,
+	BIND = 2,
+	FIN = 3
 };
 
 enum FoeTblTcpUdp {
-    TCP=0,
-    UDP=1,
-    ANY=2
+	TCP = 0,
+	UDP = 1,
+	ANY = 2
 };
 
 enum FoeTblEE {
-	NOT_ENTRY_END=0,
-	ENTRY_END_FP=1,
-	ENTRY_END_FOE=2
+	NOT_ENTRY_END = 0,
+	ENTRY_END_FP = 1,
+	ENTRY_END_FOE = 2
 };
 
 enum FoeLinkType {
-	LINK_TO_FOE=0,
-	LINK_TO_FP=1
+	LINK_TO_FOE = 0,
+	LINK_TO_FP = 1
 };
 
-/* state = unbind & static */
-struct us_info_blk1 {
-#ifdef __BIG_ENDIAN
-    uint32_t sta:1; /* static entry */
-    uint32_t resv3:1;
-    uint32_t state:2; /* state of entry (0: invalid, 1:unbind, 2: bind, 3: fin) */
-    uint32_t fmt:2; /* entry format */
-    uint32_t minf:1; /* more information in block 2 */
-    uint32_t ttl:1;  
-    uint32_t pppoe:2; /* PPPoE field */
-    uint32_t snap:2; /* SNAP field */
-    uint32_t v2:2; /* vlan2 field */
-    uint32_t v1:2; /* vlan1 field */
-    uint32_t resv1:2;
-    uint32_t da:1; /* destination mac */
-    uint32_t sa:1; /* source mac */
-    uint32_t dport:1; /* destination port */
-    uint32_t sport:1; /* source port */
-    uint32_t dip:1; /* destination ip */
-    uint32_t sip:1; /* source ip */
-    uint32_t resv:8;
-#else
-    uint8_t resv;
-    uint8_t sip:1; /* source ip */
-    uint8_t dip:1; /* destination ip */
-    uint8_t sport:1; /* source port */
-    uint8_t dport:1; /* destination port */
-    uint8_t sa:1; /* source mac */
-    uint8_t da:1; /* destination mac */
-    uint8_t resv1:2;
-    uint8_t v1:2; /* vlan1 field */
-    uint8_t v2:2; /* vlan2 field */
-    uint8_t snap:2; /* SNAP field */
-    uint8_t pppoe:2; /* PPPoE field */
-    uint8_t ttl:1;  
-    uint8_t minf:1; /* more information in block 2 */
-    uint8_t fmt:2; /* entry format */
-    uint8_t state:2; /* state of entry (0: invalid, 1:unbind, 2: bind, 3: fin) */
-    uint8_t resv3:1;
-    uint8_t sta:1; /* static entry */
-#endif
+enum FoeIPAct {
+	IPV4_HNAPT = 0,
+	IPV4_HNAT = 1,
+	IPV6_1T_ROUTE = 2,
+	IPV4_DSLITE = 3,
+	IPV6_3T_ROUTE = 4,
+	IPV6_5T_ROUTE = 5,
+	IPV6_6RD = 7,
 };
+
+#define IS_IPV4_HNAPT(x)	(((x)->bfib1.pkt_type == IPV4_HNAPT) ? 1: 0)
+#define IS_IPV4_HNAT(x)		(((x)->bfib1.pkt_type == IPV4_HNAT) ? 1 : 0)
+#define IS_IPV6_1T_ROUTE(x)	(((x)->bfib1.pkt_type == IPV6_1T_ROUTE) ? 1 : 0)
+#define IS_IPV4_DSLITE(x)	(((x)->bfib1.pkt_type == IPV4_DSLITE) ? 1 : 0)
+#define IS_IPV6_3T_ROUTE(x)	(((x)->bfib1.pkt_type == IPV6_3T_ROUTE) ? 1 : 0)
+#define IS_IPV6_5T_ROUTE(x)	(((x)->bfib1.pkt_type == IPV6_5T_ROUTE) ? 1 : 0)
+#define IS_IPV6_6RD(x)		(((x)->bfib1.pkt_type == IPV6_6RD) ? 1: 0)
+#define IS_IPV4_GRP(x)		(IS_IPV4_HNAPT(x) | IS_IPV4_HNAT(x))
+#define IS_IPV6_GRP(x)		(IS_IPV6_1T_ROUTE(x) | IS_IPV6_3T_ROUTE(x) | IS_IPV6_5T_ROUTE(x) | IS_IPV6_6RD(x) |  IS_IPV4_DSLITE(x))
+
+#if defined (CONFIG_HNAT_V2)
 
 /* state = unbind & dynamic */
 struct ud_info_blk1 {
 #ifdef __BIG_ENDIAN
     uint32_t sta:1; /* static entry */
-    uint32_t t_u:1; /* 0: tcp, 1: udp */
+	 uint32_t udp:1;
+	 uint32_t state:2; 
+	 uint32_t pkt_type:3;
+	 uint32_t preb:1;
+	 uint32_t pcnt:16; /* packet count */
+	 uint32_t time_stamp:8;
+#else
+    uint32_t time_stamp:8;
+    uint32_t pcnt:16; /* packet count */
+	 uint32_t preb:1;
+	 uint32_t pkt_type:3;
     uint32_t state:2; 
-    uint32_t fmt:2; /* entry format */
+	 uint32_t udp:1;
+    uint32_t sta:1; /* static entry */
+#endif
+};
+
+/* state = bind & fin */
+struct bf_info_blk1 {
+#ifdef __BIG_ENDIAN
+	uint32_t sta:1;		/* static entry */
+	uint32_t udp:1;
+	uint32_t state:2;
+	uint32_t pkt_type:3;
+    uint32_t ttl:1;  
+	uint32_t rmt:1;		/* remove tunnel ip header (6rd/dslite only) */
+	uint32_t cah:1;		/* cacheable flag */
+	uint32_t drm:1;		/* inform switch of keeping DSCP(IPv4) or TC(IPv6) */
+	uint32_t dvp:1;		/* inform switch of keeping VPRI */
+	uint32_t psn:1;		/* egress packet has PPPoE session */
+	uint32_t vlan_layer:3;
+	uint32_t ka:1;		/* keep alive */
+	uint32_t time_stamp:15;
+#else
+	uint32_t time_stamp:15;
+	uint32_t ka:1;		/* keep alive */
+	uint32_t vlan_layer:3;
+	uint32_t psn:1;		/* egress packet has PPPoE session */
+	uint32_t dvp:1;		/* inform switch of keeping VPRI */
+	uint32_t drm:1;		/* inform switch of keeping DSCP(IPv4) or TC(IPv6) */
+	uint32_t cah:1;		/* cacheable flag */
+	uint32_t rmt:1;		/* remove tunnel ip header (6rd/dslite only) */
+   uint32_t ttl:1;  
+	uint32_t pkt_type:3;
+	uint32_t state:2;
+	uint32_t udp:1;
+	uint32_t sta:1;		/* static entry */
+#endif
+};
+
+struct _info_blk2 {
+#if defined (CONFIG_RALINK_MT7621)
+#ifdef __BIG_ENDIAN
+	uint32_t dscp:8;	/* DSCP value */
+	uint32_t port_ag:6;	/* port account group */
+	uint32_t port_mg:6;	/* port meter group */
+	uint32_t alen:1;	/* 0:pre 1:post packet length in accounting */
+	uint32_t mlen:1;	/* 0:pre 1:post packet length in meter */
+	uint32_t mcast:1;	/* multicast this packet to CPU */
+	uint32_t vpm:1;		/* virtual channel/priority */
+	uint32_t dp:3;		/* force to PSE port x 
+			          0:PSE,1:GSW, 2:GMAC,4:PPE,5:QDMA,7=DROP */
+	uint32_t fqos:1;	/* force to PSE QoS port */
+	uint32_t qid:4;		/* QID in Qos Port */
+#else
+	uint32_t qid:4;		/* QID in Qos Port */
+	uint32_t fqos:1;	/* force to PSE QoS port */
+	uint32_t dp:3;		/* force to PSE port x 
+			          0:PSE,1:GSW, 2:GMAC,4:PPE,5:QDMA,7=DROP */
+	uint32_t vpm:1;		/* virtual channel/priority */
+	uint32_t mcast:1;	/* multicast this packet to CPU */
+	uint32_t mlen:1;	/* 0:pre 1:post packet length in meter */
+	uint32_t alen:1;	/* 0:pre 1:post packet length in accounting */
+	uint32_t port_mg:6;	/* port meter group */
+	uint32_t port_ag:6;	/* port account group */
+	uint32_t dscp:8;	/* DSCP value */
+#endif	
+	
+#else
+
+#ifdef __BIG_ENDIAN
+	uint32_t dscp:8;	/* DSCP value */
+	uint32_t port_ag:6;	/* port account group */
+	uint32_t port_mg:6;	/* port meter group */
+	uint32_t fdq:4;		/* force DRAM queue (for CAR case) */
+	uint32_t up:3;		/* new user priority */
+	uint32_t fp:1;		/* force new user priority */
+	uint32_t fpidx:4;	/* force port index */
+#else
+	uint32_t fpidx:4;	/* force port index */
+	uint32_t fp:1;		/* force new user priority */
+	uint32_t up:3;		/* new user priority */
+	uint32_t fdq:4;		/* force DRAM queue (for CAR case) */
+	uint32_t port_mg:6;	/* port meter group */
+	uint32_t port_ag:6;	/* port account group */
+	uint32_t dscp:8;	/* DSCP value */
+#endif	
+	
+#endif
+};
+
+#else
+/* state = unbind & dynamic */
+struct ud_info_blk1 {
+#ifdef __BIG_ENDIAN
+    uint32_t sta:1; /* static entry */
+    uint32_t udp:1; /* 0: tcp, 1: udp */
+    uint32_t state:2; 
+    uint32_t pkt_type:2; /* entry format */
     uint32_t resv:2;
     uint32_t pcnt:16; /* packet count */
     uint32_t time_stamp:8;
@@ -180,9 +243,9 @@ struct ud_info_blk1 {
     uint32_t time_stamp:8;
     uint32_t pcnt:16; /* packet count */
     uint32_t resv:2;
-    uint32_t fmt:2; /* entry format */
+	uint32_t pkt_type:2;	/* entry format */
     uint32_t state:2; 
-    uint32_t t_u:1; /* 0: tcp, 1: udp */
+	uint32_t udp:1;
     uint32_t sta:1; /* static entry */
 #endif
 };
@@ -192,9 +255,9 @@ struct ud_info_blk1 {
 struct bf_info_blk1 {
 #ifdef __BIG_ENDIAN
     uint16_t sta:1; /* static entry */
-    uint16_t t_u:1; /* 0: tcp, 1:udp */
+    uint16_t udp:1; /* 0: tcp, 1:udp */
     uint16_t state:2;
-    uint16_t fmt:2; /* entry format */
+    uint16_t pkt_type:2; /* entry format */
     uint16_t ka:1; /* keep alive */
     uint16_t ttl:1;
     uint16_t pppoe:2;
@@ -210,9 +273,9 @@ struct bf_info_blk1 {
     uint16_t pppoe:2;
     uint16_t ttl:1;
     uint16_t ka:1; /* keep alive */
-    uint16_t fmt:2; /* entry format */
+	 uint16_t pkt_type:2;	/* entry format */
     uint16_t state:2;
-    uint16_t t_u:1; /* 0: tcp, 1:udp */
+	 uint16_t udp:1;
     uint16_t sta:1; /* static entry */
 #endif
 };
@@ -221,7 +284,7 @@ struct _info_blk2 {
 #ifdef __BIG_ENDIAN
     uint16_t dscp:8; /* DSCP value */
     uint32_t ae:1;  /* account enable */
-    uint32_t rmdscp:1; 
+    uint32_t drm:1; 
     uint32_t port_ag:6; /* port account group */
     uint32_t me:1;  /* meter enable */
     uint32_t resv:1; 
@@ -239,11 +302,12 @@ struct _info_blk2 {
     uint16_t resv:1; 
     uint16_t me:1;  /* meter enable */
     uint16_t port_ag:6; /* port account group */
-    uint16_t rmdscp:1; /* remark IPv4 DSCP */
+	 uint16_t drm:1;		/* remark IPv4 DSCP */
     uint16_t ae:1;  /* account enable */
     uint16_t dscp:8; /* DSCP value */
 #endif
 };
+#endif
 
 /*
  * Foe Entry (64B)
@@ -283,22 +347,339 @@ struct _info_blk2 {
  *	|     tmp_buf(4B)       |    |       tmp_buf(4B)     |
  *	+-----------------------+    +-----------------------+
  *
+ * Foe Entry (80)
+ *
+ *      IPV4 HNAPT:			     IPV4:
+ *	+-----------------------+    +-----------------------+
+ *	|  Information Block 1  |    |  Information Block 1  |
+ *	+-----------------------+    +-----------------------+
+ *	|	SIP(4B)		|    |		SIP(4B)      |
+ *	+-----------------------+    +-----------------------+
+ *	|	DIP(4B)		|    |		DIP(4B)      |
+ *	+-----------------------+    +-----------------------+
+ *	| SPORT(2B) | DPORT(2B) |    |	      Rev(4B)        |
+ *	+-----------+-----------+    +-----------------------+
+ *	| EG DSCP| Info Block 2 |    |	Information Block 2  | 
+ *	+-----------------------+    +-----------------------+
+ *	|      New SIP(4B)	|    |     New SIP (4B)      |
+ *	+-----------------------+    +-----------------------+
+ *	|      New DIP(4B)	|    |     New DIP (4B)      |
+ *	+-----------------------+    +-----------------------+
+ *	| New SPORT | New DPORT |    | New SPORT | New DPORT |
+ *	+-----------+-----------+    +-----------------------+
+ *	|          REV          |    |		REV	     |
+ *	+-----------------------+    +-----------------------+
+ *	|Act_dp|   REV          |    |Act_dp|	REV	     |
+ *	+-----------------------+    +-----------------------+
+ *	|      tmp_buf(4B)      |    |	     temp_buf(4B)    | 
+ *	+-----------------------+    +-----------|-----------+
+ *	| ETYPE     | VLAN1 ID  |    | ETYPE     |  VLAN1    |
+ *	+-----------+-----------+    +-----------+-----------+
+ *	|       DMAC[47:16]     |    |       SMAC[47:16]     | 
+ *	+-----------------------+    +-----------------------+
+ *	| DMAC[15:0]| VLAN2 ID  |    | DMAC[15:0]|  VLAN2    |
+ *	+-----------------------+    +-----------------------+
+ *	|       SMAC[47:16]     |    |       SMAC[47:16]     | 
+ *	+-----------------------+    +-----------------------+
+ *	| SMAC[15:0]| PPPOE ID  |    | SMAC[15:0]| PPPOE ID  |
+ *	+-----------------------+    +-----------------------+
+ *
  */
-struct FoeEntry {
+#if defined (CONFIG_HNAT_V2)
+struct _ipv4_hnapt {
     union {
-	struct us_info_blk1 usib1;
 	struct ud_info_blk1 udib1;
 	struct bf_info_blk1 bfib1;
 	uint32_t info_blk1;
     };
-    union {
 	uint32_t	sip;
-	uint32_t	ipv6_dip0;
-    };
+	uint32_t dip;
+
+#ifdef __BIG_ENDIAN	
+	uint16_t sport;
+	uint16_t dport;
+#else
+	uint16_t dport;
+	uint16_t sport;
+#endif
+
     union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
+   };
+	uint32_t new_sip;
+	uint32_t new_dip;
+
+#ifdef __BIG_ENDIAN	
+	uint16_t new_sport;
+	uint16_t new_dport;	
+#else
+	uint16_t new_dport;
+	uint16_t new_sport;
+#endif
+	
+	uint32_t resv1;
+	uint32_t resv2;
+	
+#ifdef __BIG_ENDIAN	
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv3:26;
+#else
+	uint32_t resv3:26;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+	
+#ifdef __BIG_ENDIAN	
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	
+	uint8_t dmac_hi[4];
+	
+#ifdef __BIG_ENDIAN	
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	
+	uint8_t smac_hi[4];
+	
+#ifdef __BIG_ENDIAN	
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;	
+#else
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+
+struct _ipv4_dslite {
+   union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	
+	uint32_t	sip;
 	uint32_t	dip;
+
+#ifdef __BIG_ENDIAN	
+	uint16_t sport;
+	uint16_t dport;
+#else
+	uint16_t dport;
+	uint16_t sport;
+#endif
+
+	uint32_t tunnel_sipv6_0;
+	uint32_t tunnel_sipv6_1;
+	uint32_t tunnel_sipv6_2;
+	uint32_t tunnel_sipv6_3;
+
+	uint32_t tunnel_dipv6_0;
+	uint32_t tunnel_dipv6_1;
+	uint32_t tunnel_dipv6_2;
+	uint32_t tunnel_dipv6_3;
+
+#ifdef __BIG_ENDIAN
+	uint16_t resv:4;	
+	uint16_t priority:4;	/* in order to consist with Linux kernel (should be 8bits) */
+	uint8_t flow_lbl[3];	/* in order to consist with Linux kernel (should be 20bits) */
+#else
+	uint8_t flow_lbl[3];	/* in order to consist with Linux kernel (should be 20bits) */
+	uint16_t priority:4;	/* in order to consist with Linux kernel (should be 8bits) */
+	uint16_t resv:4;
+#endif
+	
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv2:18;
+	uint32_t hop_limit:8;
+#else
+	uint32_t hop_limit:8;
+	uint32_t resv2:18;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+	
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
+	};
+
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	
+	uint8_t dmac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	
+	uint8_t smac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+
+
+struct _ipv6_1t_route {
+	union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	uint32_t	ipv6_dip0;
 	uint32_t	ipv6_dip1;
+	uint32_t resv;
+
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
     };
+
+	uint32_t ipv6_dip2;
+	uint32_t ipv6_dip3;
+	
+	uint32_t resv1;
+	
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv2:26;
+#else
+	uint32_t resv2:26;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+	
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	
+	uint8_t dmac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	
+	uint8_t smac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+
+struct _ipv6_3t_route {
+    union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+   };
+	uint32_t ipv6_sip0;
+	uint32_t ipv6_sip1;
+	uint32_t ipv6_sip2;
+	uint32_t ipv6_sip3;
+	uint32_t ipv6_dip0;
+	uint32_t	ipv6_dip1;
+	uint32_t ipv6_dip2;
+	uint32_t ipv6_dip3;
+
+#ifdef __BIG_ENDIAN
+	uint32_t resv:24;
+	uint32_t prot:8;
+#else
+	uint32_t prot:8;
+	uint32_t resv:24;
+#endif
+
+	uint32_t resv1;
+	uint32_t resv2;
+	uint32_t resv3;
+	
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv4:26;
+#else
+	uint32_t resv4:26;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
+    };
+
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	
+	uint8_t dmac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	
+	uint8_t smac_hi[4];
+
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else	
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+struct _ipv6_5t_route {
+	union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	uint32_t ipv6_sip0;
+	uint32_t ipv6_sip1;
+	uint32_t ipv6_sip2;
+	uint32_t ipv6_sip3;
+	uint32_t ipv6_dip0;
+	uint32_t ipv6_dip1;
+	uint32_t ipv6_dip2;
+	uint32_t ipv6_dip3;
 
 #ifdef __BIG_ENDIAN
     uint16_t	sport;
@@ -308,19 +689,212 @@ struct FoeEntry {
     uint16_t	sport;
 #endif
 
+	uint32_t resv1;
+	uint32_t resv2;
+	uint32_t resv3;
+	
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv4:26;
+#else
+	uint32_t resv4:26;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+
     union {
 	struct _info_blk2 iblk2;
 	uint32_t info_blk2;
     };
 
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif	
+
+	uint8_t dmac_hi[4];
+
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else	
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif	
+
+	uint8_t smac_hi[4];
+
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else	
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+
+struct _ipv6_6rd {
     union {
-	uint32_t	new_sip;
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	uint32_t ipv6_sip0;
+	uint32_t ipv6_sip1;
+	uint32_t ipv6_sip2;
+	uint32_t ipv6_sip3;
+	uint32_t ipv6_dip0;
+	uint32_t ipv6_dip1;
 	uint32_t	ipv6_dip2;
+	uint32_t ipv6_dip3;
+	
+#ifdef __BIG_ENDIAN
+	uint16_t sport;
+	uint16_t dport;
+#else
+	uint16_t dport;
+	uint16_t sport;
+#endif
+
+	uint32_t tunnel_sipv4;
+	uint32_t tunnel_dipv4;
+
+#ifdef __BIG_ENDIAN
+	uint32_t ttl:8;
+	uint32_t dscp:8;
+	uint32_t hdr_chksum:16;
+#else
+	uint32_t hdr_chksum:16;
+	uint32_t dscp:8;
+	uint32_t ttl:8;
+#endif
+
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv1:23;
+	uint32_t flag:3;
+#else
+	uint32_t flag:3;
+	uint32_t resv1:23;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
     };
+
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	
+	uint8_t dmac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	
+	uint8_t smac_hi[4];
+	
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+
+};
+
+struct FoeEntry {
     union {
-	uint32_t	new_dip;
-	uint32_t	ipv6_dip3;
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;	//common header
+		struct _ipv4_hnapt ipv4_hnapt;	// nat & napt share same data structure
+#if defined (CONFIG_RA_HW_NAT_IPV6)
+		struct _ipv4_dslite ipv4_dslite;
+		struct _ipv6_1t_route ipv6_1t_route;
+		struct _ipv6_3t_route ipv6_3t_route;
+		struct _ipv6_5t_route ipv6_5t_route;
+		struct _ipv6_6rd ipv6_6rd;
+#endif
     };
+};
+
+struct FoePriKey {
+	/* TODO: add new primary key to support dslite, 6rd */
+
+	/* Ipv4 */
+	struct {
+		uint32_t sip;
+		uint32_t dip;
+		uint16_t sport;
+		uint16_t dport;
+		uint32_t is_udp:1;
+	} ipv4_hnapt;
+
+	struct {
+		uint32_t sip;
+		uint32_t dip;
+		/* TODO */
+	} ipv4_hnat;
+
+	struct {
+		uint32_t sip;
+		uint32_t dip;
+		/* TODO */
+	} ipv4_dslite;
+
+	/* IPv6 */
+	struct {
+		uint32_t dip0;
+		uint32_t dip1;
+		uint32_t dip2;
+		uint32_t dip3;
+	} ipv6_routing;
+
+	struct {
+		/* TODO */
+	} ipv6_6rd;
+
+	uint32_t pkt_type;	/* entry format */
+};
+
+#else
+
+struct _ipv4_hnapt {
+	union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	uint32_t sip;
+	uint32_t dip;
+#ifdef __BIG_ENDIAN
+	uint16_t sport;
+	uint16_t dport;
+#else
+	uint16_t dport;
+	uint16_t sport;
+#endif
+
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
+    };
+
+	uint32_t new_sip;
+	uint32_t new_dip;
 #ifdef __BIG_ENDIAN
     uint16_t	new_sport;
     uint16_t	new_dport;
@@ -364,11 +938,71 @@ struct FoeEntry {
     uint16_t	resv2;
 #endif
     uint32_t	resv3;
-    struct bf_info_blk1 tmp_buf; /* for semi-auto bind */
+	uint32_t resv4;
+};
+
+struct _ipv6_1t_route {
+	union {
+		struct ud_info_blk1 udib1;
+		struct bf_info_blk1 bfib1;
+		uint32_t info_blk1;
+	};
+	uint32_t ipv6_dip0;
+	uint32_t ipv6_dip1;
+	uint32_t resv;
+
+	union {
+		struct _info_blk2 iblk2;
+		uint32_t info_blk2;
+	};
+
+	uint32_t ipv6_dip2;
+	uint32_t ipv6_dip3;
+	
+	uint32_t resv1;
+
+#ifdef __BIG_ENDIAN
+	uint32_t act_dp:6;	/* UDF */
+	uint32_t resv2:26;
+#else
+	uint32_t resv2:26;
+	uint32_t act_dp:6;	/* UDF */
+#endif
+
+#ifdef __BIG_ENDIAN
+	uint16_t etype;
+	uint16_t vlan1;
+#else
+	uint16_t vlan1;
+	uint16_t etype;
+#endif
+	uint8_t dmac_hi[4];
+#ifdef __BIG_ENDIAN
+	uint8_t dmac_lo[2];
+	uint16_t vlan2;
+#else
+	uint16_t vlan2;
+	uint8_t dmac_lo[2];
+#endif
+	uint8_t smac_hi[4];
+#ifdef __BIG_ENDIAN
+	uint8_t smac_lo[2];
+	uint16_t pppoe_id;
+#else
+	uint16_t pppoe_id;
+	uint8_t smac_lo[2];
+#endif
+};
+
+struct FoeEntry {
+	union {
+		struct bf_info_blk1 bfib1;	//common header
+		struct _ipv4_hnapt ipv4_hnapt;	// nat & napt share same data structure
+		struct _ipv6_1t_route ipv6_1t_route;
+	};
 };
 
 struct FoePriKey {
-
     /* Ipv4 */
     struct {
 	uint32_t sip;
@@ -376,7 +1010,7 @@ struct FoePriKey {
 	uint16_t sport;
 	uint16_t dport;
 	uint32_t is_udp:1;
-    }ipv4;
+	} ipv4;
 
     /* IPv6 */
     struct {
@@ -384,22 +1018,22 @@ struct FoePriKey {
 	uint32_t dip1;
 	uint32_t dip2;
 	uint32_t dip3;
-    }ipv6;
+	} ipv6;
 
-    uint32_t fmt; /* entry format */
+	uint32_t pkt_type;	/* entry format */
 };
+#endif
 
-int32_t FoeHashFun(struct FoePriKey *key,enum FoeEntryState TargetState);
+int32_t FoeHashFun(struct FoePriKey *key, enum FoeEntryState TargetState);
 uint32_t FoeInsEntry(struct FoeEntry *entry);
-void FoeSetMacInfo(uint8_t *dst, uint8_t *src);
-void FoeGetMacInfo(uint8_t *dst, uint8_t *src);
+void FoeSetMacInfo(uint8_t * dst, uint8_t * src);
+void FoeGetMacInfo(uint8_t * dst, uint8_t * src);
 void FoeDumpEntry(uint32_t Index);
-int FoeAddEntry(struct hwnat_tuple *opt);
-int FoeDelEntry(struct hwnat_tuple *opt);
 int FoeGetAllEntries(struct hwnat_args *opt);
 int FoeBindEntry(struct hwnat_args *opt);
 int FoeUnBindEntry(struct hwnat_args *opt);
 int FoeDelEntryByNum(uint32_t entry_num);
 void FoeTblClean(void);
+int FoeDumpCacheEntry(void);
 
 #endif

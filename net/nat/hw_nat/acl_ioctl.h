@@ -1,20 +1,4 @@
 /*
- ***************************************************************************
- * Ralink Tech Inc.
- * 4F, No. 2 Technology 5th Rd.
- * Science-based Industrial Park
- * Hsin-chu, Taiwan, R.O.C.
- *
- * (c) Copyright 2002-2006, Ralink Technology, Inc.
- *
- * All rights reserved. Ralink's source code is an unpublished work and the
- * use of a copyright notice does not imply otherwise. This source code
- * contains confidential trade secret material of Ralink Tech. Any attempt
- * or participation in deciphering, decoding, reverse engineering or in any
- * way altering the source code is stricitly prohibited, unless the prior
- * written consent of Ralink Technology, Inc. is obtained.
- ***************************************************************************
-
     Module Name:
     acl_ioctl.h
 
@@ -29,8 +13,6 @@
 
 #ifndef	__ACL_IOCTL_H__
 #define	__ACL_IOCTL_H__
-
-#include "common.h"
 
 #define ACL_ADD_SMAC_DIP_ANY   		(0)
 #define ACL_ADD_SMAC_DIP_TCP   		(1)
@@ -60,26 +42,26 @@
 #define ACL_MAJOR			(230)
 
 enum AclRuleMethod {
-	ACL_ALLOW_RULE=0,	
-	ACL_DENY_RULE=1,
-	ACL_PRIORITY_RULE=2/*set user priority only*/
+	ACL_ALLOW_RULE = 0,
+	ACL_DENY_RULE = 1,
+	ACL_PRIORITY_RULE = 2	/*set user priority only */
 };
 
 enum AclRuleOpt {
-	ACL_RULE_ADD=0,
-	ACL_RULE_DEL=1
+	ACL_RULE_ADD = 0,
+	ACL_RULE_DEL = 1
 };
 
 enum AclProtoType {
-	ACL_PROTO_ANY=0,
-	ACL_PROTO_TCP=1,
-	ACL_PROTO_UDP=2
+	ACL_PROTO_ANY = 0,
+	ACL_PROTO_TCP = 1,
+	ACL_PROTO_UDP = 2
 };
 
 enum AclResult {
-	ACL_SUCCESS=0,
-	ACL_FAIL=1,
-	ACL_TBL_FULL=2
+	ACL_SUCCESS = 0,
+	ACL_FAIL = 1,
+	ACL_TBL_FULL = 2
 };
 
 struct acl_args {
@@ -100,9 +82,9 @@ struct acl_args {
 	unsigned char tos_e; /* end of tos */
 	unsigned short ethertype; /* end of tos */
 	unsigned short protocol; /* protocol of ip header */
-	unsigned int   vid:12; /*VID*/
-	unsigned int   up:3; /*acl=>up*/
-	unsigned int   pn:3; /*physical port*/
+	unsigned int vid:12;
+	 /*VID*/ unsigned int up:3;	/*acl=>up */
+	unsigned int pn:3;	/*physical port */
 };
 
 struct acl_list_args {

@@ -1,41 +1,98 @@
 /*
- ***************************************************************************
- * Ralink Tech Inc.
- * 4F, No. 2 Technology 5th Rd.
- * Science-based Industrial Park
- * Hsin-chu, Taiwan, R.O.C.
- *
- * (c) Copyright 2002-2006, Ralink Technology, Inc.
- *
- * All rights reserved. Ralink's source code is an unpublished work and the
- * use of a copyright notice does not imply otherwise. This source code
- * contains confidential trade secret material of Ralink Tech. Any attempt
- * or participation in deciphering, decoding, reverse engineering or in any
- * way altering the source code is stricitly prohibited, unless the prior
- * written consent of Ralink Technology, Inc. is obtained.
- ***************************************************************************
-
  Module Name:
  policy.h
 
-Abstract:
+    Abstract:
 
-Revision History:
-Who         When            What
---------    ----------      ----------------------------------------------
-Name        Date            Modification logs
-Steven Liu  2007-01-23      Initial version
- */
+    Revision History:
+    Who         When            What
+    --------    ----------      ----------------------------------------------
+    Name        Date            Modification logs
+    Steven Liu  2007-01-23      Initial version
+*/
 
 #ifndef _POLICY_WANTED
 #define _POLICY_WANTED
 
 #include <linux/version.h>
+#include <asm/rt2880/rt_mmap.h>
+#include "frame_engine.h"
 
 /*
  * DEFINITIONS AND MACROS
  */
-#define POLICY_TBL_BASE    (0xbfb50000 + 0x1000)
+#define POLICY_TBL_BASE    (RALINK_FRAME_ENGINE_BASE + 0x1000)
+
+enum L2RuleDir {
+	OTHERS = 0,
+	DMAC = 1,
+	SMAC = 2,
+	SDMAC = 3
+};
+
+enum L3RuleDir {
+	IP_QOS = 0,
+	DIP = 1,
+	SIP = 2,
+	SDIP = 3
+};
+
+enum L4RuleDir {
+	DONT_CARE = 0,
+	DPORT = 1,
+	SPORT = 2,
+	SDPORT = 3
+};
+
+enum RuleType {
+	L2_RULE = 0,
+	L3_RULE = 1,
+	L4_RULE = 2,
+	PT_RULE = 3
+};
+
+enum PortNum {
+	PN_CPU = 0,
+	PN_GE1 = 1,
+	PN_DONT_CARE = 7
+};
+
+enum OpCode {
+	AND = 0,
+	OR = 1
+};
+
+enum TcpFlag {
+	TCP_FIN = 1,
+	TCP_SYN = 2,
+	TCP_RESET = 4,
+	TCP_PUSH = 8,
+	TCP_ACK = 16,
+	TCP_URGENT = 32
+};
+
+enum TcpFlagOp {
+	EQUAL = 0,
+	NOT_EQUAL = 1,
+	IN_SET = 2,
+	NOT_IN_SET = 3
+};
+
+enum L4Type {
+	FLT_IP_PROT = 0,
+	FLT_UDP = 1,
+	FLT_TCP = 2,
+	FLT_TCP_UDP = 3
+};
+
+enum FpnType {
+	FPN_CPU = 0,
+	FPN_GE1 = 1,
+	FPN_GE2 = 2,
+	FPN_FRC_PRI_ONLY = 5,
+	FPN_ALLOW = 4,
+	FPN_DROP = 7
+};
 
 /*
  * TYPEDEFS AND STRUCTURES
@@ -89,22 +146,22 @@ struct common_field {
 
 	struct {
 	    uint8_t ee:1; /* entry end */
-	    uint8_t dop:1; /* drop out profile*/
+			uint8_t dop:1;	/* drop out profile */
 	    uint8_t mg:6; /* meter group */
-	}mtr; /* meter */
+		} mtr;		/* meter */
 
 	struct {
 	    uint8_t ee:1; /* entry end */
 	    uint8_t rsv:1; 
 	    uint8_t ag:6; /* accounting group */
-	}ac; /* account */
+		} ac;		/* account */
 
 	struct {
 	    uint8_t ee:1; /* entry end */
 	    uint8_t fpp:1; /* Force Destination Port */
 	    uint8_t fpn:3; /* Force Port Number */
 	    uint8_t up:3; /* User Perority */
-	}fpp; /* force destination port & force new user priority */
+		} fpp;		/* force destination port & force new user priority */
 
 	struct {
 	    uint8_t ee:1; /* entry end */
@@ -158,7 +215,6 @@ struct l3_rule {
 #ifdef __BIG_ENDIAN
     union { 
 
-	/* ip boundary = ip ~ ip + (ip_rng_m << ip_rng_e) */
 	struct {
 	    uint16_t ip_seg:2; /* segment for ipv */
 	    uint16_t v4:1;  /* ipv4/ipv6 */
@@ -253,18 +309,18 @@ struct l4_rule {
 	    uint16_t tcp_f:6; /* Expected value of TCP flags (U/A/P/R/S/F) */
 	    uint16_t tcp_fm:6;  /* Mask of TCP flags */
 	    uint16_t tu:2; /* 11:tcp/udp, 10:tcp, 01:udp, 00:ip_proto */
-	}tcp;
+		} tcp;
 
 	struct {
 	    uint16_t resv:14;
 	    uint16_t tu:2; /* 11:tcp/udp, 10:tcp, 01:udp, 00:ip_proto */
-	}udp;
+		} udp;
 
 	struct {
 	    uint16_t prot:8; /* ip protocol field */
 	    uint16_t resv:6;
 	    uint16_t tu:2; /* 11:tcp/udp, 10:tcp, 01:udp, 00:ip_proto */
-	}ip;
+		} ip;
     };
 #endif
 }__attribute__ ((packed));

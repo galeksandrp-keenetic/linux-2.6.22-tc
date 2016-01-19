@@ -1,20 +1,4 @@
 /*
- ***************************************************************************
- * Ralink Tech Inc.
- * 4F, No. 2 Technology 5th Rd.
- * Science-based Industrial Park
- * Hsin-chu, Taiwan, R.O.C.
- *
- * (c) Copyright 2002-2006, Ralink Technology, Inc.
- *
- * All rights reserved. Ralink's source code is an unpublished work and the
- * use of a copyright notice does not imply otherwise. This source code
- * contains confidential trade secret material of Ralink Tech. Any attempt
- * or participation in deciphering, decoding, reverse engineering or in any
- * way altering the source code is stricitly prohibited, unless the prior
- * written consent of Ralink Technology, Inc. is obtained.
- ***************************************************************************
-
     Module Name:
     mtr_ioctl.h
 
@@ -29,8 +13,6 @@
 
 #ifndef	__MTR_IOCTL_H__
 #define	__MTR_IOCTL_H__
-
-#include "common.h"
 
 #define MTR_ADD_MAC_UL_ENTRY              (0)
 #define MTR_ADD_MAC_DL_ENTRY              (1)
@@ -57,24 +39,22 @@
 #define MTR_DEVNAME                     "mtr0"
 #define MTR_MAJOR                       (250)
 
-
 enum MtrInterval {
-	_1MS=0,
-	_10MS=1,
-	_50MS=2,
-	_100MS=3,
-	_500MS=4,
-	_1000MS=5,
-	_5000MS=6,
-	_10000MS=7
+	_1MS = 0,
+	_10MS = 1,
+	_50MS = 2,
+	_100MS = 3,
+	_500MS = 4,
+	_1000MS = 5,
+	_5000MS = 6,
+	_10000MS = 7
 };
 
 enum MtrResult {
-	MTR_SUCCESS=0,
-	MTR_FAIL=1,
-	MTR_TBL_FULL=2
+	MTR_SUCCESS = 0,
+	MTR_FAIL = 1,
+	MTR_TBL_FULL = 2
 };
-
 
 struct mtr_args {
     unsigned char  mac[6];
