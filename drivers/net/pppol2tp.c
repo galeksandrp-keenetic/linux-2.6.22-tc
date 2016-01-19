@@ -79,6 +79,25 @@ static struct proc_dir_entry *proc_cmd = NULL;
 
 #define SK_STATE(sk) (sk)->sk_state
 
+#define DEBUG_L2TP 1
+#define DUMP_PKT
+
+#ifdef DEBUG_L2TP
+#  define DEBUGP(lvl, x...)	{ if (lvl <= DEBUG_L2TP) \
+					printk("pppol2tp: "x); }
+#else
+#  define DEBUGP(x...)	{;}
+#endif
+
+/* Debud levels */
+#define DBG_NONE	0
+#define DBG_INFO	1
+#define DBG_WARNING	3
+#define DBG_ERROR	4
+#define DBG_STATE	5
+#define DBG_DUMP	6
+#define DBG_JUNK	7
+
 typedef struct l2tp_sess {
 	struct l2tp_sess *pnext;
 	struct pppol2tp_addr l2a;
@@ -437,12 +456,25 @@ int l2tp_input_proc(struct sk_buff *skb) {
 		if( hdrflags & L2TP_HDRFLAG_O ) ptr += 2 + ntohs(*(u16 *) ptr);
 			offset = (int)(ptr - psh) + iph->ihl * 4 + sizeof(struct udphdr) ;
 	
-      if( hdrflags & L2TP_HDRFLAG_T ) { /* control packet, process hello and send to userspace */
-     		if( !(hdrflags & L2TP_HDRFLAG_S) || unlikely(offset + 8 > skb->len) ) goto skip_put;
+		if( hdrflags & L2TP_HDRFLAG_T ) { /* control packet, process hello and send to userspace */
+			uint32_t mtype = 0;
 
-     		ptr += 6;
-     		if( ntohs(*(u16 *) ptr) != 0x6 ) goto skip_put; /* check hello avp type */
-     		
+			if(!(hdrflags & L2TP_HDRFLAG_S)
+				|| unlikely(offset + 8 > skb->len))
+			{
+				goto skip_put;
+			}
+
+			ptr += 6;
+			mtype = ntohs(*(uint16_t *) ptr);
+			if((mtype != 0x06)
+				&& (mtype != 0x10))
+			{
+				DEBUGP(DBG_DUMP, "skip control message (0x%02x)\n", mtype);
+				goto skip_put; /* check hello avp type */
+			}
+
+
      		/* build zlb */
      		skb_pull(skb, (iph->ihl * 4 + sizeof(struct udphdr))); /* l2tp header len */
      		*((u16 *) psh) = htons(L2TP_HDRFLAG_T | L2TP_HDRFLAG_L | L2TP_HDRFLAG_S |  L2TP_HDR_VER);
