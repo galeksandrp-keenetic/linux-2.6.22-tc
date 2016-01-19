@@ -76,5 +76,7 @@ void nf_conntrack_expect_init(struct nf_conntrack_expect *, int,
 void nf_conntrack_expect_put(struct nf_conntrack_expect *exp);
 int nf_conntrack_expect_related(struct nf_conntrack_expect *expect);
 
+int nf_conntrack_expect_update_timer(struct nf_conntrack_expect *expect);
+
 #endif /*_NF_CONNTRACK_EXPECT_H*/
 

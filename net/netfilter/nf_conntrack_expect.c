@@ -370,6 +370,30 @@ out:
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_expect_related);
 
+int nf_conntrack_expect_update_timer(struct nf_conntrack_expect *expect)
+{
+	struct nf_conntrack_expect *i = NULL;
+	int ret;
+
+	i = nf_conntrack_expect_find_get(&expect->tuple);
+	if(i == NULL)
+		return -1;
+
+	write_lock_bh(&nf_conntrack_lock);
+
+	if (refresh_timer(i)) {
+		ret = 0;
+		goto out;
+	}
+
+	ret = -1;
+out:
+	nf_conntrack_expect_put(i);
+	write_unlock_bh(&nf_conntrack_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(nf_conntrack_expect_update_timer);
+
 #ifdef CONFIG_PROC_FS
 static void *exp_seq_start(struct seq_file *s, loff_t *pos)
 {
