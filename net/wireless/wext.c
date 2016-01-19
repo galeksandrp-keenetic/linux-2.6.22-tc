@@ -101,6 +101,9 @@
 
 #include <asm/uaccess.h>		/* copy_to_user() */
 
+int wifi_link_monitor = 0; /* link up = 1, link down = 0 */
+EXPORT_SYMBOL(wifi_link_monitor);
+
 /************************* GLOBAL VARIABLES *************************/
 /*
  * You should not use global variables, because of re-entrancy.
