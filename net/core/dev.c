@@ -2303,6 +2303,37 @@ EXPORT_SYMBOL(vpn_pthrough_setup);
 int (*l2tp_input)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(l2tp_input);
 
+int (*pptp_input)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(pptp_input);
+
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+
+int (*go_swnat)(struct sk_buff * skb, u8 origin) = NULL;
+EXPORT_SYMBOL(go_swnat);
+
+void (*prebind_from_fastnat)(struct sk_buff * skb,
+	u32 orig_saddr, u16 orig_sport, struct nf_conn * ct,
+	enum ip_conntrack_info ctinfo) = NULL;
+EXPORT_SYMBOL(prebind_from_fastnat);
+
+void (*prebind_from_l2tptx)(struct sk_buff * skb, struct sock * sock,
+	u16 l2w_tid, u16 l2w_sid, u16 w2l_tid, u16 w2l_sid,
+	u32 saddr, u32 daddr, u16 sport, u16 dport) = NULL;
+EXPORT_SYMBOL(prebind_from_l2tptx);
+
+void (*prebind_from_pptptx)(struct sk_buff * skb,
+	struct iphdr * iph_int, struct sock *sock, u32 saddr, u32 daddr) = NULL;
+EXPORT_SYMBOL(prebind_from_pptptx);
+
+void (*prebind_from_pppoetx)(struct sk_buff * skb, struct sock *sock,
+	u16 sid) = NULL;
+EXPORT_SYMBOL(prebind_from_pppoetx);
+
+void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(prebind_from_raeth);
+
+#endif //#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 __IMEM int netif_receive_skb(struct sk_buff *skb)
 {
