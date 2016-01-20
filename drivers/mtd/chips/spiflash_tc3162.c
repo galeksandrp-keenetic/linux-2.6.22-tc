@@ -26,6 +26,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/gen_probe.h>
+//#include <linux/mtd/partitions.h>
 #include <asm/delay.h>
 #include <linux/timer.h>
 #include <asm/io.h>
@@ -35,7 +36,9 @@
 /* debugging */
 /* #define SPIFLASH_DEBUG */
 #define TC_SOC
-
+static const char *part_probes[] __initdata =
+    { "ndmpart", NULL };
+    
 #define MIN(a,b)        ((a) < (b) ? (a) : (b))
 #define FALSE 	0
 #define TRUE 	1
@@ -60,6 +63,7 @@
 #define MANUFACTURER_MXIC		0x00c2
 #define MANUFACTURER_SPANSION	0x0001
 #define MANUFACTURER_EON		0x001c
+#define MANUFACTURER_NUMONYX	0x0020
 
 /* ST */
 #define M25P16	          		0x2015
@@ -91,11 +95,12 @@
 #define S25FL032A          		0x0215
 #define S25FL064A          		0x0216
 #define S25FL128P          		0x2018
+#define N25Q064					0xba17
 
 /* EON */
-#define EN25Q32          		0x3016
+#define EN25Q32				0x3016
 #define EN25Q64          		0x3017
-#define EN25Q128          		0x3018
+#define EN25Q128			0x3018
 
 #if defined(TC_SOC) 
 static __u32 reg0x28;
@@ -174,17 +179,17 @@ static __u8 four_byte_mode = 0;
 static __u32
 spiflash_regread32(int reg)
 {
-	volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
-
-	return (*addr);
+	//volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
+	//return (*addr);
+	return regRead32((__u32)(CR_SPI_BASE + reg));
 }
 
 static void
 spiflash_regwrite32(int reg, __u32 data)
 {
-	volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
-
-	*addr = data;
+	//volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
+	regWrite32((__u32)(CR_SPI_BASE + reg),data);
+	//*addr = data;
 	return;
 }
 
@@ -350,8 +355,19 @@ static inline void spiflash_done(void)
 static u32
 spiflash_read (struct map_info *map, u32 from, u32 to, u32 size)
 {
+#ifdef CONFIG_TCSUPPORT_MT7510_E1
+	int i;
+	for(i=0;i<size;i++){
+		*(char *)(to+i) = *(char *)(map->virt + from + i);
+		wmb();
+		if(*(char *)(to+i) == 0){
+			*(char *)(to+i) = *(char *)(map->virt + from + i);
+			wmb();
+		}
+	}
+#else	
 	memcpy((char *)to, (char *)(map->virt + from), size);
-
+#endif
    	return (0);
 }
 
@@ -361,7 +377,7 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 	int done = FALSE, page_offset, bytes_left, finished;
 #if defined(TC_SOC) 
 	__u32 xact_len, spi_data[8], opcode, reg;
-	__u32 reg_value;
+	__u32 reg_value = 0;
 	unsigned char words, bytes, finalrun, i, j;
 #else
 	__u32 xact_len, spi_data = 0, opcode, reg;
@@ -443,15 +459,18 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 #if defined(TC_SOC)
         if (!byte_program_mode){
         	/*20101119 pork modified for Slic lower SPI speed request*/
-        	reg_value = VPint(SPI_REG_MASTER);
-//		VPint(SPI_REG_MASTER) = 0x38804;//Set bit [2] to 1 to enter more buffer mode
-		VPint(SPI_REG_MASTER) = reg_value | (1 << 2);
+        	reg_value = regRead32(SPI_REG_MASTER);
+//			VPint(SPI_REG_MASTER) = 0x38804;//Set bit [2] to 1 to enter more buffer mode
+			//VPint(SPI_REG_MASTER) = reg_value | (1 << 2);
+			regWrite32(SPI_REG_MASTER,reg_value|(1<<2));
  //       	VPint(SPI_REG_MOREBUF) = 0x20000100;//Set bits [8:0] to 128 (data bit counts) and bits[29:24] to 32(comman bit counts)
         	/* write exact data size into flash */
 		if(four_byte_mode == 1){
-			VPint(SPI_REG_MOREBUF) = 0x28000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 40(command bit counts)
+			//VPint(SPI_REG_MOREBUF) = 0x28000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 40(command bit counts)
+			regWrite32(SPI_REG_MOREBUF,0x28000000|(xact_len<<3));
 		}else{
-           		VPint(SPI_REG_MOREBUF) = 0x20000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 32(command bit counts)
+			regWrite32(SPI_REG_MOREBUF,0x20000000|(xact_len<<3));
+           		//VPint(SPI_REG_MOREBUF) = 0x20000000|(xact_len<<3);//Set bits [8:0] to data bit counts and bits[29:24] to 32(command bit counts)
 		}	
         }
 #endif
@@ -495,10 +514,13 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 #if defined(TC_SOC) 
 		if (!byte_program_mode){
 			/*20101119 pork modified for Slic lower SPI speed request*/
-			while(VPint(SPI_REG_BASE) & 0x10000);//Make sure the bit spi_master_busy is 0 and then continue
-			VPint(SPI_REG_MOREBUF) = 0x00000000;//Set the default value back
+			//while(VPint(SPI_REG_BASE) & 0x10000);//Make sure the bit spi_master_busy is 0 and then continue
+			while(regRead32(SPI_REG_BASE) & 0x10000);//Make sure the bit spi_master_busy is 0 and then continue
+			//VPint(SPI_REG_MOREBUF) = 0x00000000;//Set the default value back
+			regWrite32(SPI_REG_MOREBUF,0x0);//Set the default value back
 //			VPint(SPI_REG_MASTER) = 0x38800;//Set the default value back
-			VPint(SPI_REG_MASTER) = reg_value;
+			//VPint(SPI_REG_MASTER) = reg_value;
+			regWrite32(SPI_REG_MASTER,reg_value);
 		}
 #endif
 
@@ -684,6 +706,13 @@ static struct spi_flash_info flash_tables[] = {
 		DeviceSize: SIZE_16MiB,
 		EraseSize: SIZE_64KiB,
 	},
+	{
+		mfr_id: MANUFACTURER_NUMONYX,
+		dev_id: N25Q064,
+		name: "N25Q064",
+		DeviceSize: SIZE_8MiB,
+		EraseSize: SIZE_64KiB,
+	},
 };
 
 static void spiflash_unlock (void)
@@ -737,7 +766,7 @@ struct spi_chip_info *spiflash_probe_tc3162(struct map_info *map)
 	unsigned long flash_id;
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	if(down_interruptible(&SPI_SEM))
-		return -ERESTARTSYS;
+		return NULL;
 
 	*((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM)) = reg0x28;
 #endif
@@ -757,7 +786,11 @@ struct spi_chip_info *spiflash_probe_tc3162(struct map_info *map)
 			}
 
 			if(flash_tables[i].DeviceSize >= SIZE_32MiB){
-				VPint(SPI_REG_BASE) |= ((1<<19)|(1<<20));
+				int tmpVal;
+				tmpVal = regRead32(SPI_REG_BASE);
+				tmpVal |=((1<<19)|(1<<20));
+				//VPint(SPI_REG_BASE) |= ((1<<19)|(1<<20));
+				regWrite32(SPI_REG_BASE,tmpVal);
 				four_byte_mode = 1;	
 			}
 			chip_info = spiflash_tc3162_setup(map);
@@ -1011,7 +1044,9 @@ static struct mtd_info *spiflash_probe(struct map_info *map)
 {
 	struct spi_chip_info *chip_info = NULL;
 	struct mtd_info *mtd;
-
+	struct mtd_partition *mtd_parts;
+	int np;
+	
 	chip_info = spiflash_probe_tc3162(map);
 	if (!chip_info)
 		return NULL;
@@ -1045,9 +1080,13 @@ static struct mtd_info *spiflash_probe(struct map_info *map)
 
 	printk(KERN_INFO "%s: Found SPIFLASH %dMiB %s\n",
 		map->name, chip_info->flash->DeviceSize/(1024*1024), chip_info->flash->name);
-#ifdef CONFIG_TCSUPPORT_DUAL_IMAGE_ENHANCE
-		offset = chip_info->flash->DeviceSize/2;
-#endif
+
+	np = parse_mtd_partitions(mtd, part_probes, &mtd_parts, 0);
+	if (np > 0) {
+		add_mtd_partitions(mtd, mtd_parts, np);
+	} else {
+		printk("No partitions found on flash bank!\n");
+	}
 	return mtd;
 }
 
@@ -1068,7 +1107,7 @@ static struct mtd_chip_driver spiflash_chipdrv = {
 	.module	 = THIS_MODULE
 };
 
-#if  defined(CONFIG_TCSUPPORT_SUPPORT_FLASH)
+#if defined(CONFIG_TCSUPPORT_SUPPORT_FLASH)
 static int read_proc_support_flash(char *page, char **start, off_t off,
 	int count, int *eof, void *data)
 {
@@ -1137,7 +1176,6 @@ static int __init spiflash_probe_init(void)
 
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	reg0x28 = *((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM));
-
 	if  (isRT63368) {
 		reg0x28 &= (0xf000ffff);
 		reg0x28 |= (0x10 << 16);
@@ -1145,6 +1183,7 @@ static int __init spiflash_probe_init(void)
 	}
 #endif
 	register_mtd_chip_driver(&spiflash_chipdrv);
+	printk(KERN_INFO "TC3262 SPI driver loaded\n");
 	return 0;
 }
 

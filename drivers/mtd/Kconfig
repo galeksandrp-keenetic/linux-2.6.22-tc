@@ -14,41 +14,6 @@ menuconfig MTD
 
 if MTD
 
-choice
-	prompt "Root File System Type"
-	default ROOTFS_IN_FLASH
-
-config  ROOTFS_IN_RAM
-        bool "RootFS_in_RAM"
-	select BLK_DEV_INITRD 
-	select BLK_DEV_RAM 
-
-config  ROOTFS_IN_FLASH
-        bool "RootFS_in_FLASH"
-endchoice
-
-choice
-       prompt "Flash Size"
-       default FLASH_8M
-
-config FLASH_4M
-       bool "4M"
-
-config FLASH_8M
-       bool "8M"
-
-config FLASH_16M
-       bool "16M"
-
-endchoice
-
-
-config MTD_PURE_BRIDGE
-	bool "Kernel Max Size:640KB"
-	help
-	  This turns on pure bridge option for mtd.
-	default n
-
 config MTD_DEBUG
 	bool "Debugging"
 	help
@@ -168,6 +133,43 @@ config MTD_CMDLINE_PARTS
 	  mtdparts=sa1100:256k(ARMboot)ro,-(root)
 
 	  If unsure, say 'N'.
+
+config MTD_NDM_PARTS
+	bool "NDM partitions parser"
+	depends on MTD_PARTITIONS = "y" && MTD = "y"
+
+config MTD_NDM_BOOT_UPDATE
+	bool "Update bootloader"
+	depends on MTD_NDM_PARTS
+
+config MTD_NDM_CONFIG_TRANSITION
+	bool "Partition \"Config\" transition"
+	depends on MTD_NDM_PARTS
+
+config MTD_NDM_CONFIG_TRANSITION_OFFSET
+	hex "Offset of old partition"
+	default 0x0
+	depends on MTD_NDM_CONFIG_TRANSITION
+
+config MTD_NDM_CONFIG_TRANSITION_OFFSET_2
+	hex "Secondary offset of old partition"
+	default 0x0
+	depends on MTD_NDM_CONFIG_TRANSITION
+
+config MTD_NDM_DUMP_SIZE
+	hex "Dump partition size"
+	default 0x0
+	depends on MTD_NDM_PARTS
+
+config MTD_NDM_STORAGE_SIZE
+	hex "Storage partition size"
+	default 0x100000
+	depends on MTD_NDM_PARTS
+
+config MTD_NDM_FLASH_SIZE_LIMIT
+	hex "Limit of flash size"
+	default 0x0
+	depends on MTD_NDM_PARTS
 
 config MTD_AFS_PARTS
 	tristate "ARM Firmware Suite partition parsing"

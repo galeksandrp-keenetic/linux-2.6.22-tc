@@ -164,6 +164,39 @@ typedef unsigned char uint8;            /* 8-bit unsigned integer       */
 #ifndef VPchar
 #define VPchar			*(volatile unsigned char *)
 #endif
+#ifdef CONFIG_TCSUPPORT_MT7510_E1
+static inline unsigned long int regRead32(uint32 reg)	\
+{       						\
+	uint32 tmp;					\
+	tmp = VPint((reg & 0xf) + 0xbfb003a0);   	\
+	__asm__ __volatile("sync");			\
+	tmp = VPint(reg);				\
+	__asm__ __volatile("sync");			\
+        return tmp;             	           	\
+}
+static inline void regWrite32(uint32 reg, uint32 vlaue) \
+{                                                       \
+        VPint(reg) = vlaue;                             \
+	__asm__ __volatile("sync");			\
+}
+
+#else
+static inline uint32 regRead32(uint32 reg)		\
+{						  	\
+	return VPint(reg);			  	\
+}		
+static inline void regWrite32(uint32 reg, uint32 vlaue)	\
+{                                                	\
+        VPint(reg) = vlaue;                      	\
+}
+#endif
+static inline unsigned long int regReadPhy32(uint32 reg)	\
+{       						\
+	uint32 tmp;					\
+	tmp = VPint(reg);	  	\
+	tmp = VPint(reg);				\
+        return tmp;             	           	\
+}
 
 #ifdef CONFIG_CPU_TC3162
 #define TC3162L2		1

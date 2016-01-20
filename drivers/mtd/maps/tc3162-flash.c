@@ -7,12 +7,14 @@
 #include <linux/mtd/partitions.h>
 #include <linux/vmalloc.h>
 #include <linux/err.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 #include <asm/tc3162/tc3162.h>
 
 #define WINDOW_ADDR 0x1fc00000
 #define WINDOW_SIZE 0x400000
 #define BUSWIDTH 	2
+
 
 static struct mtd_info *tc3162_mtd_info;
 
@@ -23,279 +25,71 @@ static struct map_info tc3162_map = {
        .phys = WINDOW_ADDR,
 };
 
-static struct mtd_partition tc3162_parts[] = {
-        {
-#ifdef CONFIG_MTD_NAND_RALINK
-                name:           "U-Boot",  /* mtdblock0 */
-                size:           0x20000,  /* 128K */
-                offset:         0,
-                mask_flags:     0  /* force read-only */
-        }, {
-                name:           "U-Config", /* mtdblock1 */
-                size:           0x20000,  /* 128K */
-                offset:         0x20000,
-                mask_flags:     0  /* force read-only */
-        }, {
-                name:           "RF-EEPROM", /* mtdblock2 */
-                size:           0x20000,  /* 128K */
-                offset:         0x40000,
-                mask_flags:     0  /* force read-only */
-        }, {
-#ifdef CONFIG_ROOTFS_IN_FLASH
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x140000,
-                offset:         0x60000,
-        }, {
-                name:           "RootFS", /* mtdblock4 */
-                size:           0x800000,
-                offset:         0x1A0000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x20000,
-                offset:         0x9A0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x800000,
-                offset:         0x9C0000,
-#else
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x940000,
-                offset:         0x60000,
-        }, {
-                name:           "Config", /* mtdblock4 */
-                size:           0x20000,
-                offset:         0x9A0000,
-        }, {
-                name:           "Storage", /* mtdblock5 */
-                size:           0x800000,
-                offset:         0x9C0000,
-#endif /* IN_FLASH */
-        }, {
-                name:           "System", /* mtdblock6/7 */
-                size:           (0x8000000 - 0x11C0000), /* Flash 128Mb */
-                offset:         0x11C0000,
-#else
-                name:           "U-Boot",  /* mtdblock0 */
-                size:           0x30000,  /* 192K */
-                offset:         0,
-                mask_flags:     0  /* force read-only */
-        }, {
-                name:           "U-Config", /* mtdblock1 */
-                size:           0x10000,  /* 64K */
-                offset:         0x30000,
-                mask_flags:     0  /* force read-only */
-        }, {
-                name:           "RF-EEPROM", /* mtdblock2 */
-                size:           0x10000,  /* 64K */
-                offset:         0x40000,
-                mask_flags:     0  /* force read-only */
-        }, {
-#ifdef CONFIG_ROOTFS_IN_FLASH
-#if defined (CONFIG_FLASH_4M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x130000,
-                offset:         0x50000,
-        }, {
-                name:           "RootFS", /* mtdblock4 */
-                size:           0x270000,
-                offset:         0x180000,
-        }, {
-                name:           "Firmware", /* mtdblock5 */
-                size:           0x3A0000,
-                offset:         0x50000,
-        },{
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x3f0000,
-        }, {
-				name:           "Storage", /* mtdblock6 */
-				size:           0,
-				offset:         0x3d0000,
-		}, {
-				name:           "Full", /* mtdblock7 */
-				size:           0x400000,
-				offset:         0,
-#elif defined (CONFIG_FLASH_8M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x150000,
-                offset:         0x50000,
-        }, {
-                name:           "RootFS", /* mtdblock4 */
-                size:           0x550000,
-                offset:         0x1a0000,
-        }, {
-                name:           "Firmware", /* mtdblock5 */
-                size:           0x6A0000,
-                offset:         0x50000,
-        },{
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x6f0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0x700000,
-		}, {
-				name:           "Full", /* mtdblock7 */
-				size:           0x800000,
-				offset:         0,
-#elif defined (CONFIG_FLASH_16M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x150000,
-                offset:         0x50000,
-        }, {
-                name:           "RootFS", /* mtdblock4 */
-                size:           0xd50000,
-                offset:         0x1a0000,
-        }, {
-                name:           "Firmware", /* mtdblock5 */
-                size:           0xEA0000,
-                offset:         0x50000,
-        },{
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0xef0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0xf00000,
-        }, {
-				name:           "Full", /* mtdblock7 */
-				size:           0x1000000,
-				offset:         0,
-#else /* 32M */
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x150000,
-                offset:         0x50000,
-        }, {
-                name:           "RootFS", /* mtdblock4 */
-                size:           0x1d50000,
-                offset:         0x1a0000,
-        },{
-                name:           "Firmware", /* mtdblock5 */
-                size:           0x1EA0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x1ef0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0x1f00000,
-		}, {
-				name:           "Full", /* mtdblock7 */
-				size:           0x2000000,
-				offset:         0,
-#endif
-#else
-#if defined (CONFIG_FLASH_4M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x3a0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x3f0000,
-#elif defined (CONFIG_FLASH_8M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x6a0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x6f0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0x700000,
-#elif defined (CONFIG_FLASH_16M)
-                name:           "Kernel", /* mtdblock3 */
-                size:           0xea0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0xef0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0xf00000,
-#else /* 32M */
-                name:           "Kernel", /* mtdblock3 */
-                size:           0x1ea0000,
-                offset:         0x50000,
-        }, {
-                name:           "Config", /* mtdblock5 */
-                size:           0x10000,
-                offset:         0x1ef0000,
-        }, {
-                name:           "Storage", /* mtdblock6 */
-                size:           0x100000,
-                offset:         0x1f00000,
-#endif
-#endif
-#endif /* NAND */
-        }
-};
-
-static int tc3162_parts_size = sizeof(tc3162_parts) / sizeof(tc3162_parts[0]);
-
 static int __init tc3162_mtd_init(void)
 {
+#ifdef CONFIG_TCSUPPORT_ADDR_MAPPING
+	/*add address mapping on 7510. Pork*/
+	if(isMT751020){
+		uint32 tmpVal;
+		tmpVal = regRead32(0xbfb00038);
+		tmpVal &= 0xffe0e0e0;
+		tmpVal |= 0x80070f00;
+		regWrite32(0xbfb00038,tmpVal);
+		//VPint(0xbfb00038) |= 0x80070F00;
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x1c000000);
+		tc3162_map.virt = ioremap_nocache(0x1c000000, 0x1000000);
+		tc3162_map.phys = 0x1c000000;
+		tc3162_map.size = 0x1000000;
+		ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
+	}
 	/*add 8M 16M flash support. shnwind*/
-#if !defined CONFIG_FLASH_4M
+	else if (isTC3162U || isTC3182 || isRT65168 || isRT63165 || isRT63365 || isRT63260){
+#else
 	if (isTC3162U || isTC3182 || isRT65168 || isRT63165 || isRT63365 || isRT63260){
+#endif //CONFIG_TCSUPPORT_ADDR_MAPPING
 		/*enable addr bigger than 4M support.*/
 		VPint(0xbfb00038) |= 0x80000000;
-		printk("tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x10000000);
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x10000000);
 		tc3162_map.virt = ioremap_nocache(0x10000000, 0x1000000);
 		tc3162_map.phys = 0x10000000;
 		tc3162_map.size = 0x1000000;
 		ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
-	} else
-#endif
-	{
-		printk("tc3162: flash device 0x%08x at 0x%08x\n", WINDOW_SIZE, WINDOW_ADDR);
+	}else{
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", WINDOW_SIZE, WINDOW_ADDR);
 		tc3162_map.virt = ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 	}
 	if (!tc3162_map.virt) {
-   		printk("tc3162: Failed to ioremap\n");
+		printk(KERN_ERR "tc3162: Failed to ioremap\n");
 		return -EIO;
 	}
 
 	simple_map_init(&tc3162_map);
 
-	/* check if boot from SPI flash */
-	if (IS_NANDFLASH) {
-		tc3162_mtd_info = do_map_probe("nandflash_probe", &tc3162_map);
-	} else if (IS_SPIFLASH) {
-		tc3162_mtd_info = do_map_probe("spiflash_probe", &tc3162_map);
-	} else {
-		tc3162_mtd_info = do_map_probe("cfi_probe", &tc3162_map);
-	}
+	tc3162_mtd_info = do_map_probe("spiflash_probe", &tc3162_map);
 
 	if (!tc3162_mtd_info) {
-		iounmap(tc3162_map.virt);
+		iounmap((void *)tc3162_map.virt);
 		return -ENXIO;
 	}
 
-  	tc3162_mtd_info->owner = THIS_MODULE;
+	tc3162_mtd_info->owner = THIS_MODULE;
+	if (add_mtd_device(tc3162_mtd_info)) {
+		printk(KERN_INFO "Failed to add tc3262 flash device\n");
+		map_destroy(tc3162_mtd_info);
+		tc3162_mtd_info = 0;
+		iounmap((void *)tc3162_map.virt);
+		return -ENOMEM;
+	}
 
-	add_mtd_partitions(tc3162_mtd_info, tc3162_parts, tc3162_parts_size);
 	return 0;
 }
 
 static void __exit tc3162_mtd_cleanup(void)
 {
 	if (tc3162_mtd_info) {
-    	del_mtd_partitions(tc3162_mtd_info);
-       	map_destroy(tc3162_mtd_info);
-	}
-
-   	if (tc3162_map.virt) {
-   		iounmap(tc3162_map.virt);
-       	tc3162_map.virt = 0;
+		del_mtd_device(tc3162_mtd_info);
+		map_destroy(tc3162_mtd_info);
+		iounmap((void *)tc3162_map.virt);
 	}
 }
 
