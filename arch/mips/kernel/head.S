@@ -130,6 +130,8 @@
 #endif
 	.endm
 
+	j kernel_entry
+	nop
 #ifndef CONFIG_NO_EXCEPT_FILL
 	/*
 	 * Reserved space for exception handlers.
@@ -149,6 +151,12 @@ EXPORT(_stext)
 	 */
 	__INIT
 #endif
+
+#ifdef CONFIG_IMAGE_CMDLINE_HACK
+	.ascii	"CMDLINE:"
+EXPORT(__image_cmdline)
+	.fill	0x400
+#endif /* CONFIG_IMAGE_CMDLINE_HACK */
 
 NESTED(kernel_entry, 16, sp)			# kernel entry point
 

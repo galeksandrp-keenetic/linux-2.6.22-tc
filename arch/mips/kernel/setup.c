@@ -451,8 +451,32 @@ static void __init arch_mem_init(char **cmdline_p)
 	printk("Determined physical RAM map:\n");
 	print_memory_map();
 
+#if CONFIG_IMAGE_CMDLINE_HACK
+	extern char __image_cmdline[];
+	char *p = __image_cmdline;
+	int replace = 0;
+
+	if (*p == '-') {
+		replace = 1;
+		p++;
+	}
+
+	if (*p == '\0') {
+		printk(KERN_ERR "__image_cmdline is not set\n");
+		return;
+	}
+
+	if (replace) {
+		strlcpy(command_line, p, sizeof(command_line));
+	} else {
+		strlcpy(command_line, arcs_cmdline, sizeof(command_line));
+		strlcat(command_line, " ", sizeof(command_line));
+		strlcat(command_line, p, sizeof(command_line));
+	}
+#else
 	strlcpy(command_line, arcs_cmdline, sizeof(command_line));
 	strlcpy(boot_command_line, command_line, COMMAND_LINE_SIZE);
+#endif
 
 	*cmdline_p = command_line;
 
