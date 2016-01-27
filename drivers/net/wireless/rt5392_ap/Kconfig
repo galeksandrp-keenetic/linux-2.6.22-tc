@@ -1,8 +1,6 @@
 config RT5392_AP
 	tristate "Ralink RT5392 802.11n AP support"
 	select WIRELESS_EXT
-	select WEXT_SPY
-	select WEXT_PRIV
 
 config  RT5392_AP_LED
 	bool "LED Support"

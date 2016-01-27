@@ -1,8 +1,6 @@
 config RT3593_AP
 	tristate "Ralink RT5392 802.11n AP support"
 	select WIRELESS_EXT
-	select WEXT_SPY
-	select WEXT_PRIV
 
 config  RT3593_AP_LED
 	bool "LED Support"
@@ -47,11 +45,6 @@ config  RT3593_AP_NETIF_BLOCK
 	depends on RT3593_AP
 	help
 	Support Net interface block while Tx-Sw queue full
-
-config  RT3593_AP_DFS
-	bool "DFS"
-	depends on RT3593_AP
-	select RALINK_TIMER_DFS
 
 config  RT3593_AP_CARRIER
 	bool "Carrier Detect"

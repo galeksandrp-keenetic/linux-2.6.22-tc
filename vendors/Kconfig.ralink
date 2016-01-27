@@ -1,0 +1,37 @@
+menu "Ralink Module"
+
+#############
+# Wireless
+#############
+menuconfig RT2860V2
+	bool "RT2860v2 Wi-Fi Driver"
+
+if RT2860V2
+source "drivers/net/wireless/rt2860v2_ap/Kconfig"
+endif
+
+menuconfig RT539X_AP
+	bool "RT539X PCI Wi-Fi Driver"
+	select WIRELESS_EXT
+
+if RT539X_AP
+source "drivers/net/wireless/rt5392_ap/Kconfig"
+endif
+
+menuconfig RT359X_AP
+	bool "RT359X PCI Wi-Fi Driver"
+	select WIRELESS_EXT
+
+if RT359X_AP
+source "drivers/net/wireless/rt3592_ap/Kconfig"
+endif
+
+menuconfig RT559X_AP
+	bool "RT559X PCI Wi-Fi Driver"
+	select WIRELESS_EXT
+
+if RT559X_AP
+source "drivers/net/wireless/rt5592_ap/Kconfig"
+endif
+
+endmenu

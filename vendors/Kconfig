@@ -1,0 +1,6 @@
+# Add new vendor config
+
+
+source "vendors/Kconfig.ralink"
+
+source "vendors/Kconfig.ndms"

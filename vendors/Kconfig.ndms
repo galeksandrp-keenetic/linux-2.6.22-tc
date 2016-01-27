@@ -1,0 +1,5 @@
+menu "NDM Systems options"
+
+source "net/nat/hw_nat/Kconfig"
+
+endmenu

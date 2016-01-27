@@ -716,7 +716,5 @@ config RA_NAT_NONE
 	bool 'Disable support Ralink NAT modules'
 	default y
 
-source "net/nat/hw_nat/Kconfig"
-
 endmenu
 
