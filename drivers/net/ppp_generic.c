@@ -1420,6 +1420,22 @@ void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
 	pch->ppp->stats.rx_bytes += skb->len;
 	skb->dev->last_rx = jiffies;
 }
+
+void ppp_stats_reset(struct net_device *dev)
+{
+	struct ppp *ppp;
+
+	if (dev == NULL)
+		return;
+
+	ppp = (struct ppp *) dev->priv;
+
+	ppp->stats.tx_bytes = 0;
+	ppp->stats.tx_packets = 0;
+	ppp->stats.rx_bytes = 0;
+	ppp->stats.rx_packets = 0;
+}
+
 void
 ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 {
@@ -2774,6 +2790,7 @@ EXPORT_SYMBOL(ppp_output_wakeup);
 EXPORT_SYMBOL(ppp_register_compressor);
 EXPORT_SYMBOL(ppp_unregister_compressor);
 EXPORT_SYMBOL(ppp_stat_add);
+EXPORT_SYMBOL(ppp_stats_reset);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_CHARDEV_MAJOR(PPP_MAJOR);
 MODULE_ALIAS("/dev/ppp");
