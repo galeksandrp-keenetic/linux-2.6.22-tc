@@ -428,7 +428,8 @@ static int create_mtd_partitions(struct mtd_info *master,
 				ndm_parts[PART_RF_EEPROM].offset;
 			ndm_parts[PART_KERNEL].offset = offset;
 		}
-		if ((le32_to_cpu(magic) == ROOTFS_MAGIC) ||
+		if ((le32_to_cpu(magic) == ROOTFS_MAGIC) ||	/* squashfs4 */
+		    (magic == ROOTFS_MAGIC) ||			/* squashfs3 */
 		    (le32_to_cpu(magic) == NDMS_MAGIC)) {
 			printk(KERN_INFO "Found rootfs at offset 0x%x\n", offset);
 
