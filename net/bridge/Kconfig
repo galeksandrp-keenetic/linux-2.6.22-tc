@@ -30,3 +30,8 @@ config BRIDGE
 	  will be called bridge.
 
 	  If unsure, say N.
+
+config UBRIDGE
+	tristate "Simplified Ethernet Bridge"
+	depends on BRIDGE
+	default n

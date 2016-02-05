@@ -13,3 +13,5 @@ bridge-$(CONFIG_SYSFS) += br_sysfs_if.o br_sysfs_br.o
 #bridge-$(CONFIG_BRIDGE_NETFILTER) += br_netfilter.o
 
 obj-$(CONFIG_BRIDGE_NF_EBTABLES) += netfilter/
+
+obj-$(CONFIG_UBRIDGE) += ubridge.o
