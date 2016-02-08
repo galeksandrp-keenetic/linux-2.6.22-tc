@@ -802,6 +802,18 @@ void brioctl_set(int (*hook) (unsigned int, void __user *))
 
 EXPORT_SYMBOL(brioctl_set);
 
+static DEFINE_MUTEX(ubr_ioctl_mutex);
+static int (*ubr_ioctl_hook) (unsigned int cmd, void __user *arg);
+
+void ubrioctl_set(int (*hook) (unsigned int, void __user *))
+{
+	mutex_lock(&ubr_ioctl_mutex);
+	ubr_ioctl_hook = hook;
+	mutex_unlock(&ubr_ioctl_mutex);
+}
+
+EXPORT_SYMBOL(ubrioctl_set);
+
 static DEFINE_MUTEX(vlan_ioctl_mutex);
 static int (*vlan_ioctl_hook) (void __user *arg);
 
@@ -885,6 +897,18 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			if (br_ioctl_hook)
 				err = br_ioctl_hook(cmd, argp);
 			mutex_unlock(&br_ioctl_mutex);
+			break;
+		case SIOCUBRADDBR:
+		case SIOCUBRDELBR:
+		case SIOCUBRSHOW:
+			err = -ENOPKG;
+			if (!ubr_ioctl_hook)
+				request_module("ubridge");
+
+			mutex_lock(&ubr_ioctl_mutex);
+			if (ubr_ioctl_hook)
+				err = ubr_ioctl_hook(cmd, argp);
+			mutex_unlock(&ubr_ioctl_mutex);
 			break;
 		case SIOCGIFVLAN:
 		case SIOCSIFVLAN:

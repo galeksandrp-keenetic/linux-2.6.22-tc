@@ -32,7 +32,7 @@ static LIST_HEAD(ubr_list);
 
 struct ubr_private {
 	struct net_device		*slave_dev;
-	struct br_cpu_netstats	stats;
+	struct net_device_stats	stats;
 	struct list_head		list;
 	struct net_device		*dev;
 };
@@ -41,7 +41,7 @@ static int ubr_dev_ioctl(struct net_device *, struct ifreq *, int);
 
 
 
-static struct sk_buff *ubr_handle_frame(struct sk_buff *skb)
+static struct sk_buff *ubr_handle_frame(struct net_bridge_port *p, struct sk_buff *skb)
 {
 	struct ubr_private *ubr, *tmp;
 
@@ -55,8 +55,6 @@ static struct sk_buff *ubr_handle_frame(struct sk_buff *skb)
 
 			ubr->stats.rx_packets++;
 			ubr->stats.rx_bytes += skb->len;
-			dst_release(skb_dst(skb));
-			skb_dst_set(skb, NULL);
 
 			netif_receive_skb(skb);
 			return NULL;
@@ -96,24 +94,14 @@ static int ubr_xmit(struct sk_buff *skb, struct net_device *master_dev)
 	return 0;
 }
 
-static struct rtnl_link_stats64 *ubr_get_stats64(struct net_device *dev,
-						struct rtnl_link_stats64 *stats)
+static struct net_device_stats *ubr_get_stats(struct net_device *dev)
 {
 	struct ubr_private *ubr = netdev_priv(dev);
-	struct br_cpu_netstats *sum = &ubr->stats;
 
-	memset(stats, 0, sizeof (*stats));
-	if (unlikely(sum == NULL))
-		return NULL;
-
-	stats->tx_bytes   = sum->tx_bytes;
-	stats->tx_packets = sum->tx_packets;
-	stats->rx_bytes   = sum->rx_bytes;
-	stats->rx_packets = sum->rx_packets;
-
-	return stats;
+	return &ubr->stats;
 }
 
+#if 0
 void ubr_change_rx_flags(struct net_device *dev,
 						int flags)
 {
@@ -133,18 +121,7 @@ void ubr_change_rx_flags(struct net_device *dev,
 			printk(KERN_ERR "Error changing promiscuity\n");
 	}
 }
-
-
-static const struct net_device_ops ubr_netdev_ops =
-{
-	.ndo_open = ubr_open,
-	.ndo_stop = ubr_stop,
-	.ndo_start_xmit = ubr_xmit,
-	.ndo_get_stats64 = ubr_get_stats64,
-	.ndo_do_ioctl = ubr_dev_ioctl,
-	.ndo_change_rx_flags = ubr_change_rx_flags,
-
-};
+#endif
 
 static int ubr_deregister(struct net_device *dev)
 {
@@ -165,12 +142,12 @@ static int ubr_deregister(struct net_device *dev)
 	return 0;
 }
 
-static int ubr_free_master(struct net *net, const char *name)
+static int ubr_free_master(const char *name)
 {
 	struct net_device *dev;
 	int ret = 0;
 
-	dev = __dev_get_by_name(net, name);
+	dev = __dev_get_by_name(name);
 	if (dev == NULL)
 		ret =  -ENXIO; 	/* Could not find device */
 	else if (dev->flags & IFF_UP)
@@ -202,8 +179,14 @@ static int ubr_alloc_master(const char *name)
 						| NETIF_F_HIGHDMA
 						| NETIF_F_LLTX;
 	dev->flags		= IFF_BROADCAST | IFF_MULTICAST;
-	dev->netdev_ops = &ubr_netdev_ops;
 	dev->destructor		= free_netdev;
+
+	dev->do_ioctl = ubr_dev_ioctl;
+	dev->get_stats = ubr_get_stats;
+	dev->hard_start_xmit = ubr_xmit;
+	dev->open = ubr_open;
+	dev->stop = ubr_stop;
+	//dev->change_rx_flags = ubr_change_rx_flags;
 
 	err = register_netdev(dev);
 	if (err) {
@@ -227,17 +210,12 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	struct net_device *dev1, *vlan_dev;
 	struct ubr_private *ubr0 = netdev_priv(master_dev);
 	struct net_bridge_port *p;
-#ifdef CONFIG_NET_NS
-	struct net *net = master_dev->nd_net;
-#else
-	struct net *net = &init_net;
-#endif
 	int err = -ENODEV;
 
 	if (ubr0->slave_dev != NULL)
 		return -EBUSY;
 
-	dev1 = __dev_get_by_index(&init_net, ifindex);
+	dev1 = __dev_get_by_index(ifindex);
 	if (!dev1)
 		goto out;
 
@@ -245,7 +223,7 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	call_netdevice_notifiers(NETDEV_CHANGEADDR, master_dev);
 	ubr0->slave_dev = dev1;
 	// Update all VLAN sub-devices' MAC address
-	for_each_netdev(net, vlan_dev) {
+	for_each_netdev(vlan_dev) {
 		if (!is_vlan_dev(vlan_dev))
 			continue;
 		if (vlan_dev_info(vlan_dev)->real_dev == master_dev) {
@@ -256,18 +234,7 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 		}
 	}
 
-	p = kzalloc(sizeof(*p), GFP_KERNEL);
-	if (p == NULL)
-		return -ENOMEM;
-	p->port_id = cur_port--;
-	p->port_no = 0;
-	p->state = BR_STATE_DISABLED;
-	p->dev = dev1;
-	err = netdev_rx_handler_register(dev1, ubr_handle_frame, p);
-	if (err) {
-		kfree(p);
-		goto out;
-	}
+	br_handle_frame_hook = ubr_handle_frame;
 
 	if (master_dev->flags & IFF_PROMISC)
 		dev_set_promiscuity(dev1, 1);
@@ -285,7 +252,7 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 	struct ubr_private *ubr0 = netdev_priv(master_dev);
 	int err = -ENODEV;
 
-	dev1 = __dev_get_by_index(&init_net, ifindex);
+	dev1 = __dev_get_by_index(ifindex);
 	if (!dev1)
 		goto out;
 
@@ -293,11 +260,10 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 		goto out;
 	ubr0->slave_dev = NULL;
 
-	netdev_rx_handler_unregister(dev1);
-
 	if (master_dev->flags & IFF_PROMISC)
 		dev_set_promiscuity(dev1, -1);
 
+	br_handle_frame_hook = NULL;
 	err = 0;
 
 out:
@@ -333,7 +299,7 @@ static long ubr_show(char *buf, long len)
 	return written;
 }
 
-int ubr_ioctl_deviceless_stub(struct net *net, unsigned int cmd, void __user *uarg)
+int ubr_ioctl_deviceless_stub(unsigned int cmd, void __user *uarg)
 {
 	char buf[IFNAMSIZ];
 
@@ -347,7 +313,7 @@ int ubr_ioctl_deviceless_stub(struct net *net, unsigned int cmd, void __user *ua
 		if (cmd == SIOCUBRADDBR)
 			return ubr_alloc_master(buf);
 
-		return ubr_free_master(net, buf);
+		return ubr_free_master(buf);
 	case SIOCUBRSHOW:
 		{
 			char *buf_;

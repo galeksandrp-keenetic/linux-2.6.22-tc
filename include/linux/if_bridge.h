@@ -147,6 +147,7 @@ extern void brioctl_set(int (*ioctl_hook)(unsigned int, void __user *));
 extern struct sk_buff *(*br_handle_frame_hook)(struct net_bridge_port *p,
 					       struct sk_buff *skb);
 extern int (*br_should_route_hook)(struct sk_buff **pskb);
+extern void ubrioctl_set(int (*ioctl_hook)(unsigned int, void __user *));
 
 #endif
 
