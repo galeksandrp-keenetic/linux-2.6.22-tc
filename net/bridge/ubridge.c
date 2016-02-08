@@ -26,8 +26,6 @@
 #define BR_PORT_BITS	10
 #define BR_MAX_PORTS	(1<<BR_PORT_BITS)
 
-static int cur_port = BR_MAX_PORTS - 1;
-
 static LIST_HEAD(ubr_list);
 
 struct ubr_private {
@@ -134,7 +132,7 @@ static int ubr_deregister(struct net_device *dev)
 		list_del_init(&ubr->list);
 
 	if (ubr->slave_dev) {
-		netdev_rx_handler_unregister(ubr->slave_dev);
+		br_handle_frame_hook = NULL;
 		//kobject_del(&p->kobj);	// no need
 	}
 	unregister_netdevice(dev);
@@ -209,7 +207,6 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 {
 	struct net_device *dev1, *vlan_dev;
 	struct ubr_private *ubr0 = netdev_priv(master_dev);
-	struct net_bridge_port *p;
 	int err = -ENODEV;
 
 	if (ubr0->slave_dev != NULL)
@@ -224,12 +221,15 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	ubr0->slave_dev = dev1;
 	// Update all VLAN sub-devices' MAC address
 	for_each_netdev(vlan_dev) {
-		if (!is_vlan_dev(vlan_dev))
+		struct vlan_dev_info *vdi;
+		if (!(vlan_dev->priv_flags & IFF_802_1Q_VLAN))
 			continue;
-		if (vlan_dev_info(vlan_dev)->real_dev == master_dev) {
+		if (vlan_dev &&
+				(vdi = netdev_priv(vlan_dev)) &&
+				vdi->real_dev == master_dev) {
 			struct sockaddr addr;
 			memcpy(addr.sa_data, dev1->dev_addr, ETH_ALEN);
-			if (!vlan_dev->netdev_ops->ndo_set_mac_address(vlan_dev, &addr))
+			if (vlan_dev->set_mac_address && !vlan_dev->set_mac_address(vlan_dev, &addr))
 				call_netdevice_notifiers(NETDEV_CHANGEADDR, vlan_dev);
 		}
 	}
@@ -368,7 +368,7 @@ static int ubr_dev_event(
 			list_for_each_entry(ubr_item, &ubr_list, list) {
 				if (ubr_item->slave_dev == pdev) {
 					/* delif */
-					netdev_rx_handler_unregister(ubr_item->slave_dev);
+					br_handle_frame_hook = NULL;
 					ubr_item->slave_dev = NULL;
 				}
 			}
