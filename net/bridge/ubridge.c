@@ -58,7 +58,7 @@ static struct sk_buff *ubr_handle_frame(struct net_bridge_port *p, struct sk_buf
 			return NULL;
 		}
 	}
-	return NULL;
+	return skb;
 
 }
 
@@ -132,7 +132,7 @@ static int ubr_deregister(struct net_device *dev)
 		list_del_init(&ubr->list);
 
 	if (ubr->slave_dev) {
-		br_handle_frame_hook = NULL;
+		ubr_handle_frame_hook = NULL;
 		//kobject_del(&p->kobj);	// no need
 	}
 	unregister_netdevice(dev);
@@ -234,7 +234,7 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 		}
 	}
 
-	br_handle_frame_hook = ubr_handle_frame;
+	ubr_handle_frame_hook = ubr_handle_frame;
 
 	if (master_dev->flags & IFF_PROMISC)
 		dev_set_promiscuity(dev1, 1);
@@ -263,7 +263,7 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 	if (master_dev->flags & IFF_PROMISC)
 		dev_set_promiscuity(dev1, -1);
 
-	br_handle_frame_hook = NULL;
+	ubr_handle_frame_hook = NULL;
 	err = 0;
 
 out:
@@ -368,7 +368,7 @@ static int ubr_dev_event(
 			list_for_each_entry(ubr_item, &ubr_list, list) {
 				if (ubr_item->slave_dev == pdev) {
 					/* delif */
-					br_handle_frame_hook = NULL;
+					ubr_handle_frame_hook = NULL;
 					ubr_item->slave_dev = NULL;
 				}
 			}

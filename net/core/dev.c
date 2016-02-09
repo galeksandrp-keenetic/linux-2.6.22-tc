@@ -2219,6 +2219,11 @@ static inline int deliver_skb(struct sk_buff *skb,
 	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
 
+#if defined(CONFIG_UBRIDGE) || defined (CONFIG_UBRIDGE_MODULE)
+__DMEM struct sk_buff *(*ubr_handle_frame_hook)(struct net_bridge_port *p,
+					struct sk_buff *skb) __read_mostly;
+#endif
+
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
 /* These hooks defined here for ATM */
 struct net_bridge;
@@ -2236,10 +2241,9 @@ static inline struct sk_buff *handle_bridge(struct sk_buff *skb,
 					    struct packet_type **pt_prev, int *ret,
 					    struct net_device *orig_dev)
 {
-	struct net_bridge_port *port;
+	struct net_bridge_port *port = NULL;
 
-	if (skb->pkt_type == PACKET_LOOPBACK ||
-	    (port = rcu_dereference(skb->dev->br_port)) == NULL)
+	if (!skb || skb->pkt_type == PACKET_LOOPBACK)
 		return skb;
 
 	if (*pt_prev) {
@@ -2247,7 +2251,16 @@ static inline struct sk_buff *handle_bridge(struct sk_buff *skb,
 		*pt_prev = NULL;
 	}
 
-	return br_handle_frame_hook(port, skb);
+	port = rcu_dereference(skb->dev->br_port);
+	if (port &&  br_handle_frame_hook)
+		skb = br_handle_frame_hook(port, skb);
+
+#if defined(CONFIG_UBRIDGE) || defined (CONFIG_UBRIDGE_MODULE)
+	if (skb && ubr_handle_frame_hook)
+		skb = ubr_handle_frame_hook(port, skb);
+#endif
+
+	return skb;
 }
 #else
 #define handle_bridge(skb, pt_prev, ret, orig_dev)	(skb)
@@ -4413,6 +4426,10 @@ EXPORT_SYMBOL(dev_get_flags);
 EXPORT_SYMBOL(br_handle_frame_hook);
 EXPORT_SYMBOL(br_fdb_get_hook);
 EXPORT_SYMBOL(br_fdb_put_hook);
+#endif
+
+#if defined(CONFIG_UBRIDGE) || defined (CONFIG_UBRIDGE_MODULE)
+EXPORT_SYMBOL(ubr_handle_frame_hook);
 #endif
 
 #ifdef CONFIG_KMOD
