@@ -281,7 +281,7 @@ static long ubr_show(char *buf, long len)
 		len = SHOW_BUF_MAX_LEN;
 
 	list_for_each_entry(ubr_item, &ubr_list, list) {
-		written += snprintf(buf + written, len - written, "%-16s %02hhx%02hhx%02hhx%02hhx%02hhx%02hhx\t",
+		written += snprintf(buf + written, len - written, "%-16s %02hx%02hx%02hx%02hx%02hx%02hx\t",
 				ubr_item->dev->name, ubr_item->dev->dev_addr[0], ubr_item->dev->dev_addr[1],
 				ubr_item->dev->dev_addr[2], ubr_item->dev->dev_addr[3], ubr_item->dev->dev_addr[4],
 				ubr_item->dev->dev_addr[5]);
