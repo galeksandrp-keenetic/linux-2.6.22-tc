@@ -1442,17 +1442,64 @@ static inline void show_string(struct usb_device *udev, char *id, char *string)
 static int __usb_port_suspend(struct usb_device *, int port1);
 #endif
 
-/* Implementation Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-static void usb_get_os_str_desc(struct usb_device *udev)
-{
-	/* Read the OS String Descriptor */
-	u8 *os_str_desc = usb_cache_string(udev, 0xEE);
+/////////// WCID device support /////////////
 
-	if(os_str_desc == NULL)
-		return;
+struct support_id_wimax {
+	u16 vendor_id;
+	u16 product_id;
+};
+
+static struct support_id_wimax support_id_wimax_list[] = {
+	{ 0x15a9, 0x002a }, /* Yota WLTUBA-107 old */
+	{ 0x15a9, 0x002b }, /* Yota WLTUBA-107 old */
+	{ 0x15a9, 0x002c }, /* Yota (Altair 380D) */
+//	{ 0x15a9, 0x002d }, /* Yota Wi-Fi Modem 4G LTE switched */
+	{ 0x15a9, 0x0030 }, /* Yota Wi-Fi Modem */
+	{ 0x15a9, 0x003a }, /* Yota WLTUBA-108 */
+	{ 0x15a9, 0x003b }, /* Yota Wi-Fi Modem 4G LTE */
+	{ 0x216f, 0x0042 }, /* Yota WLTUBA-107 non-switched */
+	{ 0x216f, 0x0043 }, /* Yota WLTUBA-107 new */
+	{ 0x216f, 0x0044 }, /* Yota WLTUBA-107 */
+	{ 0x216f, 0x0045 }, /* Yota WLTUBA-107 new */
+	{ 0x216f, 0x0057 }, /* Yota (Altair 380D) CDROM mode */
+	{ 0x1bbb, 0x025e }, /* Yota OneTouch W8 */
+	{ 0, 0 },
+};
+
+static int is_wimax(u16 vendor_id, u16 product_id)
+{
+	int i = 0, res = 0;
+
+	while (1) {
+		if (support_id_wimax_list[i].vendor_id == 0)
+			break;
+		if ((support_id_wimax_list[i].vendor_id == vendor_id) &&
+			(support_id_wimax_list[i].product_id == product_id)) {
+			res = 1;
+			break;
+		}
+		i++;
+	}
+	return res;
+}
+/* Implementation Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
+static int usb_get_os_str_desc(struct usb_device *udev)
+{
+	u8 *os_str_desc;
+
+	if (!is_wimax(__le16_to_cpu(udev->descriptor.idVendor), __le16_to_cpu(udev->descriptor.idProduct)))
+		return 0;
+
+	/* Read the OS String Descriptor */
+	os_str_desc = usb_cache_string(udev, 0xEE);
+
+	if (os_str_desc == NULL)
+		return 0;
 
 	/* Check MS Windows USB feature descriptors, see https://github.com/pbatard/libwdi/wiki/WCID-Devices */
-	if(strncmp(os_str_desc, "MSFT100", 7) == 0)
+	if(strncmp(os_str_desc, "MSFT100", 7) != 0)
+		return 0;
+
 	{
 		u8 *data, buf[40];
 		int res = 0;
@@ -1462,17 +1509,17 @@ static void usb_get_os_str_desc(struct usb_device *udev)
 		/* Compatible ID Feature Descriptor, part 1, 16 bytes, index 4 */
 		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
 			data, 0x10, USB_CTRL_SET_TIMEOUT);
-		if((res < 0) || (data[6] != 0x04))
-			return;
+		if ((res < 0) || (data[6] != 0x04))
+			return 1;
 		memset(data, 0, sizeof(buf));
 		/* Compatible ID Feature Descriptor, part 2, 40 bytes, index 4 */
 		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
 			data, 0x28, USB_CTRL_SET_TIMEOUT);
-		if((res < 0) || ((data[17] != 0x01) && (data[18] == 0x00)))
-			return;
-		printk("Found WCID device %s in %s mode.\n", udev->product, data + 18);
+		if ((res < 0) || ((data[17] != 0x01) && (data[18] == 0x00)))
+			return 1;
+		printk(KERN_INFO "found WCID device %s in %s mode\n", udev->product, data + 18);
 	}
-	return;
+	return 2;
 }
 
 /**
@@ -1497,7 +1544,7 @@ static void usb_get_os_str_desc(struct usb_device *udev)
  */
 int usb_new_device(struct usb_device *udev)
 {
-	int err;
+	int err, res = 0;
 
 	/* Determine quirks */
 	usb_detect_quirks(udev);
@@ -1516,7 +1563,9 @@ int usb_new_device(struct usb_device *udev)
 	udev->serial = usb_cache_string(udev, udev->descriptor.iSerialNumber);
 
 	/* Get Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-	usb_get_os_str_desc(udev);
+	res = usb_get_os_str_desc(udev);
+	if (res == 1)
+		usb_set_device_state(udev, USB_STATE_RECONNECTING);
 
 	/* Tell the world! */
 	dev_dbg(&udev->dev, "new device strings: Mfr=%d, Product=%d, "

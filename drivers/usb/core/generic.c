@@ -161,7 +161,7 @@ static int generic_probe(struct usb_device *udev)
 	 * with the driver core and lets interface drivers bind to them.
 	 */
 	c = choose_configuration(udev);
-	if (c >= 0) {
+	if (c >= 0 && udev->state != USB_STATE_RECONNECTING) {
 		err = usb_set_configuration(udev, c);
 		if (err) {
 			dev_err(&udev->dev, "can't set config #%d, error %d\n",
