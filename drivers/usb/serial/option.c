@@ -104,6 +104,7 @@ static int  option_send_setup(struct usb_serial_port *port);
 #define OPTION_PRODUCT_ETNA_NETWORK_EX			0x7071
 #define OPTION_PRODUCT_ETNA_KOI_MODEM			0x7100
 #define OPTION_PRODUCT_ETNA_KOI_NETWORK			0x7111
+#define OPTION_PRODUCT_GTM380_MODEM				0x7201
 
 #define HUAWEI_VENDOR_ID						0x12D1
 #define HUAWEI_PRODUCT_E600						0x1001
@@ -127,6 +128,7 @@ static int  option_send_setup(struct usb_serial_port *port);
 #define ALCATEL_VENDOR_ID						0x1bbb
 #define CRESCENT_VENDOR_ID						0x1c9e
 #define ALCATEL_PRODUCT_X100					0x9603
+#define CMOTECH_VENDOR_ID						0x16d8
 
 static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
@@ -167,7 +169,7 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, 0x7501) }, /* Option GI 0431 */
 	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E600) },
 	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E220) },
-	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E220BIS) },
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E220BIS, 0xff, 0xff, 0xff) },
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1100) }, /* Novatel Merlin XS620/S640 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1110) }, /* Novatel Merlin S620 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1120) }, /* Novatel Merlin EX720 */
@@ -283,16 +285,33 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x62) }, /*Huawei E3131 Prot=62*/
 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x63) }, /*Huawei E3131 Prot=63*/
 //	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x76) }, /*Huawei E3131 Prot=76*/
+	{ USB_DEVICE(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_E600) },                         /*Huawei E3131(S-1) MTS*/
+	//{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1506, 0xff, 0x02, 0x76) }, /*Huawei E3131 Prot=76*/
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1001, 0xff, 0x02, 0x01) }, /* Huawei E303 Prot=01 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1001, 0xff, 0x02, 0x02) }, /* Huawei E352 Prot=02 */
+	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1001, 0xff, 0x02, 0x03) }, /* Huawei E352 Prot=03 */
+	//{ USB_DEVICE_INTERFACE_NUMBER(0x0408, 0xea42, 2) }, /* Yota/Megafon: Use only iface #2 as ttyUSB0 */
 	{ USB_DEVICE(0x0408, 0xea42) }, /*Megafon/Yota LTE*/
 	{ USB_DEVICE(0x201e, 0x10f8) }, /*smartfren CE81B*/
+	//{ USB_DEVICE_INTERFACE_NUMBER(0x0408, 0xea40, 2) }, /* Yota/MTS: Use only iface #2 as ttyUSB0 */
 	{ USB_DEVICE(0x0408, 0xea40) }, /*MTS/Yota*/
 	{ USB_DEVICE(0x19d2, 0x1217) }, /*MTS ZTEMF652*/
 	{ USB_DEVICE(0x1410, 0xb001) }, /*Novatel Wireles Интертелеком USB551L*/
 	{ USB_DEVICE(0x20a6, 0x1105) }, /*TE*/
+	{ USB_DEVICE(0x20a6, 0x1106) }, /*TE W130*/
 	{ USB_DEVICE(0x1bbb, 0x00b7)},  /*Alcatel X600D */
 	{ USB_DEVICE(0x2001, 0x7d02)},  /*D-Link DWM-157 */
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x19d2, 0x0167, 0xff, 0xff, 0xff) },/*ZTE MF821D */
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x2020, 0x4000, 0xff, 0x02, 0x01) }, /*Rostelekom Sense R41*/
+	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0xb001) }, /*Novatel Wireles Интертелеком USB551L*/
+	{ USB_DEVICE(CMOTECH_VENDOR_ID, 0x6002) },	/* Sprint U301 */
+	{ USB_DEVICE(0x1199, 0x0301) }, 		/* Sprint 250U */
+	{ USB_DEVICE(0x1199, 0x68a3) }, /* Sierra Wireless AirCard USB 305 (AT&T)*/
+	{ USB_DEVICE(0x1bbb, 0x022c) }, /*Alcatel beeline X602D*/
+	{ USB_DEVICE(0x1c9e, 0x9b01) },/*Longcheer LU1107*/
+	{ USB_DEVICE(0x0586, 0x3443) },/*ZyXel WAH1604*/
+	{ USB_DEVICE(0x15eb , 0x0001) },/*CDMA-450*/
+	{ USB_DEVICE(0x05c6, 0x9201) }, /*MOTIV UM6602*/
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
@@ -627,6 +646,8 @@ static void option_instat_callback(struct urb *urb)
 			dbg("%s: type %x req %x", __FUNCTION__,
 				req_pkt->bRequestType,req_pkt->bRequest);
 		}
+	} else if (status == -ENOENT || status == -ESHUTDOWN) {
+		dbg("%s: urb stopped: %d\n", __func__, status);
 	} else
 		dbg("%s: error %d", __FUNCTION__, status);
 
