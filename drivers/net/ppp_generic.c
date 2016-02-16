@@ -47,6 +47,8 @@
 #include <net/slhc_vj.h>
 #include <asm/atomic.h>
 
+#include "ppp_session.h"
+
 #define PPP_VERSION	"2.4.2"
 
 /*
@@ -99,6 +101,11 @@ struct channel {
 	u32		lastseq;	/* MP: last sequence # received */
 #endif /* CONFIG_PPP_MULTILINK */
 };
+
+LIST_HEAD(pppoe_sessions);
+EXPORT_SYMBOL(pppoe_sessions);
+
+spinlock_t pppoe_sessions_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * SMP locking issues:
@@ -2034,10 +2041,27 @@ void
 ppp_unregister_channel(struct ppp_channel *chan)
 {
 	struct channel *pch = chan->ppp;
+	struct list_head *plist, *temp;
+	struct pppoe_session_item *pitem;
+	int idx;
 
 	if (pch == 0)
 		return;		/* should never happen */
 	chan->ppp = NULL;
+
+	idx = ppp_channel_index(pch->chan);
+	spin_lock_bh(&pppoe_sessions_lock);
+	list_for_each_safe(plist, temp, &pppoe_sessions) {
+		pitem = list_entry(plist, struct pppoe_session_item, list);
+		if (idx == pitem->idx) {
+			if (pch->ppp && pch->ppp->dev)
+				pch->ppp->dev->sid = 0;
+			list_del(plist);
+			kfree(pitem);
+			break;
+		}
+	}
+	spin_unlock_bh(&pppoe_sessions_lock);
 
 	/*
 	 * This ensures that we have returned from any calls into the
@@ -2576,6 +2600,9 @@ ppp_connect_channel(struct channel *pch, int unit)
 	struct ppp *ppp;
 	int ret = -ENXIO;
 	int hdrlen;
+	int idx = 0;
+	struct net_device *dev = NULL;
+	struct pppoe_session_item *pitem;
 
 	mutex_lock(&all_ppp_mutex);
 	ppp = ppp_find_unit(unit);
@@ -2603,6 +2630,28 @@ ppp_connect_channel(struct channel *pch, int unit)
 	write_unlock_bh(&pch->upl);
  out:
 	mutex_unlock(&all_ppp_mutex);
+
+	idx = ppp_channel_index(pch->chan);
+
+	spin_lock_bh(&pppoe_sessions_lock);
+	list_for_each_entry(pitem, &pppoe_sessions, list) {
+		if (idx == pitem->idx) {
+			if (pch->ppp && pch->ppp->dev) {
+				strncpy(pitem->name, pch->ppp->dev->name, sizeof pitem->name);
+				pch->ppp->dev->sid = pitem->sid;
+				dev = pch->ppp->dev;
+			}
+			break;
+		}
+	}
+	spin_unlock_bh(&pppoe_sessions_lock);
+
+	if (dev) {
+		rtnl_lock();
+		netdev_features_change(dev);
+		rtnl_unlock();
+	}
+
 	return ret;
 }
 

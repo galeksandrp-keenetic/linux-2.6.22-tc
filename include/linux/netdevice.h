@@ -545,6 +545,7 @@ struct net_device
 	struct device		dev;
 	/* space for optional statistics and wireless sysfs groups */
 	struct attribute_group  *sysfs_groups[3];
+	unsigned sid;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 

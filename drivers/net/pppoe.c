@@ -82,6 +82,8 @@
 
 #include <asm/uaccess.h>
 
+#include "ppp_session.h"
+
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1<<PPPOE_HASH_BITS)
 
@@ -549,6 +551,13 @@ static int pppoe_release(struct socket *sock)
 	return 0;
 }
 
+static inline bool __is_raeth(const char *dev)
+{
+	if (!strncmp(dev, "eth2", 4))
+		return true;
+	return false;
+}
+
 
 static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		  int sockaddr_len, int flags)
@@ -557,7 +566,9 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	struct net_device *dev;
 	struct sockaddr_pppox *sp = (struct sockaddr_pppox *) uservaddr;
 	struct pppox_sock *po = pppox_sk(sk);
-	int error;
+	struct pppoe_session_item *pitem;
+	int error, idx;
+	unsigned sid = 0;
 
 	lock_sock(sk);
 
@@ -632,6 +643,23 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	}
 
 	po->num = sp->sa_addr.pppoe.sid;
+
+	sid = be16_to_cpu(po->num);
+	idx = ppp_channel_index(&po->chan);
+
+	if (__is_raeth(po->pppoe_pa.dev) && sid && idx >= 0) {
+		pitem = kmalloc(sizeof *pitem, GFP_KERNEL);
+		if (pitem == NULL)
+			goto end;
+
+		memset(pitem->name, 0, sizeof pitem->name);
+		pitem->idx = idx;
+		pitem->sid = sid;
+
+		spin_lock_bh(&pppoe_sessions_lock);
+		list_add_tail(&pitem->list, &pppoe_sessions);
+		spin_unlock_bh(&pppoe_sessions_lock);
+	}
 
  end:
 	release_sock(sk);
