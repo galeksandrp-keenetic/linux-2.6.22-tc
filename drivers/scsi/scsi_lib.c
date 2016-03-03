@@ -1199,8 +1199,8 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 			 * If the device is fully deleted, we refuse to
 			 * process any commands as well.
 			 */
-			sdev_printk(KERN_ERR, sdev,
-				    "rejecting I/O to dead device\n");
+			sdev_printk(KERN_WARNING, sdev,
+				    "rejecting I/O to scsi device\n");
 			ret = BLKPREP_KILL;
 			break;
 		case SDEV_QUIESCE:

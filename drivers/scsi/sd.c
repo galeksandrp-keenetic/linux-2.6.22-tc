@@ -1130,15 +1130,16 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 		 * If manual intervention is required, or this is an
 		 * absent USB storage device, a spinup is meaningless.
 		 */
-		if (sense_valid &&
-		    sshdr.sense_key == NOT_READY &&
-		    sshdr.asc == 4 && sshdr.ascq == 3) {
-			break;		/* manual intervention required */
-
+		if (sense_valid && sshdr.sense_key == NOT_READY) {
+		    if(sshdr.asc == 4 && sshdr.ascq == 3)
+				break;		/* manual intervention required */
+			if (sshdr.asc == 4 && sshdr.ascq == 0xb)
+				break;	/* standby */
+			if (sshdr.asc == 4 && sshdr.ascq == 0xc)
+				break;	/* unavailable */
 		/*
 		 * Issue command to spin up drive when not ready
 		 */
-		} else if (sense_valid && sshdr.sense_key == NOT_READY) {
 			if (!spintime) {
 				sd_printk(KERN_NOTICE, sdkp, "Spinning up disk...");
 				cmd[0] = START_STOP;
