@@ -113,7 +113,13 @@ int ethtool_op_set_ufo(struct net_device *dev, u32 data)
 static int ethtool_get_settings(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd cmd = { ETHTOOL_GSET };
+	struct ethtool_cmd ucmd;
 	int err;
+
+	if (copy_from_user(&ucmd, useraddr, sizeof(cmd)))
+		return -EFAULT;
+
+	cmd.phy_address = ucmd.phy_address;
 
 	if (!dev->ethtool_ops->get_settings)
 		return -EOPNOTSUPP;
