@@ -15,6 +15,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
+#include "../xfrm/xfrm_mtk_symbols.h"
 
 int xfrm4_rcv(struct sk_buff *skb)
 {
@@ -89,8 +90,20 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 		if (xfrm_state_check_expire(x))
 			goto drop_unlock;
 
-		if (x->type->input(x, skb))
-			goto drop_unlock;
+		if (atomic_read(&esp_mtk_hardware)) {
+			if (x->type->input(x, skb) == 1) //ipsec_esp_input()
+			{
+				spin_unlock(&x->lock);
+				return 0;
+			}
+			else
+			{
+				goto drop_unlock;
+			}
+		} else {
+			if (x->type->input(x, skb)) //esp_input()
+				goto drop_unlock;
+		}
 
 		/* only the first xfrm gets the encap type */
 		encap_type = 0;

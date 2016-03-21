@@ -24,6 +24,7 @@
 #include <linux/cache.h>
 
 #include "xfrm_hash.h"
+#include "xfrm_mtk_symbols.h"
 
 struct sock *xfrm_nl;
 EXPORT_SYMBOL(xfrm_nl);
@@ -355,6 +356,7 @@ EXPORT_SYMBOL(__xfrm_state_destroy);
 
 int __xfrm_state_delete(struct xfrm_state *x)
 {
+	void (*ipsec_do_free)(unsigned int spi);
 	int err = -ESRCH;
 
 	if (x->km.state != XFRM_STATE_DEAD) {
@@ -373,6 +375,18 @@ int __xfrm_state_delete(struct xfrm_state *x)
 		 */
 		xfrm_state_put(x);
 		err = 0;
+
+		rcu_read_lock();
+		if ((x->type != NULL) &&
+			atomic_read(&esp_mtk_hardware) &&
+			(NULL != (ipsec_do_free = rcu_dereference(eip93Adapter_free))) &&
+			(x->type->description) &&
+			(x->type->description[0] == 'E') &&
+			(x->type->description[3] == '4')) { // 'ESP4'
+
+			ipsec_do_free(x->id.spi);
+		}
+		rcu_read_unlock();
 	}
 
 	return err;

@@ -17,6 +17,7 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/icmp.h>
+#include "../xfrm/xfrm_mtk_symbols.h"
 
 static int xfrm4_tunnel_check_size(struct sk_buff *skb)
 {
@@ -93,6 +94,11 @@ out_exit:
 	return err;
 error:
 	spin_unlock_bh(&x->lock);
+	if (atomic_read(&esp_mtk_hardware)) {
+		if (err == 1) {
+			return err;
+		}
+	}
 error_nolock:
 	kfree_skb(skb);
 	goto out_exit;

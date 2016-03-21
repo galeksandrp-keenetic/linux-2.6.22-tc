@@ -13,6 +13,8 @@
 #include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
+#include <net/esp.h>
+#include "../xfrm/xfrm_mtk_symbols.h"
 
 static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 {
@@ -45,11 +47,36 @@ static int xfrm4_tunnel_output(struct xfrm_state *x, struct sk_buff *skb)
 	struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
 	struct iphdr *iph, *top_iph;
 	int flags;
+    struct esp_data *esp;
+    int header_len;
 
 	iph = ip_hdr(skb);
 	skb->transport_header = skb->network_header;
 
-	skb_push(skb, x->props.header_len);
+	if (atomic_read(&esp_mtk_hardware)) {
+		/* 1. Don't need to take care esp header(8 bytes) and iv(8 bytes)
+		 * because EIP93 will cover it !!
+		 * 2. Don't change the value of x->props.header_len becaue it
+		 * will also change the values for dst_mtu and tcp mss, which
+		 * will cause ftp stress test failure.
+		 */
+		esp = x->data;
+		if (!esp) {
+			printk("%s: esp is NULL\n", __FUNCTION__);
+			return -EPERM;
+		}
+
+		header_len = (x->props.header_len) - (sizeof(struct ip_esp_hdr) + esp->conf.ivlen);
+		if (header_len < 0) {
+			printk("%s: Wrong value for header_len:%d\n", __FUNCTION__, header_len);
+			return -EPERM;
+		}
+
+		skb_push(skb, header_len);
+	} else {
+		skb_push(skb, x->props.header_len);
+	}
+
 	skb_reset_network_header(skb);
 	top_iph = ip_hdr(skb);
 
