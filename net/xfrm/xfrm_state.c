@@ -595,7 +595,7 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		struct xfrm_policy *pol, int *err,
 		unsigned short family)
 {
-	unsigned int h = xfrm_dst_hash(daddr, saddr, tmpl->reqid, family);
+	unsigned int h;
 	struct hlist_node *entry;
 	struct xfrm_state *x, *x0;
 	int acquire_in_progress = 0;
@@ -603,6 +603,7 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 	struct xfrm_state *best = NULL;
 
 	spin_lock_bh(&xfrm_state_lock);
+	h = xfrm_dst_hash(daddr, saddr, tmpl->reqid, family);
 	hlist_for_each_entry(x, entry, xfrm_state_bydst+h, bydst) {
 		if (x->props.family == family &&
 		    x->props.reqid == tmpl->reqid &&
