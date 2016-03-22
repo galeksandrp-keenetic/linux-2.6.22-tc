@@ -32,6 +32,9 @@ source "net/unix/Kconfig"
 source "net/xfrm/Kconfig"
 source "net/iucv/Kconfig"
 
+config FAST_NAT
+	 tristate "Fast NAT support"
+
 config INET
 	bool "TCP/IP networking"
 	---help---

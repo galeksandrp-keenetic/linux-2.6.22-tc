@@ -82,6 +82,10 @@
 
 #include <asm/uaccess.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <net/fast_vpn.h>
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+
 #include "ppp_session.h"
 
 #define PPPOE_HASH_BITS 4
@@ -879,6 +883,12 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	struct pppoe_hdr *ph;
 	int data_len = skb->len;
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	void (*swnat_prebind)(struct sk_buff * skb, struct sock *sock, u16 sid) = NULL;
+	extern void (*prebind_from_pppoetx)(struct sk_buff * skb,
+					    struct sock *sock, u16 sid);
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+
 	if (sock_flag(sk, SOCK_DEAD) || !(sk->sk_state & PPPOX_CONNECTED))
 		goto abort;
 
@@ -903,6 +913,22 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 
 	skb->protocol = __constant_htons(ETH_P_PPP_SES);
 	skb->dev = dev;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	rcu_read_lock();
+	if (SWNAT_PPP_CHECK_MARK(skb)) {
+		/* We already have PPP encap, do skip it */
+		SWNAT_FNAT_RESET_MARK(skb);
+		SWNAT_PPP_RESET_MARK(skb);
+	} else if (SWNAT_FNAT_CHECK_MARK(skb) &&
+		   (NULL != (swnat_prebind = rcu_dereference(prebind_from_pppoetx)))) {
+		sock_hold(sk);
+		swnat_prebind(skb, sk, ph->sid);
+		SWNAT_FNAT_RESET_MARK(skb);
+		SWNAT_PPP_SET_MARK(skb);
+	}
+	rcu_read_unlock();
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	dev->hard_header(skb, dev, ETH_P_PPP_SES,
 			 po->pppoe_pa.remote, NULL, data_len);

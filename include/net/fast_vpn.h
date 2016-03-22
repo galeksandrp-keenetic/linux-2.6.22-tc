@@ -1,6 +1,7 @@
 #ifndef __FAST_VPN_H_
 #define __FAST_VPN_H_
 
+#include <linux/list.h>
 
 #define FAST_VPN_RECV			1
 // By default, send through tasklets
@@ -14,11 +15,11 @@
 #define FAST_VPN_RES_OK			1
 #define FAST_VPN_RES_SKIPPED	0
 
-
 /* SWNAT section */
 
 #define SWNAT_ORIGIN_RAETH		0x10
 #define SWNAT_ORIGIN_RT2860		0x20
+#define SWNAT_ORIGIN_USB_MAC	0x30
 
 /* 32-th bit */
 #define SWNAT_FNAT_MARK		0x80000000
@@ -27,6 +28,14 @@
 /* 31-th bit */
 #define SWNAT_PPP_MARK		0x40000000
 #define SWNAT_PPP_MASK		0xbfffffff
+
+/* 30-th bit */
+#define SWNAT_MC_MARK		0x20000000
+#define SWNAT_MC_MASK		0xdfffffff
+
+/* 29-th bit */
+#define SWNAT_MC_PROBE_MARK		0x10000000
+#define SWNAT_MC_PROBE_MASK		0xefffffff
 
 /* FNAT mark */
 
@@ -61,5 +70,50 @@ do { \
 } while (0);
 
 /* End of PPP mark */
+
+/* MC mark */
+
+#define SWNAT_MC_SET_MARK(skb_) \
+do { \
+	(skb_)->mark = ((skb_)->mark & ~SWNAT_MC_MASK) ^ SWNAT_MC_MARK; \
+} while (0);
+
+#define SWNAT_MC_CHECK_MARK(skb_) \
+	(((skb_)->mark & ~SWNAT_MC_MASK) == SWNAT_MC_MARK)
+
+#define SWNAT_MC_RESET_MARK(skb_) \
+do { \
+	(skb_)->mark = ((skb_)->mark & ~SWNAT_MC_MASK) ^ 0; \
+} while (0);
+
+/* End of MC mark */
+
+/* MC probe mark */
+
+#define SWNAT_MC_PROBE_SET_MARK(skb_) \
+do { \
+	(skb_)->mark = ((skb_)->mark & ~SWNAT_MC_PROBE_MASK) ^ SWNAT_MC_PROBE_MARK; \
+} while (0);
+
+#define SWNAT_MC_PROBE_CHECK_MARK(skb_) \
+	(((skb_)->mark & ~SWNAT_MC_PROBE_MASK) == SWNAT_MC_PROBE_MARK)
+
+#define SWNAT_MC_PROBE_RESET_MARK(skb_) \
+do { \
+	(skb_)->mark = ((skb_)->mark & ~SWNAT_MC_PROBE_MASK) ^ 0; \
+} while (0);
+
+/* End of MC probe mark */
+
+/* List of new MC streams */
+
+struct new_mc_streams {
+	u32 group_addr;
+	struct net_device * out_dev;
+	u32 handled;
+
+	struct list_head list;
+};
+
 
 #endif //__FAST_VPN_H_

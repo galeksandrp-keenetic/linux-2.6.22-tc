@@ -42,6 +42,13 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_core.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <net/ip.h>
+#include <net/tcp.h>
+#include <net/fast_vpn.h>
+#include <linux/ntc_shaper_hooks.h>
+#endif
+
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 #include "../nat/hw_nat/ra_nat.h"
 #endif
@@ -142,15 +149,25 @@ static int nf_conntrack_hash_rnd_initted;
 static unsigned int nf_conntrack_hash_rnd;
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+/* Enable or Disable FastNAT */
 extern int ipv4_fastnat_conntrack;
-int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
-				enum ip_conntrack_info ctinfo,
-                struct sk_buff **pskb,
-                struct nf_conntrack_l3proto *l3proto,
-					 struct nf_conntrack_l4proto *l4proto) = NULL;
 
-				
+extern int (*fast_nat_hit_hook_func)(struct sk_buff *skb);
+
+int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
+	enum ip_conntrack_info ctinfo,
+	struct sk_buff *skb,
+	struct nf_conntrack_l3proto *l3proto,
+	struct nf_conntrack_l4proto *l4proto) = NULL;
 EXPORT_SYMBOL(fast_nat_bind_hook_func);
+
+extern void (*prebind_from_fastnat)(struct sk_buff * skb,
+		u32 orig_saddr, u16 orig_sport,
+		struct nf_conn * ct,
+		enum ip_conntrack_info ct_info);
+
+int (*fast_nat_bind_hook_ingress)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(fast_nat_bind_hook_ingress);
 #endif
 
 static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
@@ -976,15 +993,20 @@ static inline unsigned int skip_offload_nat(struct sk_buff **pskb, u_int8_t prot
 	struct udphdr *udph;
 	struct iphdr *iph;
 
-	if( skip_offload_proto(proto) ) return 1;
+	if (skip_offload_proto(proto))
+		return 1;
 
-	if( proto == IPPROTO_UDP ) {
-	  if( (iph = ip_hdr(*pskb)) && (udph = (struct udphdr*)((char*)iph + (iph->ihl << 2))) ) {
-		 if( udph->check == 0 || (udph->dest == htons(1701) && udph->source == htons(1701)) )
+	if (proto == IPPROTO_UDP) {
+		if ((iph = ip_hdr(*pskb)) &&
+		    (udph = (struct udphdr*)((char*)iph + (iph->ihl << 2)))) {
+			if (udph->check == 0 ||
+			    (udph->dest == htons(1701) &&
+			     udph->source == htons(1701)))
 			return 1;
-	  }
+		}
 	}
-   return 0;
+
+	return 0;
 };
 #endif
 
@@ -1006,11 +1028,15 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	struct nf_conntrack_helper *helper;
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	void (*swnat_prebind)(struct sk_buff * skb,
+		u32 orig_saddr, u16 orig_sport,
+		struct nf_conn * ct,
+		enum ip_conntrack_info ct_info) = NULL;
 	int (*fast_nat_bind_hook)(struct nf_conn *ct,
 		enum ip_conntrack_info ctinfo,
-                struct sk_buff **pskb,
-                struct nf_conntrack_l3proto *l3proto,
-					 struct nf_conntrack_l4proto *l4proto);
+		struct sk_buff *skb,
+		struct nf_conntrack_l3proto *l3proto,
+		struct nf_conntrack_l4proto *l4proto);
 #endif
 	int is_helper;
 
@@ -1067,61 +1093,114 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		return -ret;
 	}
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	if( !(is_helper = skip_offload_nat(pskb, protonum)) ) {
-	phelp = nfct_help(ct);
-		if (phelp && (helper = rcu_dereference(phelp->helper)) ) {
-		is_helper = 1;
-			//printk("nat helper found, name: %s\n", helper->name);
+	if (!(is_helper = skip_offload_nat(pskb, protonum))) {
+		phelp = nfct_help(ct);
+		if (phelp && (helper = rcu_dereference(phelp->helper))) {
+			is_helper = 1;
+			printk(KERN_INFO "nat helper found, name: %s\n", helper->name);
 		}
 	}
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if( is_helper ) {
+	if (is_helper) {
 		FOE_ALG_SKIP(*pskb);
-	} else if( hooknum == NF_IP_LOCAL_OUT && IS_SPACE_AVAILABLED(*pskb) ) {
+	} else if (hooknum == NF_IP_LOCAL_OUT && IS_SPACE_AVAILABLED(*pskb)) {
 		FOE_AI(*pskb) = UN_HIT;
 	}
 #endif //defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	if( is_helper )
+	if (is_helper) {
 		ct->fast_ext = 1;
+	}
 
-	if( pf == PF_INET &&
-		 !ct->fast_ext &&
-			ipv4_fastnat_conntrack && 
+	rcu_read_lock();
+	if (pf == PF_INET &&
+	    !ct->fast_ext &&
+	    ipv4_fastnat_conntrack &&
 	    (fast_nat_bind_hook = rcu_dereference(fast_nat_bind_hook_func)) &&
-			(hooknum == NF_IP_PRE_ROUTING) &&
+	    (hooknum == NF_IP_PRE_ROUTING) &&
 	    (ctinfo == IP_CT_ESTABLISHED || ctinfo == IP_CT_ESTABLISHED + IP_CT_IS_REPLY) &&
 	    (protonum == IPPROTO_TCP || protonum == IPPROTO_UDP)) {
-		struct nf_conntrack_tuple *t1, *t2;
-#if defined(CONFIG_IP_NF_MATCH_WEBSTR) || defined(CONFIG_IP_NF_MATCH_WEBSTR_MODULE)
-		if (ipv4_fastnat_conntrack > 1 && protonum == IPPROTO_TCP ) {
-			struct tcphdr _tcph, *tcph;
-			unsigned char _data[2], *data;
+		struct sk_buff *skb = *pskb;
 
-			/* For URL filter; RFC-HTTP: GET, POST, HEAD */
-			if ((tcph = skb_header_pointer(*pskb, dataoff, sizeof(_tcph), &_tcph)) &&
-			    (data = skb_header_pointer(*pskb, dataoff + tcph->doff*4, sizeof(_data), &_data)) &&
-			    ((data[0] == 'G' && data[1] == 'E') ||
-			     (data[0] == 'P' && data[1] == 'O') ||
-			     (data[0] == 'H' && data[1] == 'E'))) {
-				ct->fast_ext = 1;
-				goto pass;
-			}
-		}
-#endif //defined(CONFIG_IP_NF_MATCH_WEBSTR) || defined(CONFIG_IP_NF_MATCH_WEBSTR_MODULE)
+		struct nf_conntrack_tuple *t1, *t2;
+
 		t1 = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
 		t2 = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
+
 		if (!(t1->dst.u3.ip == t2->src.u3.ip &&
-				t1->src.u3.ip == t2->dst.u3.ip &&
-				t1->dst.u.all == t2->src.u.all &&
-				t1->src.u.all == t2->dst.u.all)) {
-			
-			ret = fast_nat_bind_hook(ct, ctinfo, pskb, l3proto, l4proto);
+		      t1->src.u3.ip == t2->dst.u3.ip &&
+		      t1->dst.u.all == t2->src.u.all &&
+		      t1->src.u.all == t2->dst.u.all)) {
+			if (likely(NULL != rcu_dereference(fast_nat_hit_hook_func))) {
+				u32 orig_src, new_src;
+				u16 orig_port = 0;
+				struct iphdr *iph = (struct iphdr *)skb->data;
+				struct udphdr * udph = NULL;
+				struct tcphdr * tcph = NULL;
+
+				orig_src = iph->saddr;
+				if ((iph->version == 4) && (protonum == IPPROTO_TCP)) {
+					tcph = (struct tcphdr *)(skb->data + iph->ihl * 4);
+					orig_port = tcph->source;
+				}
+				if ((iph->version == 4) && (protonum == IPPROTO_UDP)) {
+					udph = (struct udphdr *)(skb->data + iph->ihl * 4);
+					orig_port = udph->source;
+				}
+
+				ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
+
+				iph = (struct iphdr *)skb->data;
+				new_src = iph->saddr;
+
+				/* Get rid of junky binds, do swnat only when src IP changed */
+				if (orig_src != new_src) { 
+					/* Set mark for further binds */
+					SWNAT_FNAT_SET_MARK(skb);
+					rcu_read_lock();
+					if (NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat))) {
+						swnat_prebind(skb, orig_src, orig_port, ct, ctinfo);
+					}
+					rcu_read_unlock();
+				}
+
+				if (NF_FAST_NAT == ret) {
+					int (*fn_bind_ingress)(struct sk_buff * skb) = NULL;
+					ntc_shaper_hook_fn *ntc_ingress = NULL;
+
+					/* from fast_nat.c */
+					fn_bind_ingress = rcu_dereference(fast_nat_bind_hook_ingress);
+					/* from ntc.ko */
+					ntc_ingress = ntc_shaper_ingress_hook_get();
+
+					if ((NULL != fn_bind_ingress) &&
+							(NULL != ntc_ingress) &&
+							(orig_src != new_src)) {
+						/* Fast NAT should not be unloaded in realtime now */
+						unsigned int ntc_retval = ntc_ingress(skb,
+								be32_to_cpu(orig_src), 0, NULL, fn_bind_ingress, NULL, NULL);
+
+						if (NF_ACCEPT == ntc_retval) {
+							/* Shaper skipped that packet */
+							ret = NF_FAST_NAT;
+						} else if (NF_DROP == ntc_retval) {
+							/* Shaper tell us to drop it */
+							ret = NF_DROP;
+						} else if (NF_STOLEN == ntc_retval) {
+							/* Shaper queued packet and will handle it's destiny */
+							ret = NF_STOLEN;
+						}
+					}
+					ntc_shaper_ingress_hook_put();
+				}
+			} else {
+				printk(KERN_WARNING "Not allowed to do bind_hook without hit_hook");
+			}
 		}
 	}
-	pass:
+	rcu_read_unlock();
 #endif //defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 #endif //defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)

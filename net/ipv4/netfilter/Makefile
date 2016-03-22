@@ -17,6 +17,7 @@ iptable_nat-objs	:= nf_nat_rule.o nf_nat_standalone.o
 obj-$(CONFIG_NF_CONNTRACK_IPV4) += nf_conntrack_ipv4.o
 
 obj-$(CONFIG_NF_NAT) += nf_nat.o
+obj-$(CONFIG_FAST_NAT) += fast_nat.o
 
 # NAT helpers (nf_conntrack)
 obj-$(CONFIG_NF_NAT_AMANDA) += nf_nat_amanda.o

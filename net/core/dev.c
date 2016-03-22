@@ -1466,14 +1466,12 @@ __IMEM int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 #endif
 		    )
 			dev_queue_xmit_nit(skb, dev);
-
 		if (netif_needs_gso(dev, skb)) {
 			if (unlikely(dev_gso_segment(skb)))
 				goto out_kfree_skb;
 			if (skb->next)
 				goto gso;
 		}
-
 		return dev->hard_start_xmit(skb, dev);
 	}
 
@@ -1505,7 +1503,6 @@ gso:
 
 	skb->destructor = DEV_GSO_CB(skb)->destructor;
 #endif
-
 out_kfree_skb:
 	kfree_skb(skb);
 	return 0;
@@ -2321,6 +2318,9 @@ EXPORT_SYMBOL(pptp_input);
 
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <linux/netfilter/nf_conntrack_common.h>
+struct nf_conn;
+struct new_mc_streams;
 
 int (*go_swnat)(struct sk_buff * skb, u8 origin) = NULL;
 EXPORT_SYMBOL(go_swnat);
@@ -2339,12 +2339,27 @@ void (*prebind_from_pptptx)(struct sk_buff * skb,
 	struct iphdr * iph_int, struct sock *sock, u32 saddr, u32 daddr) = NULL;
 EXPORT_SYMBOL(prebind_from_pptptx);
 
-void (*prebind_from_pppoetx)(struct sk_buff * skb, struct sock *sock,
-	u16 sid) = NULL;
+void (*prebind_from_pppoetx)(struct sk_buff * skb, struct sock *sock, u16 sid) = NULL;
 EXPORT_SYMBOL(prebind_from_pppoetx);
 
 void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
 EXPORT_SYMBOL(prebind_from_raeth);
+
+void (*prebind_from_usb_mac)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(prebind_from_usb_mac);
+
+void (*swnat_add_stats_l2tp)(u32 saddr, u32 daddr, u16 sport, u16 dport,
+	u32 sent_bytes, u32 sent_packets, u32 recv_bytes, u32 recv_packets) = NULL;
+EXPORT_SYMBOL(swnat_add_stats_l2tp);
+
+void (*prebind_from_mc_preroute)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(prebind_from_mc_preroute);
+
+void (*prebind_from_mc_output)(struct sk_buff * skb, u8 origin) = NULL;
+EXPORT_SYMBOL(prebind_from_mc_output);
+
+void (*update_mc_streams)(struct new_mc_streams * streams_list) = NULL;
+EXPORT_SYMBOL(update_mc_streams);
 
 #endif //#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
@@ -2387,14 +2402,14 @@ __IMEM int netif_receive_skb(struct sk_buff *skb)
 	rcu_read_lock();
 
 	if( (vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
-    	ret = NET_RX_SUCCESS;
-	   goto out;
-	}	
+		ret = NET_RX_SUCCESS;
+		goto out;
+	}
 
 	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
-    	ret = NET_RX_SUCCESS;
-	   goto out;
-	}	
+		ret = NET_RX_SUCCESS;
+		goto out;
+	}
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {

@@ -368,6 +368,33 @@ static void vlan_transfer_operstate(const struct net_device *dev, struct net_dev
 	}
 }
 
+struct net_device * get_vlan_dev_by_real(struct net_device *real_dev, u16 vlan_id)
+{
+	const char *name = real_dev->name;
+
+	if (real_dev->features & NETIF_F_VLAN_CHALLENGED) {
+		pr_info("8021q: VLANs not supported on %s\n", name);
+		return NULL;
+	}
+
+	return __find_vlan_dev(real_dev, vlan_id);
+}
+EXPORT_SYMBOL(get_vlan_dev_by_real);
+
+void vlan_dev_update_stats(struct net_device *vlan_dev, u32 recv_bytes,
+			   u32 recv_packets, u32 sent_bytes, u32 sent_packets)
+{
+	struct net_device_stats *stats = NULL;
+
+	stats = vlan_dev_get_stats(vlan_dev);
+	if (stats != NULL) {
+		stats->tx_packets += sent_packets;
+		stats->tx_bytes += sent_bytes;
+		stats->rx_packets += recv_packets;
+		stats->rx_bytes += recv_bytes;
+	}
+}
+EXPORT_SYMBOL(vlan_dev_update_stats);
 /*
  * vlan network devices have devices nesting below it, and are a special
  * "super class" of normal network devices; split their locks off into a

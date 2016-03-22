@@ -123,6 +123,7 @@ ifeq ($(CONFIG_USB_SERIAL_OPTION),y)
 EXTRA_CFLAGS += -DTC_SUPPORT_3G
 endif
 
+obj-$(CONFIG_PPP) += ppp_hook.o
 obj-$(CONFIG_PPP) += ppp_generic.o
 obj-$(CONFIG_PPP_ASYNC) += ppp_async.o
 obj-$(CONFIG_PPP_SYNC_TTY) += ppp_synctty.o
