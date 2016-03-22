@@ -468,6 +468,14 @@ static inline void xfrm_state_hold(struct xfrm_state *x)
 	atomic_inc(&x->refcnt);
 }
 
+static __inline__ int addr4_match(__be32 a1, __be32 a2, u8 prefixlen)
+{
+	/* C99 6.5.7 (3): u32 << 32 is undefined behaviour */
+	if (prefixlen == 0)
+		return 1;
+	return !((a1 ^ a2) & htonl(0xFFFFFFFFu << (32 - prefixlen)));
+}
+
 static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 {
 	__be32 *a1 = token1;
