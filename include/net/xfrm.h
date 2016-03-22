@@ -169,6 +169,9 @@ struct xfrm_state
 	struct xfrm_lifetime_cur curlft;
 	struct timer_list	timer;
 
+	/* used to fix curlft->add_time when changing date */
+	long		saved_tmo;
+
 	/* Last used time */
 	u64			lastused;
 
@@ -187,6 +190,7 @@ struct xfrm_state
 
 /* xflags - make enum if more show up */
 #define XFRM_TIME_DEFER	1
+#define XFRM_SOFT_EXPIRE 2
 
 enum {
 	XFRM_STATE_VOID,
