@@ -760,6 +760,8 @@ static inline void xfrm_sk_free_policy(struct sock *sk)
 	}
 }
 
+extern void xfrm_garbage_collect(void);
+
 #else
 
 static inline void xfrm_sk_free_policy(struct sock *sk) {}
@@ -778,6 +780,11 @@ static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *sk
 {
 	return 1;
 }
+
+static inline void xfrm_garbage_collect(void)
+{
+}
+
 #endif
 
 static __inline__

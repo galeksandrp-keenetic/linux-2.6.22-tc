@@ -2037,6 +2037,12 @@ static void __xfrm_garbage_collect(void)
 	xfrm_prune_bundles(unused_bundle);
 }
 
+void xfrm_garbage_collect(void)
+{
+	__xfrm_garbage_collect();
+}
+EXPORT_SYMBOL(xfrm_garbage_collect);
+
 static int xfrm_flush_bundles(void)
 {
 	xfrm_prune_bundles(stale_bundle);

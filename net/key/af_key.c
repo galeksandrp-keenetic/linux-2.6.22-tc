@@ -2362,6 +2362,8 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 
 out:
 	xfrm_pol_put(xp);
+	if (err == 0)
+		xfrm_garbage_collect();
 	return err;
 }
 
@@ -2626,6 +2628,8 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 
 out:
 	xfrm_pol_put(xp);
+	if (delete && err == 0)
+		xfrm_garbage_collect();
 	return err;
 }
 
