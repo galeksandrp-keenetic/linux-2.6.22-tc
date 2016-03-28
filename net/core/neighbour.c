@@ -56,6 +56,7 @@
 static void neigh_timer_handler(unsigned long arg);
 #ifdef CONFIG_ARPD
 static void neigh_app_notify(struct neighbour *n);
+static void __neigh_notify(struct neighbour *n, int type, int flags);
 #endif
 static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
 void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev);
@@ -142,6 +143,9 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 				write_unlock(&n->lock);
 				if (n->parms->neigh_cleanup)
 					n->parms->neigh_cleanup(n);
+#ifdef CONFIG_ARPD
+				__neigh_notify(n, RTM_DELNEIGH, 0);
+#endif /* #ifdef CONFIG_ARPD */
 				neigh_release(n);
 				continue;
 			}
@@ -215,6 +219,9 @@ static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev)
 			write_unlock(&n->lock);
 			if (n->parms->neigh_cleanup)
 				n->parms->neigh_cleanup(n);
+#ifdef CONFIG_ARPD
+			__neigh_notify(n, RTM_DELNEIGH, 0);
+#endif /* #ifdef CONFIG_ARPD */
 			neigh_release(n);
 		}
 	}
@@ -678,6 +685,9 @@ static void neigh_periodic_timer(unsigned long arg)
 			write_unlock(&n->lock);
 			if (n->parms->neigh_cleanup)
 				n->parms->neigh_cleanup(n);
+#ifdef CONFIG_ARPD
+			__neigh_notify(n, RTM_DELNEIGH, 0);
+#endif /* #ifdef CONFIG_ARPD */
 			neigh_release(n);
 			continue;
 		}
@@ -831,7 +841,7 @@ out:
 		call_netevent_notifiers(NETEVENT_NEIGH_UPDATE, neigh);
 
 #ifdef CONFIG_ARPD
-	if (notify && neigh->parms->app_probes)
+	if (notify)
 		neigh_app_notify(neigh);
 #endif
 	neigh_release(neigh);
@@ -1064,7 +1074,7 @@ out:
 	if (notify)
 		call_netevent_notifiers(NETEVENT_NEIGH_UPDATE, neigh);
 #ifdef CONFIG_ARPD
-	if (notify && neigh->parms->app_probes)
+	if (notify)
 		neigh_app_notify(neigh);
 #endif
 	return err;
@@ -2103,6 +2113,9 @@ void __neigh_for_each_release(struct neigh_table *tbl,
 			if (release) {
 				if (n->parms->neigh_cleanup)
 					n->parms->neigh_cleanup(n);
+#ifdef CONFIG_ARPD
+				__neigh_notify(n, RTM_DELNEIGH, 0);
+#endif /* #ifdef CONFIG_ARPD */
 				neigh_release(n);
 			}
 		}
@@ -2453,6 +2466,7 @@ static void __neigh_notify(struct neighbour *n, int type, int flags)
 		kfree_skb(skb);
 		goto errout;
 	}
+
 	err = rtnl_notify(skb, 0, RTNLGRP_NEIGH, NULL, GFP_ATOMIC);
 errout:
 	if (err < 0)
