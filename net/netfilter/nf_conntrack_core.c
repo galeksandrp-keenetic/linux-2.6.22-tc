@@ -1097,7 +1097,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 		phelp = nfct_help(ct);
 		if (phelp && (helper = rcu_dereference(phelp->helper))) {
 			is_helper = 1;
-			printk(KERN_INFO "nat helper found, name: %s\n", helper->name);
+			//printk(KERN_INFO "nat helper found, name: %s\n", helper->name);
 		}
 	}
 
