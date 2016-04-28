@@ -1464,13 +1464,42 @@ static int kill_all_udp(struct nf_conn *i, void *data)
 	else return 0;
 }
 
+static int kill_all_by_ipv4(struct nf_conn *i, void *data)
+{
+	uint32_t ipaddr = 0;
+
+	if( data == NULL ) {
+		return 0;
+	}
+
+	ipaddr = *((uint32_t *)data);
+
+	if( (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.l3num == PF_INET) &&
+		((i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u3.ip == ipaddr) ||
+			(i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u3.ip == ipaddr)) ) {
+		++(*(((uint32_t *)data) + 1)); /* increment counter */
+		return 1;
+	}
+
+	return 0;
+}
+
 void nf_conntrack_flush_udp(void)
 {
 	nf_ct_iterate_cleanup(kill_all_udp, NULL);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_flush_udp);
 
+uint32_t nf_conntrack_flush_by_ipv4(uint32_t ipaddr)
+{
+	uint32_t data[2];
 
+	data[0] = ipaddr; /* BE */
+	data[1] = 0; /* counter */
+	nf_ct_iterate_cleanup(kill_all_by_ipv4, &data);
+
+	return data[1];
+}
 
 /* Mishearing the voices in his head, our hero wonders how he's
    supposed to kill the mall. */

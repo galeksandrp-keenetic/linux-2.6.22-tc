@@ -289,6 +289,27 @@ static struct nf_hook_ops ipv4_conntrack_ops[] = {
 static int log_invalid_proto_min = 0;
 static int log_invalid_proto_max = 255;
 
+static uint32_t flush_ip_addr = 0;
+
+extern uint32_t nf_conntrack_flush_by_ipv4(uint32_t ipaddr);
+
+int flush_ip_addr_proc_handler(struct ctl_table *table, int write, struct file *filp,
+		void __user *buffer, size_t *lenp, loff_t *ppos) {
+	int res = proc_dointvec(table, write, filp, buffer, lenp, ppos);
+	uint32_t counter = 0;
+	uint32_t ip = htonl(flush_ip_addr);
+
+	if (flush_ip_addr != 0) {
+		counter = nf_conntrack_flush_by_ipv4(ip);
+		printk(KERN_INFO "IPv4 conntrack: flushed %d entries with address " NIPQUAD_FMT "\n",
+			counter, NIPQUAD(ip));
+	}
+
+	flush_ip_addr = 0;
+
+	return res;
+}
+
 static ctl_table ip_ct_sysctl_table[] = {
 	{
 		.ctl_name	= NET_IPV4_NF_CONNTRACK_MAX,
@@ -343,6 +364,13 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.proc_handler   = &proc_dointvec,
 	},
 #endif
+	{
+		.procname   = "ip_conntrack_flush_addr",
+		.data       = &flush_ip_addr,
+		.maxlen     = sizeof(uint32_t),
+		.mode       = 0644,
+		.proc_handler   = &flush_ip_addr_proc_handler,
+	},
 	{
 		.ctl_name	= 0
 	}
