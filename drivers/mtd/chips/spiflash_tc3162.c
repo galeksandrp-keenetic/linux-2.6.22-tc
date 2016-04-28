@@ -26,7 +26,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/gen_probe.h>
-//#include <linux/mtd/partitions.h>
+#include <linux/mtd/partitions.h>
 #include <asm/delay.h>
 #include <linux/timer.h>
 #include <asm/io.h>
@@ -36,7 +36,7 @@
 /* debugging */
 /* #define SPIFLASH_DEBUG */
 #define TC_SOC
-static const char *part_probes[] __initdata =
+static const char *part_probes[] =
     { "ndmpart", NULL };
     
 #define MIN(a,b)        ((a) < (b) ? (a) : (b))
