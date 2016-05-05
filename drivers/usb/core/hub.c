@@ -1482,6 +1482,9 @@ static int is_wimax(u16 vendor_id, u16 product_id)
 	}
 	return res;
 }
+
+#define DESC_SIZE   40
+
 /* Implementation Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
 static int usb_get_os_str_desc(struct usb_device *udev)
 {
@@ -1501,23 +1504,29 @@ static int usb_get_os_str_desc(struct usb_device *udev)
 		return 0;
 
 	{
-		u8 *data, buf[40];
-		int res = 0;
-		data = buf;
+		int res;
+		u8 *data = (u8*)kmalloc(DESC_SIZE, GFP_NOIO);
 
-		memset(data, 0, sizeof(buf));
+		memset(data, 0, DESC_SIZE);
 		/* Compatible ID Feature Descriptor, part 1, 16 bytes, index 4 */
 		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
 			data, 0x10, USB_CTRL_SET_TIMEOUT);
-		if ((res < 0) || (data[6] != 0x04))
+		if ((res < 0) || (data[6] != 0x04)) {
+			kfree(data);
 			return 1;
-		memset(data, 0, sizeof(buf));
+		}
+
+		memset(data, 0, DESC_SIZE);
 		/* Compatible ID Feature Descriptor, part 2, 40 bytes, index 4 */
 		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
 			data, 0x28, USB_CTRL_SET_TIMEOUT);
-		if ((res < 0) || ((data[17] != 0x01) && (data[18] == 0x00)))
+		if ((res < 0) || ((data[17] != 0x01) && (data[18] == 0x00))) {
+			kfree(data);
 			return 1;
+		}
+
 		printk(KERN_INFO "found WCID device %s in %s mode\n", udev->product, data + 18);
+		kfree(data);
 	}
 	return 2;
 }
