@@ -121,11 +121,11 @@ void ubr_change_rx_flags(struct net_device *dev,
 }
 #endif
 
+/* RTNL locked */
 static int ubr_deregister(struct net_device *dev)
 {
 	struct ubr_private *ubr = netdev_priv(dev);
 
-	rtnl_lock();
 	dev_close(dev);
 
 	if (!list_empty(&ubr->list))
@@ -136,7 +136,7 @@ static int ubr_deregister(struct net_device *dev)
 		//kobject_del(&p->kobj);	// no need
 	}
 	unregister_netdevice(dev);
-	rtnl_unlock();
+
 	return 0;
 }
 
@@ -145,6 +145,7 @@ static int ubr_free_master(const char *name)
 	struct net_device *dev;
 	int ret = 0;
 
+	rtnl_lock();
 	dev = __dev_get_by_name(name);
 	if (dev == NULL)
 		ret =  -ENXIO; 	/* Could not find device */
@@ -154,6 +155,7 @@ static int ubr_free_master(const char *name)
 	else
 		ret = ubr_deregister(dev);
 
+	rtnl_unlock();
 	return ret;
 }
 
