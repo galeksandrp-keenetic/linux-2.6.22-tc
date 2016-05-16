@@ -44,9 +44,15 @@
 #include <linux/major.h>
 #include <linux/kmod.h>
 #include <linux/device.h>
+#ifdef CONFIG_DEVFS_FS
+#include <linux/devfs_fs_kernel.h>
+#endif
 
 #define SOUND_STEP 16
 
+#ifdef CONFIG_DEVFS_FS
+int devfs_en = 0;
+#endif
 
 struct sound_unit
 {
@@ -172,6 +178,9 @@ static int sound_insert_unit(struct sound_unit **list, const struct file_operati
 
 	device_create(sound_class, dev, MKDEV(SOUND_MAJOR, s->unit_minor),
 		      s->name+6);
+#ifdef CONFIG_DEVFS_FS
+	if(devfs_en) devfs_mk_cdev(MKDEV(SOUND_MAJOR, s->unit_minor), S_IFCHR | S_IRUGO | S_IWUGO, "snd/%s", s->name+6);
+#endif
 	return r;
 
  fail:
@@ -194,6 +203,9 @@ static void sound_remove_unit(struct sound_unit **list, int unit)
 	spin_unlock(&sound_loader_lock);
 	if (p) {
 		device_destroy(sound_class, MKDEV(SOUND_MAJOR, p->unit_minor));
+#ifdef CONFIG_DEVFS_FS
+		if(devfs_en) devfs_remove("snd/%s", p->name+6);
+#endif
 		kfree(p);
 	}
 }
@@ -258,6 +270,9 @@ int register_sound_special_device(const struct file_operations *fops, int unit,
 		break;
 	    case 4:
 		name = "audio";
+		break;
+	    case 5:
+		name = "dspW";
 		break;
 	    case 8:
 		name = "sequencer2";
@@ -528,6 +543,9 @@ static void __exit cleanup_soundcore(void)
 	   empty */
 	unregister_chrdev(SOUND_MAJOR, "sound");
 	class_destroy(sound_class);
+#ifdef CONFIG_DEVFS_FS
+	if(devfs_en) devfs_remove("snd");
+#endif
 }
 
 static int __init init_soundcore(void)
@@ -539,7 +557,10 @@ static int __init init_soundcore(void)
 	sound_class = class_create(THIS_MODULE, "sound");
 	if (IS_ERR(sound_class))
 		return PTR_ERR(sound_class);
-
+#ifdef CONFIG_DEVFS_FS
+	devfs_mk_dir("snd");
+	devfs_en = 1;
+#endif
 	return 0;
 }
 
