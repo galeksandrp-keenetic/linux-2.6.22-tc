@@ -312,6 +312,7 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(0x0586, 0x3443) },/*ZyXel WAH1604*/
 	{ USB_DEVICE(0x15eb , 0x0001) },/*CDMA-450*/
 	{ USB_DEVICE(0x05c6, 0x9201) }, /*MOTIV UM6602*/
+	{ USB_DEVICE(0x19d2, 0x0317) }, /*MF827 Altel Transnistria*/
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
