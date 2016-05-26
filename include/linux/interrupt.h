@@ -273,8 +273,17 @@ enum
 	RCU_SOFTIRQ,	/* Preferable RCU should always be the last softirq */
 	/* Entries after this are ignored in split softirq mode */
 	MAX_SOFTIRQ,
+	NR_SOFTIRQS = MAX_SOFTIRQ
+#else
+	NR_SOFTIRQS
 #endif
 };
+
+/* map softirq index to softirq name. update 'softirq_to_name' in
+ * kernel/softirq.c when adding a new softirq.
+ */
+extern const char *const softirq_names[NR_SOFTIRQS];
+
 #ifdef CONFIG_PREEMPT_SOFTIRQS
 typedef  struct {
 	char type;

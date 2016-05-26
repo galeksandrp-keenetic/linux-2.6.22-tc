@@ -17,6 +17,8 @@ extern int proc_sys_init(void);
 static inline void proc_sys_init(void) { }
 #endif
 
+void proc_softirqs_init(void);
+
 struct vmalloc_info {
 	unsigned long	used;
 	unsigned long	largest_chunk;

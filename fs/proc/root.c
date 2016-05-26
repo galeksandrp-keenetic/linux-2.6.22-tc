@@ -84,6 +84,7 @@ void __init proc_root_init(void)
 	proc_mkdir("openprom", NULL);
 #endif
 	proc_tty_init();
+	proc_softirqs_init();
 #ifdef CONFIG_PROC_DEVICETREE
 	proc_device_tree_init();
 #endif

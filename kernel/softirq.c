@@ -26,21 +26,6 @@
 #include <linux/syscalls.h>
 #include <linux/delay.h>
 
-static const char *softirq_names [] =
-{
-  [HI_SOFTIRQ]		= "high",
-  [SCHED_SOFTIRQ]	= "sched",
-  [TIMER_SOFTIRQ]	= "timer",
-  [NET_TX_SOFTIRQ]	= "net-tx",
-  [NET_RX_SOFTIRQ]	= "net-rx",
-  [BLOCK_SOFTIRQ]	= "block",
-  [TASKLET_SOFTIRQ]	= "tasklet",
-#ifdef CONFIG_HIGH_RES_TIMERS
-  [HRTIMER_SOFTIRQ]	= "hrtimer",
-#endif
-  [RCU_SOFTIRQ]		= "rcu",
-};
-
 static const softirq_prio_t softirq_prio[MAX_SOFTIRQ] =  /* type, priority, nice */
 {
   [HI_SOFTIRQ]			= {SCHED_RR, CONFIG_TC_SOFTIRQ_BASE_RT_PRIO,  CONFIG_TC_SOFTIRQ_BASE_RT_NICE},
@@ -60,6 +45,24 @@ struct task_struct * softirqd_tasks[MAX_SOFTIRQ];
 
 EXPORT_SYMBOL(softirqd_tasks);
 #endif
+
+const char *const softirq_names [NR_SOFTIRQS] =
+{
+  [HI_SOFTIRQ]		= "high",
+  [SCHED_SOFTIRQ]	= "sched",
+  [TIMER_SOFTIRQ]	= "timer",
+  [NET_TX_SOFTIRQ]	= "net-tx",
+  [NET_RX_SOFTIRQ]	= "net-rx",
+  [BLOCK_SOFTIRQ]	= "block",
+  [TASKLET_SOFTIRQ]	= "tasklet",
+#ifdef CONFIG_HIGH_RES_TIMERS
+  [HRTIMER_SOFTIRQ]	= "hrtimer",
+#endif
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+  [RCU_SOFTIRQ]		= "rcu",
+#endif
+};
+
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -383,6 +386,7 @@ restart:
 			per_cpu(softirq_running, cpu) |= softirq_mask;
 			local_irq_enable();
 
+			kstat_incr_softirqs_this_cpu(h - softirq_vec);
 			h->action(h);
 			if (preempt_count != preempt_count()) {
 				//print_symbol("BUG: softirq exited %s with wrong preemption count!\n", (unsigned long) h->action);
@@ -519,6 +523,7 @@ restart:
 
 	do {
 		if (pending & 1) {
+			kstat_incr_softirqs_this_cpu(h - softirq_vec);
 			h->action(h);
 			rcu_bh_qsctr_inc(cpu);
 		}
@@ -1143,8 +1148,10 @@ static int ksoftirqd(void * __bind_cpu)
 			local_irq_enable();
 
 			h = &softirq_vec[data->nr];
-			if (h)
+			if (h) {
+				kstat_incr_softirqs_this_cpu(h - softirq_vec);
 				h->action(h);
+			}
 			rcu_bh_qsctr_inc(data->cpu);
 
 			local_irq_disable();
