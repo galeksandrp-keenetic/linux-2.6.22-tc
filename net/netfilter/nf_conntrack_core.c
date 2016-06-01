@@ -1474,9 +1474,18 @@ static int kill_all_by_ipv4(struct nf_conn *i, void *data)
 
 	ipaddr = *((uint32_t *)data);
 
+	/* check against original IPv4 addresses */
 	if( (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.l3num == PF_INET) &&
 		((i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u3.ip == ipaddr) ||
 			(i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u3.ip == ipaddr)) ) {
+		++(*(((uint32_t *)data) + 1)); /* increment counter */
+		return 1;
+	}
+
+	/* check against NAT'ed IPv4 addresses */
+	if( (i->tuplehash[IP_CT_DIR_REPLY].tuple.src.l3num == PF_INET) &&
+		((i->tuplehash[IP_CT_DIR_REPLY].tuple.src.u3.ip == ipaddr) ||
+			(i->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u3.ip == ipaddr)) ) {
 		++(*(((uint32_t *)data) + 1)); /* increment counter */
 		return 1;
 	}
