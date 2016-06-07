@@ -33,6 +33,7 @@
 #include <linux/filter.h>
 #include <linux/if_ppp.h>
 #include <linux/ppp_channel.h>
+#include <linux/ppp_hook.h>
 #include <linux/ppp-comp.h>
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
@@ -181,7 +182,15 @@ static atomic_t channel_count = ATOMIC_INIT(0);
 #define seq_after(a, b)		((s32)((a) - (b)) > 0)
 
 /* Prototypes. */
+int ppp_chan_stats_switch_get(struct ppp_channel *chan);
 void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb);
+void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes);
+void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes);
+int ppp_stats_switch_get(struct net_device *dev);
+void ppp_stats_switch_set(struct net_device *dev, int on);
+void ppp_stats_update(struct net_device *dev,
+		      u32 rx_bytes, u32 rx_packets,
+		      u32 tx_bytes, u32 tx_packets);
 static int ppp_unattached_ioctl(struct ppp_file *pf, struct file *file,
 				unsigned int cmd, unsigned long arg);
 static void ppp_xmit_process(struct ppp *ppp);
@@ -290,6 +299,8 @@ static const int npindex_to_ethertype[NUM_NP] = {
 				     ppp_recv_lock(ppp); } while (0)
 #define ppp_unlock(ppp)		do { ppp_recv_unlock(ppp); \
 				     ppp_xmit_unlock(ppp); } while (0)
+#define ppp_stats_lock(ppp)	spin_lock_bh(&(ppp)->slock)
+#define ppp_stats_unlock(ppp)	spin_unlock_bh(&(ppp)->slock)
 
 /*
  * /dev/ppp device routines.
@@ -808,6 +819,24 @@ static int __init ppp_init(void)
 		device_create(ppp_class, NULL, MKDEV(PPP_MAJOR, 0), "ppp");
 	}
 
+	BUG_ON(ppp_chan_stats_switch_get_hook != NULL);
+	rcu_assign_pointer(ppp_chan_stats_switch_get_hook, ppp_chan_stats_switch_get);
+
+	BUG_ON(ppp_stat_add_tx_hook != NULL);
+	rcu_assign_pointer(ppp_stat_add_tx_hook, ppp_stat_add_tx);
+
+	BUG_ON(ppp_stat_add_rx_hook != NULL);
+	rcu_assign_pointer(ppp_stat_add_rx_hook, ppp_stat_add_rx);
+
+	BUG_ON(ppp_stats_switch_get_hook != NULL);
+	rcu_assign_pointer(ppp_stats_switch_get_hook, ppp_stats_switch_get);
+
+	BUG_ON(ppp_stats_switch_set_hook != NULL);
+	rcu_assign_pointer(ppp_stats_switch_set_hook, ppp_stats_switch_set);
+
+	BUG_ON(ppp_stats_update_hook != NULL);
+	rcu_assign_pointer(ppp_stats_update_hook, ppp_stats_update);
+
 out:
 	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
@@ -817,6 +846,22 @@ out_chrdev:
 	unregister_chrdev(PPP_MAJOR, "ppp");
 	goto out;
 }
+
+int ppp_chan_stats_switch_get(struct ppp_channel *chan)
+{
+	struct channel *pch = chan->ppp;
+	int res = -1;
+
+	if (pch) {
+		read_lock_bh(&pch->upl);
+		if (pch->ppp)
+			res = !pch->ppp->stats_off;
+		read_unlock_bh(&pch->upl);
+	}
+
+	return res;
+}
+
 
 /*
  * Network interface unit routines.
@@ -1420,12 +1465,52 @@ ppp_do_recv(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
 	struct channel *pch = chan->ppp;
 	
-	if (pch == 0 || pch->ppp == 0 ) return;
+	if (unlikely(pch == 0 || pch->ppp == 0)) return;
 	
 	skb->dev = pch->ppp->dev;
+
+	ppp_stats_lock(pch->ppp);
 	pch->ppp->stats.rx_packets++;
 	pch->ppp->stats.rx_bytes += skb->len;
+	ppp_stats_unlock(pch->ppp);
+
 	skb->dev->last_rx = jiffies;
+}
+
+void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
+{
+	struct channel *pch = chan->ppp;
+	struct ppp *ppp;
+
+	if (unlikely(pch == NULL))
+		return;
+
+	ppp = pch->ppp;
+	if (unlikely(ppp == NULL))
+		return;
+
+	ppp_stats_lock(ppp);
+	ppp->stats.tx_bytes += add_bytes;
+	ppp->stats.tx_packets += add_pkt;
+	ppp_stats_unlock(ppp);
+}
+
+void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
+{
+	struct channel *pch = chan->ppp;
+	struct ppp *ppp;
+
+	if (unlikely(pch == NULL))
+		return;
+
+	ppp = pch->ppp;
+	if (unlikely(ppp == NULL))
+		return;
+
+	ppp_stats_lock(ppp);
+	ppp->stats.rx_bytes += add_bytes;
+	ppp->stats.rx_packets += add_pkt;
+	ppp_stats_unlock(ppp);
 }
 
 void ppp_stats_reset(struct net_device *dev)
@@ -1437,10 +1522,54 @@ void ppp_stats_reset(struct net_device *dev)
 
 	ppp = (struct ppp *) dev->priv;
 
+	ppp_stats_lock(ppp);
 	ppp->stats.tx_bytes = 0;
 	ppp->stats.tx_packets = 0;
 	ppp->stats.rx_bytes = 0;
 	ppp->stats.rx_packets = 0;
+	ppp_stats_unlock(ppp);
+}
+
+int ppp_stats_switch_get(struct net_device *dev)
+{
+	struct ppp *ppp;
+
+	if (dev == NULL)
+		return -1;
+
+	ppp = netdev_priv(dev);
+
+	return !ppp->stats_off;
+}
+
+void ppp_stats_switch_set(struct net_device *dev, int on)
+{
+	struct ppp *ppp;
+
+	if (dev == NULL)
+		return;
+
+	ppp = netdev_priv(dev);
+	ppp->stats_off = !on;
+}
+
+void ppp_stats_update(struct net_device *dev,
+		      u32 rx_bytes, u32 rx_packets,
+		      u32 tx_bytes, u32 tx_packets)
+{
+	struct ppp *ppp;
+
+	if (unlikely(dev == NULL))
+		return;
+
+	ppp = netdev_priv(dev);
+
+	ppp_stats_lock(ppp);
+	ppp->stats.tx_bytes += tx_bytes;
+	ppp->stats.tx_packets += tx_packets;
+	ppp->stats.rx_bytes += rx_bytes;
+	ppp->stats.rx_packets += rx_packets;
+	ppp_stats_unlock(ppp);
 }
 
 void

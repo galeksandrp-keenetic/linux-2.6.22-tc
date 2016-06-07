@@ -104,6 +104,7 @@ struct ppp {
 	int		n_channels;	/* how many channels are attached 54 */
 	spinlock_t	rlock;		/* lock for receive side 58 */
 	spinlock_t	wlock;		/* lock for transmit side 5c */
+	spinlock_t	slock;		/* lock for statistics */
 	int		mru;		/* max receive unit 60 */
 	int		mru_alloc;	/* MAX(1500,MRU) for dev_alloc_skb() */
 	unsigned int	flags;		/* control bits 64 */
@@ -129,6 +130,7 @@ struct ppp {
 	struct sk_buff_head mrq;	/* MP: receive reconstruction queue */
 #endif /* CONFIG_PPP_MULTILINK */
 	struct net_device_stats stats;	/* statistics */
+	bool stats_off;
 #ifdef CONFIG_PPP_FILTER
 	struct sock_filter *pass_filter;	/* filter for packets to pass */
 	struct sock_filter *active_filter;/* filter for pkts to reset idle */
