@@ -289,23 +289,43 @@ static struct nf_hook_ops ipv4_conntrack_ops[] = {
 static int log_invalid_proto_min = 0;
 static int log_invalid_proto_max = 255;
 
-static uint32_t flush_ip_addr = 0;
+static uint32_t flush_ip_addr_lan = 0;
+static uint32_t flush_ip_addr_wan = 0;
 
-extern uint32_t nf_conntrack_flush_by_ipv4(uint32_t ipaddr);
+extern uint32_t nf_conntrack_flush_by_ipv4_lan(uint32_t ipaddr);
 
-int flush_ip_addr_proc_handler(struct ctl_table *table, int write, struct file *filp,
+int flush_ip_addr_lan_proc_handler(struct ctl_table *table, int write, struct file *filp,
 		void __user *buffer, size_t *lenp, loff_t *ppos) {
 	int res = proc_dointvec(table, write, filp, buffer, lenp, ppos);
 	uint32_t counter = 0;
-	uint32_t ip = htonl(flush_ip_addr);
+	uint32_t ip = htonl(flush_ip_addr_lan);
 
-	if (flush_ip_addr != 0) {
-		counter = nf_conntrack_flush_by_ipv4(ip);
+	if (flush_ip_addr_lan != 0) {
+		counter = nf_conntrack_flush_by_ipv4_lan(ip);
 		printk(KERN_INFO "IPv4 conntrack: flushed %d entries with address " NIPQUAD_FMT "\n",
 			counter, NIPQUAD(ip));
 	}
 
-	flush_ip_addr = 0;
+	flush_ip_addr_lan = 0;
+
+	return res;
+}
+
+extern uint32_t nf_conntrack_flush_by_ipv4_wan(uint32_t ipaddr);
+
+int flush_ip_addr_wan_proc_handler(struct ctl_table *table, int write, struct file *filp,
+		void __user *buffer, size_t *lenp, loff_t *ppos) {
+	int res = proc_dointvec(table, write, filp, buffer, lenp, ppos);
+	uint32_t counter = 0;
+	uint32_t ip = htonl(flush_ip_addr_wan);
+
+	if (flush_ip_addr_wan != 0) {
+		counter = nf_conntrack_flush_by_ipv4_wan(ip);
+		printk(KERN_INFO "IPv4 conntrack: flushed %d entries with address " NIPQUAD_FMT "\n",
+			counter, NIPQUAD(ip));
+	}
+
+	flush_ip_addr_wan = 0;
 
 	return res;
 }
@@ -365,11 +385,18 @@ static ctl_table ip_ct_sysctl_table[] = {
 	},
 #endif
 	{
-		.procname   = "ip_conntrack_flush_addr",
-		.data       = &flush_ip_addr,
+		.procname   = "ip_conntrack_flush_addr_lan",
+		.data       = &flush_ip_addr_lan,
 		.maxlen     = sizeof(uint32_t),
 		.mode       = 0644,
-		.proc_handler   = &flush_ip_addr_proc_handler,
+		.proc_handler   = &flush_ip_addr_lan_proc_handler,
+	},
+	{
+		.procname   = "ip_conntrack_flush_addr_wan",
+		.data       = &flush_ip_addr_wan,
+		.maxlen     = sizeof(uint32_t),
+		.mode       = 0644,
+		.proc_handler   = &flush_ip_addr_wan_proc_handler,
 	},
 	{
 		.ctl_name	= 0
