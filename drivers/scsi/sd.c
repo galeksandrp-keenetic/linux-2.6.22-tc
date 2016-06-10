@@ -1745,6 +1745,8 @@ static int sd_probe(struct device *dev)
     }
 #endif 
 
+	sdp->allow_restart = 1;
+
 	sd_printk(KERN_NOTICE, sdkp, "Attached SCSI %sdisk\n",
 		  sdp->removable ? "removable " : "");
 
