@@ -252,23 +252,23 @@ int __init rd_load_image(char *from)
 		goto done;
 	}
 
-	printk(KERN_NOTICE "RAMDISK: Loading %dKiB [%ld disk%s] into ram disk... ",
+	printk(KERN_INFO "RAMDISK: loading %dKiB [%ld disk%s] into RAM disk...\n",
 		nblocks, ((nblocks-1)/devblocks)+1, nblocks>devblocks ? "s" : "");
 	for (i = 0, disk = 1; i < nblocks; i++) {
 		if (i && (i % devblocks == 0)) {
-			printk("done disk #%d.\n", disk++);
+			printk(KERN_INFO "RAMDISK: disk #%d loaded\n", disk++);
 /*			rotate = 0; */
 			if (sys_close(in_fd)) {
-				printk("Error closing the disk.\n");
+				printk(KERN_ERR "RAMDISK: error closing the disk\n");
 				goto noclose_input;
 			}
 			change_floppy("disk #%d", disk);
 			in_fd = sys_open(from, O_RDONLY, 0);
 			if (in_fd < 0)  {
-				printk("Error opening disk.\n");
+				printk(KERN_ERR "RAMDISK: error opening disk\n");
 				goto noclose_input;
 			}
-			printk("Loading disk #%d... ", disk);
+			printk(KERN_INFO "RAMDISK: loading disk #%d...\n", disk);
 		}
 		sys_read(in_fd, buf, BLOCK_SIZE);
 		sys_write(out_fd, buf, BLOCK_SIZE);
@@ -279,7 +279,7 @@ int __init rd_load_image(char *from)
 		}
 #endif
 	}
-	printk("done.\n");
+	printk(KERN_INFO "RAMDISK: loading done\n");
 
 successful_load:
 	res = 1;
