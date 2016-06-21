@@ -743,6 +743,9 @@ static void __init do_pre_smp_initcalls(void)
 static void run_init_process(char *init_filename)
 {
 	argv_init[0] = init_filename;
+
+	printk(KERN_INFO "Invoking %s...\n", init_filename);
+
 	kernel_execve(init_filename, argv_init, envp_init);
 }
 
@@ -756,6 +759,8 @@ static int noinline init_post(void)
 	mark_rodata_ro();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
+
+	printk(KERN_INFO "Opening initial console\n");
 
 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
 		printk(KERN_WARNING "Warning: unable to open an initial console.\n");
@@ -780,6 +785,9 @@ static int noinline init_post(void)
 		printk(KERN_WARNING "Failed to execute %s.  Attempting "
 					"defaults...\n", execute_command);
 	}
+
+	printk(KERN_INFO "Trying to execute init process\n");
+
 	run_init_process("/sbin/init");
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");
