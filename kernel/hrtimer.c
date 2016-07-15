@@ -286,7 +286,7 @@ EXPORT_SYMBOL_GPL(ktime_add_ns);
 /*
  * Divide a ktime value by a nanosecond value
  */
-u64 ktime_divns(const ktime_t kt, s64 div)
+unsigned long ktime_divns(const ktime_t kt, s64 div)
 {
 	u64 dclc, inc, dns;
 	int sft = 0;
@@ -301,7 +301,7 @@ u64 ktime_divns(const ktime_t kt, s64 div)
 	dclc >>= sft;
 	do_div(dclc, (unsigned long) div);
 
-	return dclc;
+	return (unsigned long) dclc;
 }
 #endif /* BITS_PER_LONG >= 64 */
 
@@ -632,9 +632,10 @@ void unlock_hrtimer_base(const struct hrtimer *timer, unsigned long *flags)
  * Forward the timer expiry so it will expire in the future.
  * Returns the number of overruns.
  */
-u64 hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
+unsigned long
+hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
 {
-	u64 orun = 1;
+	unsigned long orun = 1;
 	ktime_t delta;
 
 	delta = ktime_sub(now, timer->expires);

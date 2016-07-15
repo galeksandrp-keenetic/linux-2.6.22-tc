@@ -475,10 +475,7 @@ sys_call_table:
 	PTR	sys_ioprio_get
 	PTR	sys_utimensat			/* 5275 */
 	PTR	sys_signalfd
-	PTR	sys_ni_syscall
+	PTR	sys_timerfd
 	PTR	sys_eventfd
 	PTR	sys_fallocate
-	PTR	sys_timerfd_create		/* 5280 */
-	PTR	sys_timerfd_gettime
-	PTR	sys_timerfd_settime
 	.size	sys_call_table,.-sys_call_table
