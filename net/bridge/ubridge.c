@@ -254,7 +254,7 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 {
 	struct net_device *dev1;
 	struct ubr_private *ubr0 = netdev_priv(master_dev);
-	int err = -ENODEV;
+	int err = -EINVAL;
 
 	dev1 = __dev_get_by_index(ifindex);
 	if (!dev1)
