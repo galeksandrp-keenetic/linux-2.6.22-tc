@@ -134,7 +134,7 @@ struct dm96xx_priv {
 #define dm9620_err(dev, format, args...) deverr(dev, format, ##args)
 #endif
 #else
-#define dm9620_print(dev, format, args...) printk(format, ##args)
+#define dm9620_print(dev, format, args...) printk(KERN_INFO format "\n", ##args)
 #define dm9620_err(dev, format, args...) printk(KERN_ERR format, ##args)
 #endif
 
@@ -1239,7 +1239,7 @@ static int dm9620_link_reset(struct usbnet *dev)
 	/* hank add*/
 	dm9620_mdio_write(dev->net, dev->mii.phy_id, PHY_SPEC_CFG, 0x800);
 
-	dm9620_print(dev, "link_reset() speed: %d duplex: %d",
+	dm9620_print(dev, "link_reset() speed: %d, duplex: %d",
 	       ecmd.speed, ecmd.duplex);
 
 	return 0;
