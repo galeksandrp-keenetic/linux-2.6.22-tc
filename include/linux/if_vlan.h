@@ -396,6 +396,10 @@ enum vlan_ioctl_cmds {
 	GET_VLAN_VID_CMD /* Get the VID of this VLAN (specified by name) */
 };
 
+enum vlan_flags {
+	VLAN_FLAG_LOOSE_BINDING = 0x4
+};
+
 enum vlan_name_types {
 	VLAN_NAME_TYPE_PLUS_VID, /* Name will look like:  vlan0005 */
 	VLAN_NAME_TYPE_RAW_PLUS_VID, /* name will look like:  eth1.0005 */
