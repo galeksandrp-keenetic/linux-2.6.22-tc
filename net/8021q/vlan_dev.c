@@ -698,7 +698,7 @@ int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
-	printk("%s: Setting MAC address to %02X:%02X:%02X:%02X:%02X:%02X.\n", dev->name,
+	printk(KERN_INFO "%s: Setting MAC address to %02X:%02X:%02X:%02X:%02X:%02X.\n", dev->name,
 		dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2], dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
 
 	if (memcmp(VLAN_DEV_INFO(dev)->real_dev->dev_addr,
@@ -712,12 +712,12 @@ int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 
 			/* Make PROMISC visible to the user. */
 			flgs |= IFF_PROMISC;
-			printk("VLAN (%s):  Setting underlying device (%s) to promiscious mode.\n",
+			printk(KERN_INFO "VLAN (%s): Setting underlying device (%s) to promiscious mode.\n",
 			       dev->name, VLAN_DEV_INFO(dev)->real_dev->name);
 			dev_change_flags(VLAN_DEV_INFO(dev)->real_dev, flgs);
 		}
 	} else {
-		printk("VLAN (%s):  Underlying device (%s) has same MAC, not checking promiscious mode.\n",
+		printk(KERN_INFO "VLAN (%s): Underlying device (%s) has same MAC, not checking promiscious mode.\n",
 		       dev->name, VLAN_DEV_INFO(dev)->real_dev->name);
 	}
 
