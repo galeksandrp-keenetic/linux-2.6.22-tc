@@ -622,6 +622,14 @@ int vlan_dev_set_vlan_flag(char *dev_name, __u32 flag, short flag_val)
 				}
 				dev_put(dev);
 				return 0;
+			} else if (flag & VLAN_FLAG_LOOSE_BINDING) {
+				if (flag_val) {
+					VLAN_DEV_INFO(dev)->flags |= VLAN_FLAG_LOOSE_BINDING;
+				} else {
+					VLAN_DEV_INFO(dev)->flags &= ~VLAN_FLAG_LOOSE_BINDING;
+				}
+				dev_put(dev);
+				return 0;
 			} else {
 				printk(KERN_ERR  "%s: flag %i is not valid.\n",
 					__FUNCTION__, (int)(flag));
@@ -802,7 +810,8 @@ static void vlan_flush_mc_list(struct net_device *dev)
 
 int vlan_dev_open(struct net_device *dev)
 {
-	if (!(VLAN_DEV_INFO(dev)->real_dev->flags & IFF_UP))
+	if (!(VLAN_DEV_INFO(dev)->real_dev->flags & IFF_UP) &&
+	    !(VLAN_DEV_INFO(dev)->flags & VLAN_FLAG_LOOSE_BINDING))
 		return -ENETDOWN;
 
 	return 0;

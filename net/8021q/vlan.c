@@ -459,8 +459,10 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* The real device must be up and operating in order to
 	 * assosciate a VLAN device with it.
 	 */
+#if 0 /* allow to create VLANs on down interfaces */
 	if (!(real_dev->flags & IFF_UP))
 		goto out_unlock;
+#endif
 
 	if (__find_vlan_dev(real_dev, VLAN_ID) != NULL) {
 		/* was already registered. */
@@ -674,6 +676,9 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 			if (!vlandev)
 				continue;
 
+			if (VLAN_DEV_INFO(vlandev)->flags & VLAN_FLAG_LOOSE_BINDING)
+				continue;
+
 			flgs = vlandev->flags;
 			if (!(flgs & IFF_UP))
 				continue;
@@ -687,6 +692,9 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
 			vlandev = vlan_group_get_device(grp, i);
 			if (!vlandev)
+				continue;
+
+			if (VLAN_DEV_INFO(vlandev)->flags & VLAN_FLAG_LOOSE_BINDING)
 				continue;
 
 			flgs = vlandev->flags;
