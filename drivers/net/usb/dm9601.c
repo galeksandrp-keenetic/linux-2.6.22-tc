@@ -720,7 +720,6 @@ static void dm9620_set_multicast(struct net_device *net)
 	dm_write_reg_async(dev, DM_RX_CTRL, rx_ctl);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
 static void __dm9620_set_mac_address(struct usbnet *dev)
 {
 	dm_write_async(dev, DM_PHY_ADDR, ETH_ALEN, dev->net->dev_addr);
@@ -752,6 +751,7 @@ static int dm9620_set_mac_address(struct net_device *net, void *p)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
 static const struct net_device_ops vm_netdev_ops= { // new kernel 2.6.31  (20091217JJ)
 	.ndo_open               = usbnet_open,
 	.ndo_stop               = usbnet_stop,
@@ -793,6 +793,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 #else
 	dev->net->do_ioctl = dm9620_ioctl;
 	dev->net->set_multicast_list = dm9620_set_multicast;
+	dev->net->set_mac_address = dm9620_set_mac_address;
 	dev->net->ethtool_ops = &dm9620_ethtool_ops;
 #endif
 	dev->net->hard_header_len += DM_TX_OVERHEAD;
