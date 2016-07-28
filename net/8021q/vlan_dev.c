@@ -693,8 +693,10 @@ int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 	struct sockaddr *addr = (struct sockaddr *)(addr_struct_p);
 	int i;
 
+#if 0
 	if (netif_running(dev))
 		return -EBUSY;
+#endif
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
