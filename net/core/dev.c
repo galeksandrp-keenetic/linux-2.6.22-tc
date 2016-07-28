@@ -3143,7 +3143,7 @@ void dev_set_promiscuity(struct net_device *dev, int inc)
 {
 	unsigned short old_flags = dev->flags;
 
-	ASSERT_RTNL();
+	//ASSERT_RTNL();
 
 	if ((dev->promiscuity += inc) == 0)
 		dev->flags &= ~IFF_PROMISC;
@@ -3181,7 +3181,7 @@ void dev_set_allmulti(struct net_device *dev, int inc)
 {
 	unsigned short old_flags = dev->flags;
 
-	ASSERT_RTNL();
+	//ASSERT_RTNL();
 
 	dev->flags |= IFF_ALLMULTI;
 	if ((dev->allmulti += inc) == 0)
@@ -3221,7 +3221,7 @@ int dev_change_flags(struct net_device *dev, unsigned flags)
 	int ret, changes;
 	int old_flags = dev->flags;
 
-	ASSERT_RTNL();
+	//ASSERT_RTNL();
 
 	/*
 	 *	Set the flags on our device.
