@@ -101,24 +101,19 @@ static struct net_device_stats *ubr_get_stats(struct net_device *dev)
 	return &ubr->stats;
 }
 
-#if 0
+#ifdef HAVE_CHANGE_RX_FLAGS
 void ubr_change_rx_flags(struct net_device *dev,
 						int flags)
 {
-	int err = 0;
-
 	if (flags & IFF_PROMISC) {
 		struct ubr_private *master_info = netdev_priv(dev);
 		struct net_device *slave_dev = master_info->slave_dev;
 
-		netdev_dbg(dev, "%s promiscuous mode for ubridge\n",
+		printk(KERN_INFO "%s promiscuous mode for ubridge\n",
 				dev->flags & IFF_PROMISC? "Set": "Clear");
 
 		if (slave_dev)
-			err = dev_set_promiscuity(slave_dev, dev->flags & IFF_PROMISC? 1: -1);
-
-		if (err < 0)
-			printk(KERN_ERR "Error changing promiscuity\n");
+			dev_set_promiscuity(slave_dev, dev->flags & IFF_PROMISC? 1: -1);
 	}
 }
 #endif
@@ -188,7 +183,10 @@ static int ubr_alloc_master(const char *name)
 	dev->hard_start_xmit = ubr_xmit;
 	dev->open = ubr_open;
 	dev->stop = ubr_stop;
-	//dev->change_rx_flags = ubr_change_rx_flags;
+
+#ifdef HAVE_CHANGE_RX_FLAGS
+	dev->change_rx_flags = ubr_change_rx_flags;
+#endif
 
 	err = register_netdev(dev);
 	if (err) {
@@ -238,7 +236,7 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 			memcpy(addr.sa_data, dev1->dev_addr, ETH_ALEN);
 			addr.sa_family = master_dev->type;
 
-			int err = dev_set_mac_address(vlan_dev, &addr);
+			err = dev_set_mac_address(vlan_dev, &addr);
 			if (err)
 				printk(KERN_ERR "can't set MAC for device %s (error %d)\n",
 						vlan_dev->name, err);
