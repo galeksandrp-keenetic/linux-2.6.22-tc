@@ -43,7 +43,7 @@ static struct sk_buff *ubr_handle_frame(struct net_bridge_port *p, struct sk_buf
 {
 	struct ubr_private *ubr, *tmp;
 
-//	printk(KERN_ERR"handler(proto=0x%x): %d bytes\n", skb->protocol, skb->len);
+//	printk(KERN_ERR"handler(proto=0x%x): %d bytes\n", ntohs(skb->protocol) ,skb->len);
 
 	list_for_each_entry_safe(ubr, tmp, &ubr_list, list) {
 		if (skb->dev == ubr->slave_dev) {
@@ -223,18 +223,25 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);
 	call_netdevice_notifiers(NETDEV_CHANGEADDR, master_dev);
 	ubr0->slave_dev = dev1;
+
 	// Update all VLAN sub-devices' MAC address
 	for_each_netdev(vlan_dev) {
 		struct vlan_dev_info *vdi;
+
 		if (!(vlan_dev->priv_flags & IFF_802_1Q_VLAN))
 			continue;
-		if (vlan_dev &&
-				(vdi = netdev_priv(vlan_dev)) &&
-				vdi->real_dev == master_dev) {
+
+		if ((vdi = netdev_priv(vlan_dev)) &&
+		     vdi->real_dev == master_dev) {
 			struct sockaddr addr;
+
 			memcpy(addr.sa_data, dev1->dev_addr, ETH_ALEN);
-			if (vlan_dev->set_mac_address && !vlan_dev->set_mac_address(vlan_dev, &addr))
-				call_netdevice_notifiers(NETDEV_CHANGEADDR, vlan_dev);
+			addr.sa_family = master_dev->type;
+
+			int err = dev_set_mac_address(vlan_dev, &addr);
+			if (err)
+				printk(KERN_ERR "can't set MAC for device %s (error %d)\n",
+						vlan_dev->name, err);
 		}
 	}
 
