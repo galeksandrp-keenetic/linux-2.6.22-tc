@@ -395,7 +395,7 @@ struct sighand_struct {
 	atomic_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
-	wait_queue_head_t	signalfd_wqh;
+	struct list_head        signalfd_list;
 };
 
 struct pacct_struct {
